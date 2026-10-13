@@ -1,0 +1,13 @@
+[package]
+name = "secbird"
+description = "Minimal command-line control for Razer peripherals"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+secbird-core = { path = "../secbird-core" }
+serde_json = "1"
+
+[build-dependencies]
+embed-resource = "2.5"

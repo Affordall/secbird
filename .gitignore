@@ -1,0 +1,6 @@
+extracted/
+target/
+
+# third-party agent skill (installed locally, not ours)
+.claude/
+skills-lock.json

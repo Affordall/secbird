@@ -1,0 +1,10 @@
+Secretarybird contains no code or assets from Razer Inc.
+
+crates/secbird-core/devices.json restates hardware facts (USB product ids, names,
+device types, DPI limits, lighting zones, key-grid sizes, lighting command set)
+documented by the OpenRazer project (https://github.com/openrazer/openrazer,
+GPL-2.0), checkout 477f4d6 from 2026-10-05. The facts were extracted with
+tools/restate_openrazer.py; no OpenRazer code is included or executed.
+
+Razer, Synapse, Chroma and product names are trademarks of Razer Inc. Secretarybird
+is an independent project and is not affiliated with or endorsed by Razer.

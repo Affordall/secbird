@@ -1,0 +1,45 @@
+name: Device report
+description: Tell us how Secretarybird works with your Razer device (working or not)
+labels: [device]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Reports like this are how devices get marked as verified.
+        `secbird report` only sends read commands to your devices and shortens serial numbers.
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: e.g. BlackWidow V4 Pro, wired
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Does it work?
+      options:
+        - Everything I tried works
+        - Some things work
+        - Not detected or nothing works
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What did you try, and what happened?
+      placeholder: Lighting zones, brightness, DPI, polling rate, battery...
+  - type: textarea
+    id: report
+    attributes:
+      label: Output of `secbird report`
+      description: Open a terminal in the Secretarybird folder (or anywhere, if you added it to PATH) and run `secbird report`.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Secretarybird version
+      description: "`secbird --version`, or hover the tray icon"
+      placeholder: "0.1.0"

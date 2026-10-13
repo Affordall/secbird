@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v0.1.0 (or v0.1.0-rc1 for a test build). This builds the installer,
+# the portable zip and checksums, and attaches them to a DRAFT release to review and publish.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check the tag matches Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          crate=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          [ "${tag%%-*}" = "$crate" ] || { echo "Tag $GITHUB_REF_NAME does not match Cargo.toml version $crate"; exit 1; }
+          echo "VERSION=$tag" >> "$GITHUB_ENV"
+
+      - run: cargo test --release
+      - run: cargo build --release
+
+      - name: Installer
+        run: |
+          choco install innosetup --no-progress -y
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //Qp "//DAppVersion=$VERSION" installer/secbird.iss
+
+      - name: Portable zip and checksums
+        run: |
+          mkdir -p dist/Secretarybird
+          cp target/release/secbird-tray.exe target/release/secbird.exe README.md LICENSE-MIT LICENSE-APACHE dist/Secretarybird/
+          cp NOTICE dist/Secretarybird/NOTICE.txt
+          cp "target/installer/Secretarybird-Setup-$VERSION.exe" dist/
+          (cd dist && 7z a -tzip "Secretarybird-$VERSION-portable.zip" Secretarybird >/dev/null && rm -r Secretarybird)
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v h="## [${VERSION%%-*}]" 'index($0, h) == 1 {on=1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --prerelease \
+            --title "Secretarybird $VERSION" --notes-file notes.md

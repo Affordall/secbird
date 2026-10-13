@@ -1,0 +1,41 @@
+//! Lightweight control of Razer peripherals over USB HID.
+//!
+//! ```no_run
+//! let api = hidapi::HidApi::new()?;
+//! let db = secbird_core::Db::builtin()?;
+//! for dev in secbird_core::discover(&api, &db) {
+//!     println!("{} firmware {:?}", dev.name(), dev.firmware()?);
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+pub mod actions;
+pub mod commands;
+#[cfg(windows)]
+pub mod debloat;
+pub mod db;
+pub mod device;
+pub mod error;
+pub mod features;
+pub mod log;
+pub mod profile;
+pub mod proto;
+pub mod report;
+pub mod sim;
+pub mod transport;
+
+pub use db::{Db, DeviceSpec, Kind, Lighting, Matrix};
+pub use device::{discover, Device};
+pub use error::{Error, Result};
+pub use features::Rgb;
+pub use profile::{Profile, Store, Zone};
+pub use transport::Transport;
+
+/// `%APPDATA%\Secretarybird`: profiles.json and the user's devices.json.
+pub fn config_dir() -> std::path::PathBuf {
+    std::env::var_os("APPDATA")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("Secretarybird")
+}
+pub use hidapi;
