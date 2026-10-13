@@ -40,6 +40,10 @@
   .shot { margin: 28px auto 0; }
   .shot img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 30px 80px #0007; }
   .shot figcaption { text-align: center; color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 18px 50px #0006; }
+  .shots figcaption { color: var(--muted); font-size: 14.5px; margin-top: 10px; }
 
   h2 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 18px; }
   section { padding: 56px 0 0; }
@@ -91,6 +95,20 @@
       <div class="card"><b>No pop-ups, no ads</b><span>No account, no updater, nothing sent to the internet.</span></div>
       <div class="card"><b>Tiny</b><span>A 650 KB app using about 11 MB of memory in the tray.</span></div>
       <div class="card"><b>No restarts</b><span>Finds your devices in about a second. Settings come back after unplugging, sleep and reboot.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>One editor for every device</h2>
+    <div class="shots">
+      <figure>
+        <img src="mouse.webp" alt="Mouse page: lighting per zone, DPI, polling rate and profiles" width="1280" height="800" loading="lazy">
+        <figcaption><b>Mouse.</b> Lighting per zone, DPI, polling rate and profiles.</figcaption>
+      </figure>
+      <figure>
+        <img src="keyboard.webp" alt="Keyboard page: painting colors onto individual keys" width="1280" height="800" loading="lazy">
+        <figcaption><b>Keyboard.</b> Paint colors key by key on per-key keyboards (simulated device shown).</figcaption>
+      </figure>
     </div>
   </section>
 
