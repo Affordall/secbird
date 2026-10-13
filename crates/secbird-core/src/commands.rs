@@ -84,6 +84,17 @@ pub const GRID_FRAME_SIZE: u8 = 0x46;
 /// Per-LED effect on a few Naga models: off `[store, led, 0x00]`, static `[store, led, 0x06, r, g, b]`.
 pub const MOUSE_LED_EFFECT: Command = Command::new(0x03, 0x0D);
 
+/// What one button does: `[slot, button, layer, function, size, data0..data4]`, size 0x50.
+/// Layout from Synapse's `setSingleButtonAssignment`; GET and SET verified (Basilisk V3).
+/// Replies always carry 5 data bytes but report size 1, so readers take all 5.
+pub const BUTTON: Command = Command::new(0x02, 0x0C);
+pub const BUTTON_SIZE: u8 = 0x50;
+/// Button slot 0 is live and unsaved, and wins over the saved profile slots 1-5.
+/// Verified (Basilisk V3): a remap in slot 0 took effect while slot 1 was active.
+pub const BUTTON_LIVE_SLOT: u8 = 0x00;
+/// Active saved on-board profile slot: `[slot]`. GET verified (Basilisk V3: 1 of 5).
+pub const ACTIVE_SLOT: Command = Command::new(0x05, 0x04);
+
 /// Polling rate code (sent to the device) for a rate in Hz.
 pub fn polling_code(hz: u32) -> Option<u8> {
     match hz {

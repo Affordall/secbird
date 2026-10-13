@@ -66,6 +66,8 @@ pub struct SimState {
     pub led_on: BTreeMap<u8, bool>,
     pub led_rgb: BTreeMap<u8, [u8; 3]>,
     pub grid_effect: Vec<u8>,
+    /// Button assignments by (slot, button id, layer): (function, data).
+    pub buttons: BTreeMap<(u8, u8, u8), (u8, [u8; 5])>,
     /// Answer this many reads with Busy before the real reply.
     pub busy_reads: u32,
     /// Every well-formed command received, in order.
@@ -91,6 +93,7 @@ impl SimState {
             led_on: BTreeMap::new(),
             led_rgb: BTreeMap::new(),
             grid_effect: Vec::new(),
+            buttons: BTreeMap::new(),
             busy_reads: 0,
             log: Vec::new(),
             reply: None,
@@ -138,6 +141,22 @@ impl SimState {
                     }
                 }
             }
+            c if c == cmd::BUTTON.get() => match self.buttons.get(&(a[0], a[1], a[2])) {
+                // Like the real mouse: size byte 1 whatever the function's data length.
+                Some(&(function, d)) => ok(vec![a[0], a[1], a[2], function, 1, d[0], d[1], d[2], d[3], d[4]]),
+                None => (Failed, vec![]),
+            },
+            cmd::BUTTON => {
+                if !self.buttons.contains_key(&(1, a[1], a[2])) {
+                    return (Failed, vec![]);
+                }
+                self.buttons.insert((a[0], a[1], a[2]), (a[3], [a[5], a[6], a[7], a[8], a[9]]));
+                ok(a[..10].to_vec())
+            }
+            c if c == cmd::ACTIVE_SLOT.get() => match self.buttons.is_empty() {
+                true => (NotSupported, vec![]),
+                false => ok(vec![1]),
+            },
             c if c == cmd::POLLING.get() => ok(vec![self.polling_code]),
             cmd::POLLING => {
                 if cmd::polling_hz(a[0]).is_none() {
@@ -256,6 +275,26 @@ impl Sim {
         let mut s = SimState::new("SIMMOUSE0001");
         s.dpi = Some((800, 800));
         s.leds = vec![1, 4, 10];
+        // The Basilisk V3's factory buttons, as read from the real mouse, in the live
+        // slot and the active saved slot, both layers.
+        let factory: [(u8, u8, [u8; 5]); 9] = [
+            (1, 1, [1, 0, 0, 0, 0]),
+            (2, 1, [2, 0, 0, 0, 0]),
+            (3, 1, [3, 0, 0, 0, 0]),
+            (4, 1, [4, 0, 0, 0, 0]),
+            (5, 1, [5, 0, 0, 0, 0]),
+            (14, 7, [4, 0, 0, 0, 0]),
+            (15, 6, [5, 0x01, 0x90, 0x01, 0x90]),
+            (52, 14, [0x68, 0, 0x14, 0, 0]),
+            (96, 6, [6, 0, 0, 0, 0]),
+        ];
+        for slot in [0, 1] {
+            for layer in [0, 1] {
+                for (id, function, data) in factory {
+                    s.buttons.insert((slot, id, layer), (function, data));
+                }
+            }
+        }
         Sim::new(s)
     }
 
@@ -454,6 +493,35 @@ mod tests {
         assert_eq!(s.effects[&4], [cmd::EFFECT_STATIC, 0, 0, 1, 0x12, 0x34, 0x56]);
         assert_eq!(s.brightness[&4], 127);
         assert_eq!(s.effects[&10][0], cmd::EFFECT_OFF);
+    }
+
+    #[test]
+    fn buttons_remap_reset_and_follow_profiles() {
+        use crate::buttons::{Action, Layer};
+        use crate::profile::DeviceProfiles;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let found: Vec<u8> = dev.buttons().iter().map(|b| b.0).collect();
+        assert_eq!(found, [1, 2, 3, 4, 5, 14, 15, 52, 96]);
+        assert_eq!(dev.button(15, Layer::Normal).unwrap(), Action::DpiClutch { x: 400, y: 400 });
+
+        let key_a: Action = "key:a".parse().unwrap();
+        assert!(dev.set_button(5, Layer::Normal, key_a).unwrap());
+        assert!(!dev.set_button(5, Layer::Normal, key_a).unwrap(), "unchanged buttons are not rewritten");
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), key_a);
+        assert_eq!(sim.state().buttons[&(1, 5, 0)].0, 1, "saved slot untouched");
+        dev.reset_button(5, Layer::Normal).unwrap();
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), Action::Mouse(5));
+        assert!(dev.set_button(77, Layer::Normal, key_a).is_err(), "unknown button");
+
+        // Switching to a profile without the remap puts the button back.
+        let mut p = DeviceProfiles::default();
+        p.create("Gaming").unwrap();
+        p.profiles.get_mut("Gaming").unwrap().buttons.insert("side-forward/hypershift".into(), "turbo:left@10".into());
+        assert!(p.apply("Gaming", &dev).iter().all(|a| a.result.is_ok()));
+        assert_eq!(dev.button(5, Layer::HyperShift).unwrap(), Action::TurboMouse { button: 1, rate: 10 });
+        assert!(p.apply("Default", &dev).iter().all(|a| a.result.is_ok()));
+        assert_eq!(dev.button(5, Layer::HyperShift).unwrap(), Action::Mouse(5));
     }
 
     #[test]

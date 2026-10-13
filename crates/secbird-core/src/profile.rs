@@ -38,6 +38,11 @@ pub struct Profile {
     /// profile while their window is in front.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub apps: Vec<String>,
+    /// Button remaps: setting key (`side-forward`, `sniper/hypershift`, see
+    /// [`crate::buttons::setting_key`]) -> action text (`key:ctrl+c`, `turbo:left@15`).
+    /// Buttons not listed keep their saved on-board setting.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub buttons: BTreeMap<String, String>,
 }
 
 /// `C:\Games\CS2.exe`, `cs2` or ` CS2.EXE ` -> `cs2.exe`. Empty when nothing is left.
@@ -111,6 +116,27 @@ impl DeviceProfiles {
     /// The profile to show right now: the one tied to the program in front, else the active one.
     pub fn effective(&self, foreground: Option<&str>) -> &str {
         foreground.and_then(|exe| self.for_app(exe)).unwrap_or(&self.active)
+    }
+
+    /// Send profile `name` to the device. Buttons remapped by another profile of this
+    /// device but not by this one go back to their saved setting, so switching profiles
+    /// never leaves a stray remap behind.
+    pub fn apply(&self, name: &str, dev: &Device) -> Vec<Applied> {
+        let Some(profile) = self.profiles.get(name) else {
+            return vec![Applied { setting: format!("profile '{name}'"), result: Err(Error::NotFound(name.into())) }];
+        };
+        let mut out = profile.apply(dev);
+        let others: std::collections::BTreeSet<&String> = self
+            .profiles
+            .values()
+            .flat_map(|p| p.buttons.keys())
+            .filter(|k| !profile.buttons.contains_key(*k))
+            .collect();
+        for key in others {
+            let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| dev.reset_button(id, layer));
+            out.push(Applied { setting: format!("{key} back to saved"), result: result.map(|_| ()) });
+        }
+        out
     }
 
     pub fn switch(&mut self, name: &str) -> Result<()> {
@@ -258,6 +284,13 @@ impl Profile {
         }
         if !self.keys.is_empty() {
             push(format!("per-key colors ({} keys)", self.keys.len()), dev.show_frame(&self.keys));
+        }
+        for (key, action) in &self.buttons {
+            let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| {
+                let action: crate::buttons::Action = action.parse()?;
+                dev.set_button(id, layer, action).map(|_| ())
+            });
+            push(format!("{key} -> {action}"), result);
         }
         out
     }

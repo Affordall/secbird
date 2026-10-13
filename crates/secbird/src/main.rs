@@ -22,6 +22,17 @@ SETTINGS (saved to the active profile):
   keys <RRGGBB>             Every key one color (keyboards with per-key lighting)
   sync <RRGGBB>             Same color on every zone of every connected device
 
+BUTTONS (mice with on-board button memory; add --hypershift for the HyperShift layer):
+  button [list]             Buttons and what they do now
+  button <button> <action>  Remap a button, e.g. `button side-forward key:ctrl+c`
+  button <button> reset     Back to its saved setting (Synapse's or the factory one)
+  Actions: left right middle back forward scroll-up scroll-down scroll-left scroll-right
+           double-click  key:<combo> (key:a, key:ctrl+shift+f13, key:space)
+           turbo:<button or key:..>[@presses-per-second]  (turbo:left@15)
+           dpi-up dpi-down dpi-cycle-up dpi-cycle-down dpi-clutch:<dpi>
+           hypershift  media:volume-up|volume-down|mute|play-pause|next-track|previous-track
+           profile-cycle-up  disabled
+
 PROFILES:
   profile [list]            Profiles for this device (* = active)
   profile new <name>        New profile, copied from the active one
@@ -251,9 +262,10 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
             Ok(())
         }
         "apply" => {
-            let profile = store.for_device(dev).active().clone();
-            report_apply(dev, &profile)
+            let profiles = store.for_device(dev);
+            report_apply(profiles.apply(&profiles.active, dev))
         }
+        "button" => button_cmd(dev, &mut store, rest),
         "profile" => profile_cmd(dev, &mut store, rest),
         other => Err(Error::InvalidArg(format!("unknown command '{other}' (try --help)"))),
     }
@@ -298,6 +310,9 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
             if !p.apps.is_empty() {
                 println!("  apps       {}", p.apps.join(", "));
             }
+            for (button, action) in &p.buttons {
+                println!("  {button:<10} {action}");
+            }
             if *p == Default::default() {
                 println!("  (empty: change a setting to record it)");
             }
@@ -313,10 +328,10 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
         "use" => {
             let name = name.ok_or_else(need_name)?;
             profiles.switch(name)?;
-            let profile = profiles.active().clone();
+            let results = profiles.apply(name, dev);
             store.save()?;
             println!("Active profile: {name}");
-            report_apply(dev, &profile)
+            report_apply(results)
         }
         "apps" => {
             let name = name.ok_or_else(|| Error::InvalidArg("usage: profile apps <name> [program ...]".into()))?;
@@ -342,8 +357,43 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
     }
 }
 
-fn report_apply(dev: &Device, profile: &secbird_core::Profile) -> Result<(), Error> {
-    let results = profile.apply(dev);
+fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error> {
+    use secbird_core::buttons::{button_id, button_label, button_name, Layer};
+    let layer = if rest.iter().any(|a| a == "--hypershift") { Layer::HyperShift } else { Layer::Normal };
+    let args: Vec<&str> = rest.iter().map(String::as_str).filter(|a| *a != "--hypershift").collect();
+    match args.as_slice() {
+        [] | ["list"] => {
+            let buttons = dev.buttons();
+            if buttons.is_empty() {
+                return Err(Error::Unsupported(format!("{} has no on-board button assignments", dev.name())));
+            }
+            for (id, normal) in buttons {
+                let name = button_name(id).unwrap_or("?");
+                let action = match layer {
+                    Layer::Normal => normal.to_string(),
+                    Layer::HyperShift => dev.button(id, layer).map_or_else(|e| e.to_string(), |a| a.to_string()),
+                };
+                println!("  {name:<14} {action:<24} {}", button_label(id));
+            }
+            Ok(())
+        }
+        [button, "reset"] => {
+            button_id(button).ok_or_else(|| Error::InvalidArg(format!("unknown button '{button}' (see `secbird button`)")))?;
+            actions::set_button(dev, store, button, layer, None)?;
+            println!("{button}: back to {}", dev.button(button_id(button).unwrap_or(0), layer)?);
+            Ok(())
+        }
+        [button, action] => {
+            button_id(button).ok_or_else(|| Error::InvalidArg(format!("unknown button '{button}' (see `secbird button`)")))?;
+            actions::set_button(dev, store, button, layer, Some(action.parse()?))?;
+            println!("{button} now does {action}");
+            Ok(())
+        }
+        _ => Err(Error::InvalidArg("usage: button [list] | button <button> <action|reset> [--hypershift]".into())),
+    }
+}
+
+fn report_apply(results: Vec<secbird_core::profile::Applied>) -> Result<(), Error> {
     if results.is_empty() {
         println!("Nothing to apply: the profile has no recorded settings yet.");
     }

@@ -1,7 +1,9 @@
 use crate::engine::{ApplyReport, Battery, Engine};
 use secbird_core::log;
 use std::collections::HashSet;
-use crate::{apps, server};
+use crate::{apps, osd, server};
+use std::ffi::CString;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use secbird_core::config_dir;
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -22,6 +24,8 @@ const APP_NAME: &str = "Secretarybird";
 const WM_TRAY: u32 = WM_APP + 1;
 /// Sent by a second launch: open the editor of the instance already running.
 const WM_OPEN_EDITOR: u32 = WM_APP + 2;
+/// Sent by a listener thread: device events are waiting in `App::events`.
+const WM_DEVICE_EVENT: u32 = WM_APP + 3;
 const CLASS_NAME: &str = "SecretarybirdTray";
 const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
@@ -71,7 +75,21 @@ struct App {
     /// Devices already warned about low battery (cleared once charging or recovered).
     low_battery: HashSet<String>,
     batteries: Vec<Battery>,
+    /// Event collections with a listener thread; a thread removes its path when the
+    /// device goes away, so a later rescan starts a new one.
+    listening: Arc<Mutex<HashSet<CString>>>,
+    events_tx: Sender<DeviceEvent>,
+    events: Receiver<DeviceEvent>,
 }
+
+/// Something a device did by itself, reported on its event collection.
+enum DeviceEvent {
+    Dpi { key: String, x: u16, y: u16 },
+    OnboardProfile(u8),
+}
+
+/// Listener threads only block on a read, so a small stack is plenty.
+const LISTENER_STACK: usize = 64 * 1024;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
@@ -164,6 +182,7 @@ pub fn run() {
 
         let icon = load_icon();
         add_icon(hwnd, icon);
+        let (events_tx, events) = channel();
         APP.with(|cell| {
             *cell.borrow_mut() = Some(App {
                 hwnd,
@@ -176,6 +195,9 @@ pub fn run() {
                 synapse_warned: false,
                 low_battery: HashSet::new(),
                 batteries: Vec::new(),
+                listening: Arc::new(Mutex::new(HashSet::new())),
+                events_tx,
+                events,
             })
         });
         log::append("tray started");
@@ -207,6 +229,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_OPEN_EDITOR => {
             with_app(|app| app.open_editor());
+            0
+        }
+        WM_DEVICE_EVENT => {
+            with_app(|app| app.device_events());
             0
         }
         WM_DEVICECHANGE => {
@@ -311,6 +337,59 @@ impl App {
         self.notify_failures(&reports);
         self.warn_synapse(&synapse);
         self.check_battery();
+        self.start_listeners();
+    }
+
+    /// One thread per event collection, blocked in a read until the device reports
+    /// something: no polling, nothing runs in between.
+    fn start_listeners(&self) {
+        let paths = self.engine().event_paths();
+        for (key, path) in paths {
+            if !self.listening.lock().unwrap_or_else(|p| p.into_inner()).insert(path.clone()) {
+                continue;
+            }
+            let Some(device) = self.engine().open_events(&path) else {
+                self.listening.lock().unwrap_or_else(|p| p.into_inner()).remove(&path);
+                continue;
+            };
+            let (tx, listening, hwnd) = (self.events_tx.clone(), self.listening.clone(), self.hwnd as usize);
+            let spawned = std::thread::Builder::new().stack_size(LISTENER_STACK).spawn(move || {
+                let mut buf = [0u8; 16];
+                // Notification events: [0x05, kind, ...]; kind 2 = DPI (x, y big-endian),
+                // kind 1 = on-board profile.
+                while let Ok(n) = device.read(&mut buf) {
+                    let event = match (n, buf[0], buf[1]) {
+                        (6.., 0x05, 0x02) => DeviceEvent::Dpi {
+                            key: key.clone(),
+                            x: u16::from_be_bytes([buf[2], buf[3]]),
+                            y: u16::from_be_bytes([buf[4], buf[5]]),
+                        },
+                        (3.., 0x05, 0x01) => DeviceEvent::OnboardProfile(buf[2]),
+                        _ => continue,
+                    };
+                    if tx.send(event).is_err() {
+                        break;
+                    }
+                    unsafe { PostMessageW(hwnd as HWND, WM_DEVICE_EVENT, 0, 0) };
+                }
+                listening.lock().unwrap_or_else(|p| p.into_inner()).remove(&path);
+            });
+            if spawned.is_err() {
+                log::append("could not start a device event listener");
+            }
+        }
+    }
+
+    fn device_events(&mut self) {
+        while let Ok(event) = self.events.try_recv() {
+            match event {
+                DeviceEvent::Dpi { key, x, y } => {
+                    self.engine().dpi_changed(&key, x, y);
+                    osd::show(&if x == y { format!("{x} DPI") } else { format!("{x} × {y} DPI") });
+                }
+                DeviceEvent::OnboardProfile(n) => osd::show(&format!("On-board profile {n}")),
+            }
+        }
     }
 
     /// Switch devices to the profile tied to the program now in front, or back.
@@ -322,6 +401,9 @@ impl App {
         }
         let what: Vec<String> = reports.iter().map(|r| format!("{} -> {}", r.device, r.profile)).collect();
         log::append(&format!("{} in front: {}", exe.as_deref().unwrap_or("?"), what.join(", ")));
+        let mut names: Vec<&str> = reports.iter().map(|r| r.profile.as_str()).collect();
+        names.dedup();
+        osd::show(&format!("{} profile", names.join(", ")));
         self.notify_failures(&reports);
         self.update_tooltip();
     }

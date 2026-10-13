@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0] - 2026-10-13
+
+### Added
+- Button remapping for mice with on-board button memory, in the editor and with `secbird button`:
+  mouse buttons, keys and shortcuts (captured by pressing them), turbo for keys and clicks,
+  DPI up/down/cycle and sniper clutch, on-board profile switching, media keys, double click,
+  disable, and a HyperShift layer. Written to the mouse's live slot; the saved slots keep
+  Synapse's or the factory setting and Reset copies it back. Remaps live in profiles, so
+  per-app switching changes them too. Verified on the Basilisk V3 (key and button remaps).
+- Popup above the clock when the mouse's DPI button or on-board profile button is used, and
+  when a per-app profile switches. Read from the mouse's own event reports: no polling.
+- DPI changed with the mouse's button is saved to the profile in use and shown in the editor.
+
+### Changed
+- Redesigned editor: each device is one sheet with settings as rows and profiles as columns,
+  every value visible and editable in place; the active profile is lit and the light moves when
+  it changes. Games are managed in each profile's header. Works in narrow windows.
+
+### Fixed
+- A turbo setting only Synapse can make (wheel tilt) showed the wrong rate in the editor.
+
 ## [0.2.0] - 2026-10-13
 
 ### Added

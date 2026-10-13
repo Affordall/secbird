@@ -1,7 +1,7 @@
 //! Device and profile handling for the tray, kept free of Win32 code.
 
 use secbird_core::{config_dir, discover, hidapi::HidApi, Db, Device, Result, Store};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 pub struct Engine {
@@ -15,6 +15,9 @@ pub struct Engine {
     /// Programs tied to any profile, and the profiles.json timestamp they were read at.
     apps: HashSet<String>,
     apps_read: Option<SystemTime>,
+    /// Latest DPI each device reported through its event reports.
+    live_dpi: HashMap<String, (u16, u16)>,
+    live_seq: u64,
 }
 
 /// Battery state of one wireless device.
@@ -49,11 +52,60 @@ impl Engine {
             foreground: None,
             apps: HashSet::new(),
             apps_read: None,
+            live_dpi: HashMap::new(),
+            live_seq: 0,
         })
     }
 
     pub fn foreground(&self) -> Option<&str> {
         self.foreground.as_deref()
+    }
+
+    /// Collections that carry a device's own event reports (DPI and profile changes made
+    /// with its buttons), as (device key, path). On the Basilisk V3 that is interface 1,
+    /// collection 5 (usage 0001:0000, 16-byte reports); its sibling with the same usage
+    /// stays silent, so listening to both costs nothing.
+    pub fn event_paths(&self) -> Vec<(String, std::ffi::CString)> {
+        self.devices
+            .iter()
+            .flat_map(|dev| {
+                self.api
+                    .device_list()
+                    .filter(move |i| {
+                        i.vendor_id() == secbird_core::db::RAZER_VID
+                            && i.product_id() == dev.pid
+                            && i.usage_page() == 0x0001
+                            && i.usage() == 0x0000
+                    })
+                    .map(move |i| (dev.key(), i.path().to_owned()))
+            })
+            .collect()
+    }
+
+    pub fn open_events(&self, path: &std::ffi::CStr) -> Option<secbird_core::hidapi::HidDevice> {
+        self.api.open_path(path).ok()
+    }
+
+    /// The device changed DPI by itself (its DPI button). Record it in the profile in
+    /// use, so a replug or wake keeps it instead of going back.
+    pub fn dpi_changed(&mut self, key: &str, x: u16, y: u16) {
+        self.live_seq += 1;
+        self.live_dpi.insert(key.to_string(), (x, y));
+        let Some(dev) = self.devices.iter().find(|d| d.key() == key) else { return };
+        if let Ok(mut store) = Self::store() {
+            let p = store.for_device(dev);
+            let name = p.effective(self.foreground.as_deref()).to_string();
+            if let Some(profile) = p.profiles.get_mut(&name) {
+                profile.dpi = Some((x, y));
+                let _ = store.save();
+            }
+        }
+    }
+
+    /// Latest DPI reported by each device, and a counter that grows with every report,
+    /// so the editor follows new reports without undoing a DPI just set in the editor.
+    pub fn live_dpi(&self) -> (u64, &HashMap<String, (u16, u16)>) {
+        (self.live_seq, &self.live_dpi)
     }
 
     /// Called when another window comes to the front, with its exe name. Devices whose
@@ -167,8 +219,8 @@ impl Engine {
                 Ok(store) => {
                     let p = store.for_device(dev);
                     let name = p.effective(self.foreground()).to_string();
-                    let failures = p.profiles[&name]
-                        .apply(dev)
+                    let failures = p
+                        .apply(&name, dev)
                         .into_iter()
                         .filter_map(|a| a.result.err().map(|e| format!("{}: {e}", a.setting)))
                         .collect();

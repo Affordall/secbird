@@ -61,6 +61,31 @@ pub fn set_keys(dev: &Device, store: &mut Store, keys: Vec<Rgb>) -> Result<()> {
     store.save()
 }
 
+/// Remap a button (`None` puts back its saved setting). `button` is a name from
+/// [`crate::buttons::BUTTONS`].
+pub fn set_button(
+    dev: &Device,
+    store: &mut Store,
+    button: &str,
+    layer: crate::buttons::Layer,
+    action: Option<crate::buttons::Action>,
+) -> Result<()> {
+    let key = crate::buttons::setting_key(button, layer);
+    let (id, _) = crate::buttons::parse_setting_key(&key)?;
+    let buttons = &mut store.for_device(dev).active_mut().buttons;
+    match action {
+        Some(action) => {
+            dev.set_button(id, layer, action)?;
+            buttons.insert(key, action.to_string());
+        }
+        None => {
+            dev.reset_button(id, layer)?;
+            buttons.remove(&key);
+        }
+    }
+    store.save()
+}
+
 /// One zone's outcome from [`sync_color`].
 pub struct Synced {
     pub pid: u16,

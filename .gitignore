@@ -4,3 +4,6 @@ target/
 # third-party agent skill (installed locally, not ours)
 .claude/
 skills-lock.json
+
+# design tool working files (screenshots may show real serial numbers)
+.impeccable/

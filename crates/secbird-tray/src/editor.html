@@ -7,269 +7,298 @@
 <link rel="icon" type="image/png" href="{{LOGO}}">
 <style>
   :root {
-    --bg: #0d0d10; --panel: #15151a; --line: #25252d; --text: #ececf1; --muted: #8b8b97;
-    --accent: #e8782a; --radius: 14px;
-    --stage-glow: #1a1a20; --toast: #222229; --line-strong: #3a3a44; --zone-off: #2a2a31;
+    --bg: #0d0d10; --panel: #15151a; --raise: #1b1b21; --line: #25252d; --line-strong: #3a3a44;
+    --text: #ececf1; --muted: #9a9aa6; --faint: #6c6c78;
+    --accent: #e8782a; --accent-text: #f2a066; --band: #e8782a14; --band-edge: #e8782a;
+    --toast: #222229; --zone-off: #2a2a31;
     --body-fill: #141418; --body-stroke: #2b2b33; --button-fill: #1d1d23;
     --key-fill: #1b1b21; --key-stroke: #2e2e37; --key-text: #ffffff99;
     --warn-line: #ffd60a55; --warn-bg: #ffd60a12; --warn-text: #ffe58a; --err: #ff453a; --err-text: #ffb4ae;
-    --accent-text: color-mix(in srgb, var(--accent) 80%, white);
+    --shadow: 0 10px 30px -12px #000000cc;
     color-scheme: dark;
   }
   /* Light: follows Windows unless the header button picked a theme. */
   @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
-    --bg: #f4f4f7; --panel: #ffffff; --line: #e1e1e8; --text: #18181d; --muted: #696975;
-    --stage-glow: #ffffff; --toast: #ffffff; --line-strong: #c3c3cc; --zone-off: #d9d9df;
-    --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea;
-    --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099;
-    --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e;
-    --accent-text: color-mix(in srgb, var(--accent) 72%, black);
-    color-scheme: light;
+      --bg: #f4f4f7; --panel: #ffffff; --raise: #f7f7fa; --line: #e1e1e8; --line-strong: #c3c3cc;
+      --text: #18181d; --muted: #5f5f6b; --faint: #8a8a96;
+      --accent-text: #b4530f; --band: #e8782a12;
+      --toast: #ffffff; --zone-off: #d9d9df;
+      --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea;
+      --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099;
+      --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e;
+      --shadow: 0 10px 30px -14px #1b1b3040;
+      color-scheme: light;
     }
   }
   :root[data-theme="light"] {
-    --bg: #f4f4f7; --panel: #ffffff; --line: #e1e1e8; --text: #18181d; --muted: #696975;
-    --stage-glow: #ffffff; --toast: #ffffff; --line-strong: #c3c3cc; --zone-off: #d9d9df;
+    --bg: #f4f4f7; --panel: #ffffff; --raise: #f7f7fa; --line: #e1e1e8; --line-strong: #c3c3cc;
+    --text: #18181d; --muted: #5f5f6b; --faint: #8a8a96;
+    --accent-text: #b4530f; --band: #e8782a12;
+    --toast: #ffffff; --zone-off: #d9d9df;
     --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea;
     --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099;
     --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e;
-    --accent-text: color-mix(in srgb, var(--accent) 72%, black);
+    --shadow: 0 10px 30px -14px #1b1b3040;
     color-scheme: light;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; }
   button, input, select { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ::selection { background: #e8782a55; }
+  input { caret-color: var(--accent); }
+  html { scrollbar-color: var(--line-strong) transparent; accent-color: var(--accent); }
+  [hidden] { display: none !important; }
+  .num { font-variant-numeric: tabular-nums; }
 
-  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
-  .brand { background: none; border: 0; padding: 0; cursor: pointer; color: var(--text); font-weight: 650; letter-spacing: .2px; display: flex; align-items: center; gap: 10px; }
+  /* Header: brand, devices, the actions that span every device. */
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; background: var(--bg); }
+  .brand { background: none; border: 0; padding: 4px 6px 4px 0; cursor: pointer; font-weight: 650; display: flex; align-items: center; gap: 10px; flex: none; }
   .brand img { width: 26px; height: 26px; border-radius: 7px; }
-  .tabs { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .tabs { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 1; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { white-space: nowrap; flex: none; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; color: var(--muted); cursor: pointer; }
+  .tab { white-space: nowrap; flex: none; background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 13px; color: var(--muted); cursor: pointer; }
+  .tab:hover { color: var(--text); }
   .tab[aria-selected=true] { border-color: var(--line); color: var(--text); background: var(--panel); }
-  .spacer { flex: 1; }
-  .ghost { white-space: nowrap; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; color: var(--muted); }
-  .ghost:hover { color: var(--text); }
-  .sync { display: flex; align-items: center; gap: 8px; }
-  .dot { position: relative; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; border: 1px solid var(--line); flex: none; cursor: pointer; }
-  .dot input { position: absolute; inset: -8px; width: 44px; height: 44px; border: 0; padding: 0; cursor: pointer; }
+  .actions { display: flex; align-items: center; gap: 8px; flex: none; }
+  .ghost { white-space: nowrap; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; color: var(--muted); }
+  .ghost:hover { color: var(--text); border-color: var(--line-strong); }
+  .sync { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding-left: 9px; }
+  .sync:hover { border-color: var(--line-strong); }
+  .sync button { background: none; border: 0; padding: 7px 12px 7px 8px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+  .sync button:hover { color: var(--text); }
+  .mini { position: relative; width: 18px; height: 18px; border-radius: 5px; overflow: hidden; border: 1px solid #00000066; flex: none; cursor: pointer; }
+  .mini input { position: absolute; inset: -8px; width: 34px; height: 34px; border: 0; padding: 0; cursor: pointer; }
+  .theme { width: 36px; padding: 7px 0; display: grid; place-items: center; }
+  .theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 
-  main { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 440px); gap: 24px; padding: 24px; max-width: 1100px; margin: 0 auto; }
-  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 48px; }
+  .banner { margin: 0 0 18px; padding: 10px 14px; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; font-size: 13px; }
+  .banner code { font-family: ui-monospace, Consolas, monospace; }
+  .empty { text-align: center; padding: 96px 0; color: var(--muted); }
 
-  .stage { background: radial-gradient(ellipse at 50% 40%, var(--stage-glow), var(--bg) 70%); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; padding: 24px; min-height: 480px; }
-  .stage h1 { margin: 0; font-size: 20px; font-weight: 650; align-self: flex-start; }
-  .meta { color: var(--muted); font-size: 12.5px; align-self: flex-start; margin-top: 2px; }
-  .stage svg { width: min(100%, 300px); flex: 1; margin: 16px 0; }
+  /* Device line: what this is, its live look, and (narrow screens) the profile picker. */
+  .devline { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+  .devline svg { width: 46px; height: 69px; flex: none; }
+  .devline h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+  .meta { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
+  .devactions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .addp { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 600; color: var(--text); }
+  .addp:hover { border-color: var(--accent); }
+  .addp .ico { width: 14px; height: 14px; }
+  .newform { display: flex; align-items: center; gap: 8px; }
+  .newform input { width: 180px; }
+  .newform .hint-games { white-space: nowrap; }
+  .mprof { margin-left: auto; display: none; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
   .zone-shape { transition: fill .15s, stroke .15s, opacity .15s; cursor: pointer; }
-  .zones { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .chip { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 8px; cursor: pointer; }
-  .chip i { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 10px currentColor; background: currentColor; }
-  .chip[aria-pressed=true] { border-color: var(--accent); }
+  .m-body { fill: var(--body-fill); stroke: var(--body-stroke); }
+  .m-line { stroke: var(--body-stroke); }
+  .m-button { fill: var(--button-fill); stroke: var(--body-stroke); }
 
-  .panel { display: flex; flex-direction: column; gap: 16px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-  .card h2 { margin: 0 0 14px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; display: flex; justify-content: space-between; align-items: center; }
-  .row { display: flex; gap: 10px; align-items: center; }
-  .row + .row { margin-top: 14px; }
+  /* The sheet: settings are rows, profiles are columns. */
+  .sheet-wrap { position: relative; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .band { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--band); border-top: 3px solid var(--band-edge); pointer-events: none;
+    transition: transform .5s cubic-bezier(.16, 1, .3, 1), width .5s cubic-bezier(.16, 1, .3, 1); }
+  @media (prefers-reduced-motion: reduce) { .band { transition: none; } }
+  table.sheet { position: relative; width: 100%; border-collapse: separate; border-spacing: 0; min-width: 640px; }
+  .sheet th, .sheet td { text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  .sheet tr:last-child > * { border-bottom: 0; }
+  .sheet thead th { vertical-align: top; padding: 16px 14px 14px; font-weight: 400; }
+  .sheet thead th:first-child { width: 190px; }
+  .sheet tbody th { font-weight: 400; color: var(--muted); padding: 0 16px; width: 190px; white-space: nowrap; }
+  .pname { font-weight: 650; font-size: 15px; display: flex; align-items: center; gap: 8px; min-height: 28px; }
+  .live { font-size: 11.5px; font-weight: 600; color: var(--accent-text); border: 1px solid #e8782a66; border-radius: 999px; padding: 1px 8px; }
+  .mk { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .mk:hover { color: var(--text); border-color: var(--line-strong); }
+  .games { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
+  .game { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 3px 2px 10px; font-size: 12px; color: var(--muted); background: var(--bg); }
+  .game button { background: none; border: 0; color: var(--faint); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
+  .game button .ico { width: 10px; height: 10px; }
+  .game button:hover { color: var(--text); background: var(--line); }
+  .addgame, .del { background: none; border: 0; padding: 3px 2px; font-size: 12.5px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .addgame:hover, .addgame:focus-visible { color: var(--accent-text); }
+  .ico { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; flex: none; }
+  .del { color: var(--faint); margin-top: 8px; display: flex; }
+  .del:hover { color: var(--err-text); }
+  .gamein { width: 150px; padding: 4px 9px !important; font-size: 12.5px; }
+  .hint-games { color: var(--faint); font-size: 12px; }
+  .grp th { padding: 14px 16px 8px; background: var(--raise); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .grp .gtools { display: inline-flex; margin-left: 18px; vertical-align: middle; text-transform: none; letter-spacing: 0; font-weight: 400; gap: 10px; align-items: center; }
+  .sheet td { padding: 3px 6px; }
+  .cell { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 9px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 42px; }
+  .cell:hover { border-color: var(--line-strong); background: var(--bg); }
+  .cell.open { border-color: var(--accent); background: var(--bg); }
+  .cell .unset { color: var(--faint); }
+  .cell.changed { color: var(--accent-text); }
+  /* Other profiles recede so the lit column leads; their differences still show. */
+  .c-other .cell { color: var(--muted); }
+  .c-other .cell .big { font-weight: 600; }
+  .c-other .cell.changed { color: var(--accent-text); }
+  .cell small { color: var(--muted); }
+  .sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid #00000066; flex: none; }
+  .sw.off { background: none; border: 1.5px dashed var(--line-strong); }
+  .big { font-size: 17px; font-weight: 650; }
+  td.empty-col { color: var(--faint); }
 
-  select, input[type=text], input[type=number] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
-  select { flex: 1; }
-
-  .swatch { position: relative; width: 56px; height: 56px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; flex: none; }
-  .swatch input { position: absolute; inset: -10px; width: 80px; height: 80px; border: 0; padding: 0; cursor: pointer; }
-  .presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; flex: 1; }
-  .presets button { aspect-ratio: 1; border-radius: 8px; border: 1px solid #0006; cursor: pointer; }
-  .presets button:hover { transform: scale(1.08); }
+  /* Editor row: opens under the cell, never a dialog. */
+  tr.ed > td { padding: 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .edbox { padding: 18px 20px 20px; display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-start; }
+  .edbox h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+  .edbox .note { flex-basis: 100%; margin: -4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .edgroup { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select, input[type=text], input[type=number] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  select:hover, input:hover { border-color: var(--line-strong); }
+  .presets { display: grid; grid-template-columns: repeat(10, 32px); gap: 7px; }
+  .presets button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #00000066; cursor: pointer; transition: transform .12s; }
+  .presets button:hover { transform: translateY(-2px); }
+  .presets button[aria-pressed=true] { outline: 2px solid var(--text); outline-offset: 2px; }
+  .swatch { position: relative; width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--line-strong); overflow: hidden; flex: none; }
+  .swatch input { position: absolute; inset: -10px; width: 60px; height: 60px; border: 0; padding: 0; cursor: pointer; }
+  .swatch.none::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: var(--panel); border: 1.5px dashed var(--line-strong); pointer-events: none; }
+  input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
   .hex { width: 96px; text-transform: uppercase; font-family: ui-monospace, Consolas, monospace; }
-
-  input[type=range] { flex: 1; accent-color: var(--accent); }
-  .val { width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-  .switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; flex: none; margin: 0; }
+  .hex::placeholder { text-transform: none; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  input[type=range] { width: 220px; }
+  .val { min-width: 44px; color: var(--muted); }
+  .switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; flex: none; margin: 0; }
   .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: var(--accent); }
   .switch:checked::after { left: 19px; }
-
-  .dpi { font-size: 34px; font-weight: 650; width: 130px; background: none; border: 0; padding: 0; font-variant-numeric: tabular-nums; }
+  .dpi { font-size: 30px; font-weight: 650; width: 120px; background: none !important; border: 0 !important; padding: 0 !important; }
   .dpi::-webkit-inner-spin-button { display: none; }
-  .unit { color: var(--muted); }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pill { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; cursor: pointer; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; color: var(--muted); }
+  .pill:hover { color: var(--text); }
   .pill[aria-pressed=true] { color: var(--text); border-color: var(--accent); }
-  .seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; width: 100%; }
-  .seg button { flex: 1; background: none; border: 0; border-radius: 7px; padding: 6px 0; cursor: pointer; color: var(--muted); }
-  .seg button[aria-pressed=true] { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
-  .link { background: none; border: 0; color: var(--accent-text); cursor: pointer; padding: 0; font-size: 12.5px; text-transform: none; letter-spacing: 0; }
-  .newform { display: none; }
-  .newform.open { display: flex; }
-  .apps-hint { color: var(--muted); font-size: 12.5px; margin: 16px 0 8px; }
-  .app-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .app-tags:not(:empty) { margin-bottom: 10px; }
-  .app-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 11px; font-size: 13px; font-family: ui-monospace, Consolas, monospace; }
-  .app-tag button { background: none; border: 0; color: var(--muted); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; padding: 0; font-size: 15px; line-height: 1; }
-  .app-tag button:hover { color: var(--text); background: var(--line); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg button { background: none; border: 0; border-radius: 7px; padding: 6px 14px; cursor: pointer; color: var(--muted); }
+  .seg button[aria-pressed=true] { background: var(--raise); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .grp .seg { padding: 2px; }
+  .grp .seg button { padding: 3px 11px; font-size: 12.5px; }
+  .link { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+  .link:hover, .link:focus-visible { color: var(--accent-text); }
+  .combo { width: 150px; font-family: ui-monospace, Consolas, monospace; cursor: pointer; }
+  .combo:focus { border-color: var(--accent); }
+  #kb { width: 100%; max-width: 980px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; flex-basis: 100%; }
+  #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
+  #kb g:hover rect { stroke: var(--muted); }
+  #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+  .foot { color: var(--faint); font-size: 12.5px; margin: 14px 2px 0; max-width: 75ch; }
 
-  .empty { grid-column: 1 / -1; text-align: center; padding: 80px 0; color: var(--muted); }
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--toast); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; opacity: 0; transition: .2s; pointer-events: none; font-size: 13px; }
-  #toast.show { opacity: 1; transform: translateX(-50%); }
-  #toast.err { border-color: var(--err); color: var(--err-text); }
-  [hidden] { display: none !important; }
-
-  .overview { grid-column: 1 / -1; }
-  .banner { grid-column: 1 / -1; margin: 0; padding: 10px 14px; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; font-size: 13px; }
-  .banner code { font-family: ui-monospace, Consolas, monospace; }
+  /* Overview: every device at a glance. */
   .ov-head { display: flex; align-items: baseline; gap: 12px; margin: 2px 0 16px; }
-  .ov-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
+  .ov-head h1 { margin: 0; font-size: 22px; font-weight: 650; }
   .ov-head span { color: var(--muted); font-size: 13px; }
-  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px;
-    cursor: pointer; display: flex; flex-direction: column; gap: 10px; transition: border-color .15s, transform .15s; }
-  .dcard:hover { border-color: var(--line-strong); transform: translateY(-1px); }
-  .dcard.muted { cursor: default; opacity: .55; }
+  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; cursor: pointer; display: flex; flex-direction: column; gap: 10px; transition: border-color .15s, transform .15s; }
+  .dcard:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .dcard.muted { cursor: default; opacity: .6; }
   .dcard.muted:hover { transform: none; border-color: var(--line); }
-  .dtop { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; }
+  .dtop { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
   .dcard h3 { margin: 0; font-size: 16px; font-weight: 650; }
-  .dots { display: flex; gap: 7px; min-height: 14px; flex-wrap: wrap; }
-  .dots i { width: 14px; height: 14px; border-radius: 50%; background: currentColor; box-shadow: 0 0 9px currentColor; }
-  .dots i.off { background: none; box-shadow: none; border: 1.5px solid var(--line-strong); }
+  .dots { display: flex; gap: 7px; min-height: 16px; flex-wrap: wrap; }
+  .dots i { width: 16px; height: 16px; border-radius: 50%; background: currentColor; border: 1px solid #00000066; }
+  .dots i.off { background: none; border: 1.5px dashed var(--line-strong); }
   .dmeta { color: var(--muted); font-size: 12.5px; }
-  .batt { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .batt { display: flex; align-items: center; gap: 6px; }
   .batt b { width: 22px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; }
   .batt b::after { content: ""; position: absolute; left: 1px; top: 1px; bottom: 1px; width: calc((100% - 2px) * var(--lvl)); background: currentColor; border-radius: 1px; }
   .batt.low { color: var(--err); }
 
-  main.kb { grid-template-columns: 1fr; max-width: 1180px; }
-  main.kb .stage { min-height: 0; }
-  main.kb .panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
-  #kb { flex: none; width: 100%; height: auto; margin: 20px 0 16px; touch-action: none; user-select: none; -webkit-user-select: none; }
-  .m-body { fill: var(--body-fill); stroke: var(--body-stroke); }
-  .m-line { stroke: var(--body-stroke); }
-  .m-button { fill: var(--button-fill); stroke: var(--body-stroke); }
-  .theme { width: 34px; padding: 6px 0; display: grid; place-items: center; }
-  .theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-  #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
-  #kb g:hover rect { stroke: var(--muted); }
-  #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
-  .hint { color: var(--muted); font-size: 12.5px; margin: 12px 0 0; }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--toast); border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; opacity: 0; transition: .2s; pointer-events: none; font-size: 13px; box-shadow: var(--shadow); z-index: 10; }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+  #toast.err { border-color: var(--err); color: var(--err-text); }
+
+  /* Narrow windows: one profile at a time, picked from the device line. */
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+    .tabs { order: 3; flex-basis: 100%; }
+    .actions { margin-left: auto; }
+    .synclabel { display: none; }
+    main { padding: 16px 14px 40px; }
+    .mprof { display: flex; flex-basis: 100%; margin-left: 0; }
+    .devline { flex-wrap: wrap; }
+    .mprof select { flex: 1; }
+    table.sheet { min-width: 0; }
+    .sheet .c-other { display: none; }
+    .devactions { flex-basis: 100%; margin-left: 0; }
+    .newform { flex-wrap: wrap; width: 100%; }
+    .newform input { flex-basis: 100%; width: 100%; }
+    .newform .hint-games { flex-basis: 100%; order: 3; }
+    .sheet thead th:first-child, .sheet tbody th { width: 42%; white-space: normal; padding-right: 8px; }
+    .presets { grid-template-columns: repeat(5, 36px); }
+    .presets button { width: 36px; height: 36px; }
+    input[type=range] { width: 100%; }
+    .grp .gtools { display: flex; margin: 8px 0 0; }
+  }
 </style>
 </head>
 <body>
 <header>
   <button class="brand" id="home" title="All devices"><img src="{{LOGO}}" alt="">Secretarybird</button>
-  <nav class="tabs" id="tabs"></nav>
-  <div class="spacer"></div>
-  <div class="sync" id="sync" hidden>
-    <label class="dot" title="Color to sync"><input type="color" id="syncColor" value="#ff2800" aria-label="Color to sync"></label>
-    <button class="ghost" id="syncBtn" title="Same color on every zone of every device">Sync color everywhere</button>
+  <nav class="tabs" id="tabs" aria-label="Devices"></nav>
+  <div class="actions">
+    <div class="sync" id="sync" hidden>
+      <label class="mini" title="Color to sync"><input type="color" id="syncColor" value="#ff2800" aria-label="Color to sync"></label>
+      <button id="syncBtn" title="Same color on every zone of every device">Sync<span class="synclabel"> color everywhere</span></button>
+    </div>
+    <button class="ghost" id="rescan">Rescan</button>
+    <button class="ghost theme" id="theme" title="Light or dark" aria-label="Switch light or dark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
   </div>
-  <button class="ghost" id="rescan">Rescan</button>
-  <button class="ghost theme" id="theme" title="Light or dark" aria-label="Switch light or dark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
 </header>
 
 <main id="main">
   <p class="banner" id="synBanner" hidden>Razer Synapse is running and can overwrite these settings. Close it, or run <code>secbird debloat</code> to stop it starting with Windows.</p>
   <p class="empty" id="empty" hidden>No Razer devices found. Plug one in, then press Rescan.</p>
 
-  <section class="overview" id="overview" hidden>
+  <section id="overview" hidden>
     <div class="ov-head"><h1>All devices</h1><span id="ovSummary"></span></div>
     <div class="ov-grid" id="ovGrid"></div>
   </section>
 
-  <section class="stage" id="stage" hidden>
-    <h1 id="name"></h1>
-    <div class="meta" id="meta"></div>
-    <svg viewBox="0 0 240 360" id="preview" aria-label="Device lighting preview">
-      <defs>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
-        <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
-      </defs>
-      <path id="z-underglow-glow" class="zone-shape" filter="url(#glow)" fill="none" stroke-width="14"
-        d="M120 26C72 26 52 64 50 122c-2 68 8 124 24 172 13 34 79 34 92 0 16-48 26-104 24-172-2-58-22-96-70-96z"/>
-      <path class="m-body" stroke-width="1.5"
-        d="M120 18C70 18 46 60 44 120c-2 70 8 130 26 180 14 36 86 36 100 0 18-50 28-110 26-180-2-60-26-102-76-102z"/>
-      <path d="M120 22v112M47 132c40 14 106 14 146 0" fill="none" class="m-line" stroke-width="1.5"/>
-      <rect x="40" y="150" width="8" height="28" rx="3" class="m-button"/>
-      <rect x="40" y="184" width="8" height="28" rx="3" class="m-button"/>
-      <rect id="z-scroll-glow" class="zone-shape" x="106" y="52" width="28" height="52" rx="14" filter="url(#soft)"/>
-      <rect id="z-scroll" class="zone-shape" x="110" y="56" width="20" height="44" rx="10"/>
-      <circle id="z-logo-glow" class="zone-shape" cx="120" cy="246" r="20" filter="url(#soft)"/>
-      <circle id="z-logo" class="zone-shape" cx="120" cy="246" r="14"/>
-    </svg>
-    <svg id="kb" hidden aria-label="Keyboard: click or drag across keys to paint them"></svg>
-    <div class="zones" id="zones"></div>
-  </section>
-
-  <section class="panel" id="panel" hidden>
-    <div class="card">
-      <h2>Profile <button class="link" id="newBtn">+ New</button></h2>
-      <div class="row">
-        <select id="profile" aria-label="Active profile"></select>
-        <button class="ghost" id="delBtn">Delete</button>
+  <section id="device" hidden>
+    <div class="devline">
+      <svg viewBox="0 0 240 360" id="preview" aria-hidden="true">
+        <path id="z-underglow" class="zone-shape" fill="none" stroke-width="10"
+          d="M120 26C72 26 52 64 50 122c-2 68 8 124 24 172 13 34 79 34 92 0 16-48 26-104 24-172-2-58-22-96-70-96z"/>
+        <path class="m-body" stroke-width="5"
+          d="M120 18C70 18 46 60 44 120c-2 70 8 130 26 180 14 36 86 36 100 0 18-50 28-110 26-180-2-60-26-102-76-102z"/>
+        <path d="M120 22v112M47 132c40 14 106 14 146 0" fill="none" class="m-line" stroke-width="5"/>
+        <rect id="z-scroll" class="zone-shape" x="106" y="52" width="28" height="52" rx="14"/>
+        <circle id="z-logo" class="zone-shape" cx="120" cy="246" r="20"/>
+      </svg>
+      <div>
+        <h1 id="name"></h1>
+        <p class="meta" id="meta"></p>
       </div>
-      <form class="row newform" id="newForm">
-        <input type="text" id="newName" placeholder="Profile name" maxlength="32" style="flex:1" aria-label="New profile name">
-        <button class="ghost" type="submit">Create</button>
-        <button class="ghost" type="button" id="cancelNew">Cancel</button>
-      </form>
-      <p class="apps-hint" id="appsHint"></p>
-      <div class="app-tags" id="appTags"></div>
-      <form class="row" id="appForm">
-        <input type="text" id="appName" list="appList" placeholder="Game or app, e.g. cs2.exe" style="flex:1" aria-label="Program that switches to this profile" autocomplete="off">
-        <datalist id="appList"></datalist>
-        <button class="ghost" type="submit">Add</button>
-      </form>
+      <div class="devactions" id="devActions"></div>
+      <label class="mprof">Profile <select id="mProfile" aria-label="Profile"></select></label>
     </div>
-
-    <div class="card" id="lightCard">
-      <h2><span id="zoneTitle">Lighting</span> <button class="link" id="allBtn">Apply to all zones</button></h2>
-      <div class="seg" id="mode" hidden style="margin-bottom:14px">
-        <button data-mode="zone" id="wholeBtn">Whole keyboard</button><button data-mode="keys">Per key</button>
-      </div>
-      <div class="row">
-        <label class="swatch" title="Pick a color"><input type="color" id="color" aria-label="Zone color"></label>
-        <div class="presets" id="presets"></div>
-      </div>
-      <div class="row">
-        <input type="text" class="hex" id="hex" maxlength="7" aria-label="Hex color">
-        <input type="range" id="bright" min="0" max="100" aria-label="Brightness">
-        <span class="val" id="brightVal"></span>
-      </div>
-      <div class="row">
-        <input type="checkbox" class="switch" id="on" aria-label="Zone on">
-        <label for="on">Zone lit</label>
-      </div>
-      <p class="hint" id="kbHint" hidden>Pick a color, then click or drag across keys to paint them.</p>
+    <div class="sheet-wrap" id="sheetWrap">
+      <div class="band" id="band"></div>
+      <table class="sheet" id="sheet"></table>
     </div>
-
-    <div class="card" id="perfCard">
-      <div id="dpiBox">
-        <h2>Sensitivity</h2>
-        <div class="row">
-          <input type="number" class="dpi" id="dpiNum" aria-label="DPI"><span class="unit">DPI</span>
-        </div>
-        <div class="row"><input type="range" id="dpi" aria-label="DPI slider"></div>
-        <div class="row pills" id="dpiPresets"></div>
-      </div>
-      <h2 id="pollTitle" style="margin-top:20px">Polling rate</h2>
-      <div class="seg" id="polling"></div>
-    </div>
+    <p class="foot" id="foot"></p>
   </section>
 </main>
-<div id="toast" role="status"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const T = new URLSearchParams(location.search).get('t');
 const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids.filter(k => k != null && k !== false)); return e; };
 // Colors for LEDs, not screens: an LED shows even small green/blue parts (FF2D55 looks pink),
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
-const PRESETS = [['#FF0000','Red'],['#FF2800','Orange'],['#FF9600','Yellow'],['#00FF00','Green'],['#00FFFF','Cyan'],
-                 ['#0000FF','Blue'],['#5000FF','Purple'],['#FF00FF','Magenta'],['#FF0028','Pink'],['#FFFFFF','White']];
-const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow' };
-let devices = [], unsupported = [], synapse = [], dev = null, zone = null, showAll = null;
-let mode = 'zone', modeKey = '', brush = 'E8782A', painting = false;
+const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
+                 ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
+const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight' };
+const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
+  headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
+let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
+let open = null;          // the cell whose editor is showing: { row, profile }
+let btnData = {}, btnLayer = 'normal', brush = 'E8782A', painting = false, syncPicked = false;
 
 // Full-size ANSI keyboard on Razer's 6 x 22 per-key grid.
 // Each key: [label, matrix column, width, gap before, height], in key units.
@@ -287,21 +316,13 @@ const FULLSIZE = [
   [['Ctrl', 1, 1.25], ['Win', 2, 1.25], ['Alt', 3, 1.25], ['', 7, 6.25], ['Alt', 11, 1.25], ['Fn', 12, 1.25], ['Menu', 13, 1.25],
    ['Ctrl', 14, 1.25], ['←', 15, 1, .25], ['↓', 16], ['→', 17], ['0', 18, 2, .25], ['.', 20]],
 ];
-
 function layout(m) {
   if (m.rows === 6 && m.cols === 22) return FULLSIZE.flatMap((keys, row) => {
     let x = 0;
-    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
-      x += gap;
-      const k = { label, row, col, x, y: row + (row ? .25 : 0), w, h };
-      x += w;
-      return k;
-    });
+    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => { x += gap; const k = { label, row, col, x, y: row + (row ? .25 : 0), w, h }; x += w; return k; });
   });
-  // Unknown layout: a plain grid, one square per matrix cell.
-  const out = [];
-  for (let row = 0; row < m.rows; row++)
-    for (let col = 0; col < m.cols; col++) out.push({ label: '', row, col, x: col, y: row, w: 1, h: 1 });
+  const out = []; // unknown layout: one square per matrix cell
+  for (let row = 0; row < m.rows; row++) for (let col = 0; col < m.cols; col++) out.push({ label: '', row, col, x: col, y: row, w: 1, h: 1 });
   return out;
 }
 
@@ -320,7 +341,7 @@ let toastTimer;
 function toast(msg, err) {
   const t = $('toast');
   t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 4000 : 1400);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 4500 : 1600);
 }
 
 // Latest-value-wins sender: while a write is in flight, newer values replace older ones,
@@ -341,201 +362,611 @@ function live(send, done) {
   };
 }
 
-const zoneState = name => (dev.profile && dev.profile.lighting && dev.profile.lighting[name]) || {};
+const ICONS = { plus: '<path d="M8 3v10M3 8h10"/>', x: '<path d="M4 4l8 8M12 4l-8 8"/>' };
+const icon = name => `<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const label = name => NAMES[name] || name.charAt(0).toUpperCase() + name.slice(1);
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+const hz = v => v + ' Hz';
+const devLabel = d => devices.filter(x => x.pid === d.pid).length > 1 && d.serial ? d.name + ' (' + d.serial.slice(-4) + ')' : d.name;
 
-function paintZone(name) {
-  const z = zoneState(name), lit = !z.off && z.color;
-  const color = lit ? '#' + z.color : 'var(--zone-off)';
-  const alpha = lit ? 0.35 + 0.65 * ((z.brightness ?? 100) / 100) : 1;
-  for (const id of ['z-' + name, 'z-' + name + '-glow']) {
-    const el = $(id); if (!el) continue;
-    const glow = id.endsWith('glow');
-    el.style.opacity = glow ? (lit ? alpha * 0.9 : 0) : alpha;
-    if (el.getAttribute('fill') === 'none') el.style.stroke = color; else el.style.fill = color;
-  }
-  const chip = document.querySelector(`.chip[data-zone="${name}"] i`);
-  if (chip) chip.style.color = color;
+// A device's profiles: the active one is `dev.profile`, the rest come from `profilesData`.
+function adopt(d) {
+  Object.assign(dev, d);
+  dev.profilesData = dev.profilesData || {};
+  dev.profile = dev.profile || {};
+  dev.profilesData[dev.active] = dev.profile;
 }
+const prof = name => (name === dev.active ? dev.profile : (dev.profilesData && dev.profilesData[name])) || {};
+const zoneOf = (p, name) => (p.lighting && p.lighting[name]) || {};
+const keyCount = () => dev.matrix.rows * dev.matrix.cols;
 
-function renderZone() {
-  const z = zoneState(zone), color = '#' + (z.color || 'E8782A');
-  $('zoneTitle').textContent = label(zone);
-  $('color').value = color.toLowerCase(); $('hex').value = color;
-  $('bright').value = z.brightness ?? 100; $('brightVal').textContent = (z.brightness ?? 100) + '%';
-  $('on').checked = !z.off;
-  document.documentElement.style.setProperty('--accent', z.off || !z.color ? '#e8782a' : color);
-  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.zone === zone));
-}
+// ---------- Rendering ----------
 
 function render() {
   const has = devices.length > 0;
   if (!has) showAll = unsupported.length > 0;
   $('empty').hidden = has || unsupported.length > 0;
-  $('stage').hidden = $('panel').hidden = !has || showAll;
+  $('device').hidden = !has || showAll;
   $('overview').hidden = !showAll;
   $('synBanner').hidden = !synapse.length;
   $('sync').hidden = !devices.some(d => d.leds.length);
-  // Until the user picks a sync color, offer the color of the device on screen.
-  if (!syncPicked && dev) {
-    const lit = dev.leds.map(l => zoneState(l.name)).find(z => z.color && !z.off);
+  if (!syncPicked && dev) { // until a sync color is picked, offer the color on screen
+    const lit = dev.leds.map(l => zoneOf(dev.profile || {}, l.name)).find(z => z.color && !z.off);
     if (lit) $('syncColor').value = '#' + lit.color.toLowerCase();
   }
   $('tabs').innerHTML = '';
-  const tab = (text, selected, onclick) => {
-    const b = document.createElement('button');
-    b.className = 'tab'; b.textContent = text; b.setAttribute('aria-selected', selected); b.onclick = onclick;
-    $('tabs').append(b);
-  };
+  const tab = (text, selected, onclick) => $('tabs').append(el('button', { className: 'tab', textContent: text, onclick, ariaSelected: selected }));
   if (devices.length || unsupported.length) {
-    tab('All devices', !!showAll, () => { showAll = true; render(); });
+    tab('All devices', !!showAll, () => { showAll = true; open = null; render(); });
     devices.forEach(d => tab(devLabel(d), !showAll && d.id === dev.id, () => openDevice(d)));
   }
-  if (showAll) { $('main').classList.remove('kb'); renderOverview(); return; }
+  if (showAll) return renderOverview();
   if (!has) return;
 
-  $('name').textContent = dev.name;
-  $('meta').textContent = [dev.firmware && 'Firmware ' + dev.firmware, dev.serial,
-    dev.battery != null && dev.battery + '% battery', !dev.known && 'not in device database'].filter(Boolean).join(' · ');
+  $('name').textContent = devLabel(dev);
+  $('meta').textContent = [KINDS[dev.kind] || 'Device', dev.firmware && 'firmware ' + dev.firmware, dev.serial,
+    dev.battery != null && dev.battery + '% battery', !dev.known && 'not in the device database'].filter(Boolean).join(' · ');
+  $('mProfile').innerHTML = '';
+  dev.profiles.forEach(p => $('mProfile').add(new Option(p, p, false, p === dev.active)));
+  paintPreview();
+  renderNewProfile();
+  if (dev.kind === 'mouse' && btnData[dev.id] === undefined) loadButtons(dev);
+  renderSheet();
+  $('foot').textContent = 'Changes apply right away and are saved to the active profile. ' +
+    (dev.kind === 'mouse' ? 'Button changes go to the mouse’s live memory; Reset puts back what Synapse or the factory saved in it. ' : '') +
+    'Games listed under a profile switch to it while they are in front.';
+}
 
-  $('profile').innerHTML = '';
-  dev.profiles.forEach(p => $('profile').add(new Option(p, p, false, p === dev.active)));
-  renderApps();
+function openDevice(d) { dev = d; open = null; showAll = false; render(); }
 
+function paintPreview() {
   const leds = dev.leds.map(l => l.name);
-  $('lightCard').hidden = leds.length === 0;
-  $('preview').style.display = dev.kind === 'mouse' && leds.some(n => NAMES[n]) ? '' : 'none';
-  if (!leds.includes(zone)) zone = leds[0];
-  $('zones').innerHTML = '';
-  leds.forEach(name => {
-    const c = document.createElement('button');
-    c.className = 'chip'; c.dataset.zone = name; c.innerHTML = '<i></i>';
-    c.append(label(name)); c.onclick = () => { zone = name; renderZone(); };
-    $('zones').append(c);
-  });
+  $('preview').style.display = dev.kind === 'mouse' && leds.some(n => ['scroll', 'logo', 'underglow'].includes(n)) ? '' : 'none';
   ['scroll', 'logo', 'underglow'].forEach(n => {
-    const el = $('z-' + n); if (el) el.onclick = () => { if (leds.includes(n)) { zone = n; renderZone(); } };
-  });
-  leds.forEach(paintZone);
-  if (zone) renderZone();
-
-  const kb = !!dev.matrix;
-  $('main').classList.toggle('kb', kb);
-  $('kb').toggleAttribute('hidden', !kb); $('mode').hidden = !kb;
-  $('wholeBtn').textContent = ['keyboard', 'laptop', 'keypad'].includes(dev.kind) ? 'Whole keyboard' : 'Whole device';
-  if (kb) {
-    // Open in per-key mode when the profile has painted keys.
-    const key = dev.pid + '/' + dev.active;
-    if (key !== modeKey) { modeKey = key; mode = dev.profile && dev.profile.keys && dev.profile.keys.length ? 'keys' : 'zone'; }
-    renderKb();
-  }
-  setMode(kb ? mode : 'zone');
-
-  $('perfCard').hidden = !dev.dpi && !dev.polling;
-  $('dpiBox').hidden = !dev.dpi;
-  $('pollTitle').style.marginTop = dev.dpi ? '20px' : '0';
-  if (dev.dpi) {
-    const d = dev.dpi;
-    Object.assign($('dpi'), { min: d.min, max: d.max, step: d.step, value: d.x });
-    Object.assign($('dpiNum'), { min: d.min, max: d.max, step: d.step, value: d.x });
-    $('dpiPresets').innerHTML = '';
-    [400, 800, 1600, 3200, 6400].filter(v => v >= d.min && v <= d.max).forEach(v => {
-      const p = document.createElement('button');
-      p.className = 'pill'; p.textContent = v; p.setAttribute('aria-pressed', v === d.x);
-      p.onclick = () => setDpi(v);
-      $('dpiPresets').append(p);
-    });
-  }
-  $('polling').innerHTML = '';
-  if (dev.polling) dev.polling.options.forEach(hz => {
-    const b = document.createElement('button');
-    b.textContent = hz >= 1000 ? hz / 1000 + 'k Hz' : hz + ' Hz';
-    b.setAttribute('aria-pressed', hz === dev.polling.hz);
-    b.onclick = async () => {
-      try { await api('/api/polling', { hz }); dev.polling.hz = hz; render(); toast('Polling ' + hz + ' Hz · saved to ' + dev.active); }
-      catch (e) { toast(e.message, true); }
-    };
-    $('polling').append(b);
+    const e = $('z-' + n), z = zoneOf(dev.profile, n), lit = leds.includes(n) && !z.off && z.color;
+    const color = lit ? '#' + z.color : 'var(--zone-off)';
+    e.style.opacity = lit ? 0.35 + 0.65 * ((z.brightness ?? 100) / 100) : 1;
+    if (e.getAttribute('fill') === 'none') e.style.stroke = color; else e.style.fill = color;
+    e.onclick = leds.includes(n) ? () => toggleEditor('zone:' + n, dev.active) : null;
   });
 }
 
-const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-const keyCount = () => dev.matrix.rows * dev.matrix.cols;
+// Rows the sheet shows for this device, grouped.
+function rows() {
+  const g = [];
+  const light = dev.leds.map(l => ({ key: 'zone:' + l.name, label: label(l.name) }));
+  if (dev.matrix) light.push({ key: 'keys', label: 'Per-key colors' });
+  if (light.length) g.push({ name: 'Lighting', rows: light, tools: dev.leds.length > 1 ? 'allzones' : null });
+  const sens = [];
+  if (dev.dpi) sens.push({ key: 'dpi', label: 'DPI' });
+  if (dev.polling) sens.push({ key: 'polling', label: 'Polling rate' });
+  if (sens.length) g.push({ name: 'Sensitivity', rows: sens });
+  const list = btnData[dev.id];
+  if (dev.kind === 'mouse' && list !== undefined && (list === null || list.length)) {
+    g.push({ name: 'Buttons', tools: 'layer', rows: list === null ? [{ key: 'loading', label: 'Reading buttons…' }]
+      : list.filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label })) });
+  }
+  return g;
+}
+
+// Comparable value of a cell, to mark where another profile differs from the active one.
+function cellValue(key, name) {
+  const p = prof(name), active = name === dev.active;
+  if (key.startsWith('zone:')) { const z = zoneOf(p, key.slice(5)); return p.keys && p.keys.length && dev.matrix ? 'keys' : z.off ? 'off' : (z.color || '') + '/' + (z.brightness ?? 100); }
+  if (key === 'keys') return (p.keys || []).join();
+  if (key === 'dpi') return String(active && dev.dpi ? [dev.dpi.x, dev.dpi.y] : p.dpi || '');
+  if (key === 'polling') return String(active && dev.polling ? dev.polling.hz : p.polling || '');
+  if (key.startsWith('btn:')) {
+    const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return '';
+    const skey = btnLayer === 'normal' ? b.name : b.name + '/hypershift';
+    return active ? b[btnLayer] : (p.buttons && p.buttons[skey]) || b.saved[btnLayer] || b[btnLayer];
+  }
+  return '';
+}
+const differs = (key, name) => name !== dev.active && cellValue(key, name) !== cellValue(key, dev.active);
+
+// What one cell says: [html, changed?]. Active column: changed = remapped from what the
+// mouse saved. Other columns get their mark from differs().
+function cellView(key, name) {
+  const p = prof(name), active = name === dev.active;
+  if (key.startsWith('zone:')) {
+    const z = zoneOf(p, key.slice(5));
+    if (p.keys && p.keys.length && dev.matrix) return ['<span class="unset">Per-key colors</span>'];
+    if (z.off) return ['<span class="sw off"></span>Off'];
+    if (!z.color) return ['<span class="unset">Not set</span>'];
+    return [`<span class="sw" style="background:#${esc(z.color)}"></span><span class="num">#${esc(z.color)}</span>` +
+      (z.brightness != null && z.brightness !== 100 ? ` <small class="num">${z.brightness}%</small>` : '')];
+  }
+  if (key === 'keys') {
+    if (!p.keys || !p.keys.length) return ['<span class="unset">Whole keyboard</span>'];
+    const colors = [...new Set(p.keys.filter(k => k !== '000000'))];
+    return [colors.slice(0, 5).map(c => `<span class="sw" style="background:#${esc(c)}"></span>`).join('') + ` <small>${plural(colors.length, 'color')}</small>`];
+  }
+  if (key === 'dpi') {
+    const d = active && dev.dpi ? [dev.dpi.x, dev.dpi.y] : p.dpi;
+    if (!d) return ['<span class="unset">Not set</span>'];
+    return [`<span class="big num">${d[0] === d[1] ? d[0] : d[0] + ' × ' + d[1]}</span> <small>DPI</small>`];
+  }
+  if (key === 'polling') {
+    const v = active && dev.polling ? dev.polling.hz : p.polling;
+    return v ? [`<span class="num">${hz(v)}</span>`] : ['<span class="unset">Not set</span>'];
+  }
+  if (key === 'loading') return ['<span class="unset">…</span>'];
+  if (key.startsWith('btn:')) {
+    const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return [''];
+    const skey = btnLayer === 'normal' ? b.name : b.name + '/hypershift';
+    if (active) return [esc(actionLabel(b[btnLayer])), b.remapped[btnLayer]];
+    const own = p.buttons && p.buttons[skey];
+    return [esc(actionLabel(own || b.saved[btnLayer] || b[btnLayer]))];
+  }
+  return [''];
+}
+
+function renderSheet() {
+  const t = $('sheet'), names = dev.profiles, groups = rows();
+  t.innerHTML = '';
+  const head = el('tr');
+  head.append(el('th', { scope: 'col' }, el('span', { className: 'hint-games', textContent: 'Setting' })));
+  names.forEach(n => head.append(profileHeader(n)));
+  t.append(el('thead', {}, head));
+  const span = names.length + 1;
+  groups.forEach(g => {
+    const body = el('tbody');
+    const gth = el('th', { colSpan: span, scope: 'rowgroup' }, g.name);
+    if (g.tools === 'layer') {
+      const seg = el('span', { className: 'seg', role: 'group', ariaLabel: 'Button layer' });
+      [['normal', 'Normal'], ['hypershift', 'HyperShift']].forEach(([v, txt]) => seg.append(el('button', {
+        textContent: txt, ariaPressed: btnLayer === v, title: v === 'hypershift' ? 'What each button does while a button set to HyperShift is held' : '',
+        onclick: () => { btnLayer = v; if (open && open.row.startsWith('btn:')) open = null; renderSheet(); } })));
+      gth.append(el('span', { className: 'gtools' }, seg));
+    } else if (g.tools === 'allzones') {
+      gth.append(el('span', { className: 'gtools' }, el('button', { className: 'link', textContent: 'Same color on all zones',
+        onclick: () => { const z = dev.leds.map(l => zoneOf(dev.profile, l.name)).find(z => z.color); if (z) dev.leds.forEach(l => setColor(z.color, l.name)); else toast('Pick a color for one zone first', true); } })));
+    }
+    body.append(el('tr', { className: 'grp' }, gth));
+    g.rows.forEach(r => {
+      const tr = el('tr');
+      tr.dataset.row = r.key;
+      tr.append(el('th', { scope: 'row', textContent: r.label }));
+      names.forEach(n => {
+        const [html, remapped] = cellView(r.key, n);
+        const changed = n === dev.active ? remapped : differs(r.key, n);
+        const isOpen = open && open.row === r.key && open.profile === n;
+        const b = el('button', { className: 'cell' + (changed ? ' changed' : '') + (isOpen ? ' open' : ''), innerHTML: html,
+          ariaExpanded: isOpen, ariaLabel: `${r.label} in ${n}` + (n === dev.active ? '' : ' (switches to this profile)'),
+          disabled: r.key === 'loading', onclick: () => toggleEditor(r.key, n) });
+        b.dataset.profile = n;
+        tr.append(el('td', { className: n === dev.active ? 'c-on' : 'c-other' }, b));
+      });
+      body.append(tr);
+      if (open && open.row === r.key && open.profile === dev.active) {
+        const td = el('td', { colSpan: span });
+        body.append(el('tr', { className: 'ed' }, td));
+        buildEditor(td, r);
+      }
+    });
+    t.append(body);
+  });
+  requestAnimationFrame(placeBand);
+}
+
+// The lit band sits behind the active profile's column and slides when it changes.
+function placeBand() {
+  const th = $('sheet').querySelector('thead th.c-on'), band = $('band');
+  if (!th) { band.style.width = '0'; return; }
+  band.style.width = th.offsetWidth + 'px';
+  band.style.transform = `translateX(${th.offsetLeft}px)`;
+}
+window.addEventListener('resize', () => requestAnimationFrame(placeBand));
+
+function profileHeader(n) {
+  const active = n === dev.active, p = prof(n);
+  const th = el('th', { scope: 'col', className: active ? 'c-on' : 'c-other' });
+  const title = el('div', { className: 'pname' }, el('span', { textContent: n }),
+    active ? el('span', { className: 'live', textContent: 'Active' })
+      : el('button', { className: 'mk', textContent: 'Make active', onclick: () => activate(n) }));
+  const games = el('div', { className: 'games' });
+  (p.apps || []).forEach(a => games.append(el('span', { className: 'game' }, a,
+    el('button', { innerHTML: icon('x'), title: 'Remove ' + a, ariaLabel: `Remove ${a} from ${n}`, onclick: () => saveApps(n, (p.apps || []).filter(v => v !== a), 'Removed ' + a) }))));
+  const add = el('button', { className: 'addgame', innerHTML: icon('plus') + ((p.apps || []).length ? 'Game' : 'Game or app'),
+    title: `Switch to ${n} while this program is in front` });
+  add.onclick = () => {
+    const input = el('input', { type: 'text', className: 'gamein', placeholder: 'cs2.exe', autocomplete: 'off', ariaLabel: `Program that brings up ${n}` });
+    input.setAttribute('list', 'appList-' + n.replace(/\W/g, '_'));
+    const list = el('datalist', { id: 'appList-' + n.replace(/\W/g, '_') });
+    api('/api/apps').then(r => r.apps.filter(a => !(p.apps || []).includes(a)).forEach(a => list.append(new Option(a)))).catch(() => {});
+    const done = () => { input.replaceWith(add); list.remove(); };
+    input.onkeydown = e => {
+      if (e.key === 'Escape') done();
+      if (e.key === 'Enter' && input.value.trim()) { saveApps(n, [...(p.apps || []), input.value.trim()], 'Added ' + input.value.trim() + ' to ' + n); }
+    };
+    input.onblur = () => setTimeout(() => { if (document.activeElement !== input) done(); }, 150);
+    add.replaceWith(input); input.after(list); input.focus();
+  };
+  games.append(add);
+  th.append(title, games);
+  if (dev.profiles.length > 1) th.append(el('button', { className: 'del', textContent: 'Delete profile', onclick: () => deleteProfile(n) }));
+  return th;
+}
+
+// "New profile" lives beside the device name: a button that turns into a name field.
+function renderNewProfile() {
+  const box = $('devActions'); box.innerHTML = '';
+  const btn = el('button', { className: 'addp', title: 'A copy of the active profile',
+    innerHTML: icon('plus') + 'New profile' });
+  btn.onclick = () => {
+    const input = el('input', { type: 'text', placeholder: 'Name, e.g. Valorant', maxLength: 32, ariaLabel: 'New profile name' });
+    const create = el('button', { className: 'ghost', textContent: 'Create', type: 'submit' });
+    const cancel = el('button', { className: 'ghost', textContent: 'Cancel', type: 'button', onclick: () => renderNewProfile() });
+    const form = el('form', { className: 'newform', onsubmit: e => { e.preventDefault(); if (input.value.trim()) createProfile(input.value.trim()); } },
+      input, create, cancel, el('span', { className: 'hint-games', textContent: 'copies ' + dev.active }));
+    input.onkeydown = e => { if (e.key === 'Escape') { renderNewProfile(); box.querySelector('.addp').focus(); } };
+    box.innerHTML = ''; box.append(form); input.focus();
+  };
+  box.append(btn);
+}
+
+async function toggleEditor(row, name) {
+  if (open && open.row === row && open.profile === name) { open = null; renderSheet(); return focusCell(row, name); }
+  if (name !== dev.active) {
+    const ok = await activate(name, true); if (!ok) return;
+    if (row.startsWith('btn:')) await loadButtons(dev, true);
+  }
+  open = { row, profile: dev.active };
+  renderSheet();
+  const first = document.querySelector('tr.ed button, tr.ed input, tr.ed select');
+  if (first) first.focus({ preventScroll: false });
+}
+function focusCell(row, name) {
+  const c = [...document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .cell`)].find(b => b.dataset.profile === name);
+  if (c) c.focus();
+}
+// Esc closes the editor and returns to its cell.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && open && !e.target.classList.contains('combo')) { const o = open; open = null; renderSheet(); focusCell(o.row, o.profile); }
+});
+
+// Refresh just the active column's cell (keeps focus inside an open editor).
+function refreshCell(row) {
+  const c = [...document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .cell`)].find(b => b.dataset.profile === dev.active);
+  if (!c) return;
+  const [html, changed] = cellView(row, dev.active);
+  c.innerHTML = html; c.classList.toggle('changed', !!changed);
+  document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .c-other .cell`).forEach(o => o.classList.toggle('changed', differs(row, o.dataset.profile)));
+}
+
+// ---------- Editors ----------
+
+function buildEditor(td, r) {
+  const box = el('div', { className: 'edbox' });
+  td.append(box);
+  if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
+  else if (r.key === 'keys') keysEditor(box);
+  else if (r.key === 'dpi') dpiEditor(box);
+  else if (r.key === 'polling') pollingEditor(box);
+  else if (r.key.startsWith('btn:')) buttonEditor(box, r.key.slice(4));
+}
+
+function colorPicker(current, onPick) {
+  const presets = el('div', { className: 'presets', role: 'group', ariaLabel: 'Colors' });
+  const mark = c => presets.querySelectorAll('button').forEach(b => b.ariaPressed = b.dataset.c === c);
+  PRESETS.forEach(([c, n]) => { const b = el('button', { title: n + ' #' + c, ariaLabel: n, onclick: () => { onPick(c); sync(c); } });
+    b.dataset.c = c; b.style.background = '#' + c; presets.append(b); });
+  const pick = el('input', { type: 'color', ariaLabel: 'Custom color', value: '#' + (current || '808080').toLowerCase(), oninput: e => { onPick(e.target.value.slice(1).toUpperCase()); hex.value = e.target.value.toUpperCase(); } });
+  const hex = el('input', { type: 'text', className: 'hex', maxLength: 7, ariaLabel: 'Hex color', value: current ? '#' + current : '', placeholder: 'Not set',
+    onchange: e => { const v = e.target.value.replace('#', '').toUpperCase(); if (/^[0-9A-F]{6}$/.test(v)) { onPick(v); sync(v); } else toast('Use six hex digits, like FF2800', true); } });
+  const sync = c => { pick.value = '#' + c.toLowerCase(); hex.value = '#' + c; mark(c); };
+  mark(current);
+  const well = el('label', { className: 'swatch' + (current ? '' : ' none'), title: 'Any color' }, pick);
+  pick.addEventListener('input', () => well.classList.remove('none'));
+  presets.addEventListener('click', () => well.classList.remove('none'));
+  return [presets, el('div', { className: 'row' }, well, hex)];
+}
+
+function zoneEditor(box, name) {
+  const z = zoneOf(dev.profile, name);
+  const [presets, custom] = colorPicker(z.color || '', c => setColor(c, name));
+  const bright = el('input', { type: 'range', min: 0, max: 100, value: z.brightness ?? 100, ariaLabel: 'Brightness', disabled: !z.color, id: 'zoneBright' });
+  const val = el('span', { className: 'val num', id: 'zoneBrightVal',
+    textContent: !z.color ? 'Pick a color first' : z.brightness != null ? z.brightness + '%' : '100% (default)' });
+  bright.oninput = e => { const v = +e.target.value; val.textContent = v + '%'; record(name, { brightness: v }); sendBright([name, v]); };
+  const on = el('input', { type: 'checkbox', className: 'switch', checked: !!z.color && !z.off, id: 'zoneOn' });
+  on.onchange = async e => {
+    try {
+      if (e.target.checked) setColor(zoneOf(dev.profile, name).color || 'E8782A', name);
+      else { record(name, { off: true }); await api('/api/off', { zone: name }); toast(label(name) + ' off · saved to ' + dev.active); }
+    } catch (err) { toast(err.message, true); }
+  };
+  box.append(
+    el('div', { className: 'edgroup' }, el('h3', { textContent: label(name) + ' color' }), presets, custom),
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Brightness' }), el('div', { className: 'row' }, bright, val),
+      el('div', { className: 'row' }, on, el('label', { htmlFor: 'zoneOn', textContent: 'Lit' }))));
+}
+
+function keysEditor(box) {
+  const [presets, custom] = colorPicker(brush, c => { brush = c; });
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'kb'; svg.setAttribute('aria-label', 'Keyboard: click or drag across keys to paint them');
+  box.append(
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Brush' }), presets, custom),
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Quick' }),
+      el('button', { className: 'ghost', textContent: 'Fill all keys', onclick: () => setKeys(Array(keyCount()).fill(brush)) }),
+      el('button', { className: 'ghost', textContent: 'Back to whole keyboard', onclick: () => { const c = dev.leds[0] && (zoneOf(dev.profile, dev.leds[0].name).color || brush); if (c) setColor(c, dev.leds[0].name); } })),
+    el('p', { className: 'note', textContent: 'Pick a brush color, then click or drag across keys to paint them.' }), svg);
+  renderKb(svg);
+}
+
+function dpiEditor(box) {
+  const d = dev.dpi;
+  const num = el('input', { type: 'number', className: 'dpi num', min: d.min, max: d.max, step: d.step, value: d.x, ariaLabel: 'DPI', id: 'dpiNum' });
+  const slider = el('input', { type: 'range', min: d.min, max: d.max, step: d.step, value: d.x, ariaLabel: 'DPI slider', id: 'dpiSlider' });
+  const pills = el('div', { className: 'pills', id: 'dpiPills' });
+  [400, 800, 1600, 3200, 6400].filter(v => v >= d.min && v <= d.max).forEach(v =>
+    pills.append(el('button', { className: 'pill num', textContent: v, ariaPressed: v === d.x, onclick: () => setDpi(v) })));
+  num.oninput = () => { num.dataset.dirty = '1'; };
+  num.onchange = e => { delete num.dataset.dirty; setDpi(e.target.value); };
+  slider.oninput = e => setDpi(e.target.value);
+  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'DPI' }), el('div', { className: 'row' }, num, el('span', { className: 'val', textContent: d.min + '–' + d.max })), slider),
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Presets' }), pills),
+    el('p', { className: 'note', textContent: 'The DPI button on the mouse changes this too; the sheet follows it.' }));
+}
+function showDpi() { // the mouse changed DPI by itself
+  refreshCell('dpi');
+  const n = $('dpiNum'), s = $('dpiSlider');
+  if (n && !n.dataset.dirty) n.value = dev.dpi.x; // follow the mouse unless a new value is being typed
+  if (s && document.activeElement !== s) s.value = dev.dpi.x;
+  document.querySelectorAll('#dpiPills .pill').forEach(p => p.ariaPressed = +p.textContent === dev.dpi.x);
+}
+
+function pollingEditor(box) {
+  const seg = el('div', { className: 'seg', role: 'group', ariaLabel: 'Polling rate' });
+  dev.polling.options.forEach(v => seg.append(el('button', { className: 'num', textContent: hz(v), ariaPressed: v === dev.polling.hz,
+    onclick: async () => {
+      try { await api('/api/polling', { hz: v }); dev.polling.hz = v; dev.profile.polling = v;
+        seg.querySelectorAll('button').forEach(b => b.ariaPressed = b.textContent === hz(v)); refreshCell('polling'); toast('Polling ' + hz(v) + ' · saved to ' + dev.active); }
+      catch (e) { toast(e.message, true); }
+    } })));
+  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Reports per second' }), seg),
+    el('p', { className: 'note', textContent: 'Higher is smoother and uses a little more CPU. 1000 Hz suits almost everyone.' }));
+}
+
+// ---------- Buttons ----------
+// Values are action texts, as in `secbird button`.
+const BTN_CHOICES = [
+  ['Mouse', [['left', 'Left click'], ['right', 'Right click'], ['middle', 'Middle click'], ['back', 'Back'],
+    ['forward', 'Forward'], ['double-click', 'Double click'], ['scroll-up', 'Scroll up'], ['scroll-down', 'Scroll down'],
+    ['scroll-left', 'Scroll left'], ['scroll-right', 'Scroll right']]],
+  ['Keyboard', [['key', 'Key or shortcut…'], ['turbo-key', 'Turbo key…']]],
+  ['Turbo', [['turbo-left', 'Turbo left click'], ['turbo-right', 'Turbo right click']]],
+  ['Sensitivity', [['dpi-up', 'DPI up'], ['dpi-down', 'DPI down'], ['dpi-cycle-up', 'DPI cycle'],
+    ['dpi-cycle-down', 'DPI cycle down'], ['dpi-clutch', 'Sniper (DPI while held)…']]],
+  ['Media', [['media:volume-up', 'Volume up'], ['media:volume-down', 'Volume down'], ['media:mute', 'Mute'],
+    ['media:play-pause', 'Play / pause'], ['media:next-track', 'Next track'], ['media:previous-track', 'Previous track']]],
+  ['Other', [['hypershift', 'HyperShift (hold)'], ['profile-cycle-up', 'Next on-board profile'],
+    ['scroll-mode:1', 'Switch wheel free-spin'], ['disabled', 'Disabled']]],
+];
+const CHOICE_LABEL = Object.fromEntries(BTN_CHOICES.flatMap(g => g[1]));
+const KEY_CODES = { Enter: 'enter', Escape: 'esc', Backspace: 'backspace', Tab: 'tab', Space: 'space', Minus: 'minus',
+  Equal: 'equal', BracketLeft: 'lbracket', BracketRight: 'rbracket', Backslash: 'backslash', Semicolon: 'semicolon',
+  Quote: 'quote', Backquote: 'grave', Comma: 'comma', Period: 'period', Slash: 'slash', CapsLock: 'capslock',
+  PrintScreen: 'printscreen', ScrollLock: 'scrolllock', Pause: 'pause', Insert: 'insert', Home: 'home', PageUp: 'pageup',
+  Delete: 'delete', End: 'end', PageDown: 'pagedown', ArrowRight: 'right', ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up' };
+const MOD_CODES = { ControlLeft: 'ctrl', ShiftLeft: 'shift', AltLeft: 'alt', MetaLeft: 'win',
+  ControlRight: 'rctrl', ShiftRight: 'rshift', AltRight: 'ralt', MetaRight: 'rwin' };
+const keyName = code => KEY_CODES[code] || (/^Key[A-Z]$/.test(code) && code.slice(3).toLowerCase())
+  || (/^Digit\d$/.test(code) && code.slice(5)) || (/^F\d{1,2}$/.test(code) && code.toLowerCase()) || null;
+const combo = c => c.split('+').map(k => k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1)).join('+');
+
+// Action text -> [choice, combo, number] for the controls, and back.
+function splitAction(a) {
+  let m;
+  if ((m = /^turbo:key:(.+)@(\d+)$/.exec(a))) return ['turbo-key', m[1], m[2]];
+  if ((m = /^turbo:(left|right)@(\d+)$/.exec(a))) return ['turbo-' + m[1], '', m[2]];
+  if ((m = /^key:(.+)$/.exec(a))) return ['key', m[1], ''];
+  if ((m = /^dpi-clutch:(\d+)/.exec(a))) return ['dpi-clutch', '', m[1]];
+  return [a, '', ''];
+}
+function joinAction(choice, keys, n) {
+  if (choice === 'key') return keys ? 'key:' + keys : null;
+  if (choice === 'turbo-key') return keys ? `turbo:key:${keys}@${n || 7}` : null;
+  if (choice === 'turbo-left' || choice === 'turbo-right') return `turbo:${choice.slice(6)}@${n || 7}`;
+  if (choice === 'dpi-clutch') return 'dpi-clutch:' + (n || 400);
+  return choice;
+}
+// Plain words for any action text.
+function actionLabel(a) {
+  if (!a) return '';
+  let m;
+  if ((m = /^key:(.+)$/.exec(a))) return 'Key ' + combo(m[1]);
+  if ((m = /^turbo:key:(.+)@(\d+)$/.exec(a))) return `Turbo key ${combo(m[1])} · ${m[2]}/s`;
+  if ((m = /^turbo:(.+)@(\d+)$/.exec(a))) return `Turbo ${(CHOICE_LABEL[m[1]] || m[1].replace(/-/g, ' ')).toLowerCase()} · ${m[2]}/s`;
+  if ((m = /^dpi-clutch:(\d+)/.exec(a))) return `Sniper · ${m[1]} DPI`;
+  if (CHOICE_LABEL[a]) return CHOICE_LABEL[a];
+  return a.replace(/[-:]/g, ' ').replace(/^./, c => c.toUpperCase());
+}
+
+async function loadButtons(d, force) {
+  if (d.kind !== 'mouse' || (!force && btnData[d.id] !== undefined)) return;
+  btnData[d.id] = null; // loading
+  if (dev && dev.id === d.id && !showAll) renderSheet();
+  try { btnData[d.id] = (await api('/api/buttons', { id: d.id })).buttons; } catch { btnData[d.id] = []; }
+  if (dev && dev.id === d.id && !showAll) renderSheet();
+}
+
+function buttonEditor(box, name) {
+  const b = (btnData[dev.id] || []).find(x => x.name === name); if (!b) return;
+  const action = b[btnLayer], [choice, keys, n] = splitAction(action);
+  const sel = el('select', { ariaLabel: b.label + ' action', id: 'btnSel' });
+  let found = false;
+  BTN_CHOICES.forEach(([group, opts]) => {
+    const g = el('optgroup', { label: group });
+    opts.forEach(([v, t]) => { g.append(new Option(t, v, false, v === choice)); found ||= v === choice; });
+    sel.append(g);
+  });
+  if (!found) sel.prepend(new Option(actionLabel(action) + ' (as saved)', action, false, true)); // only Synapse sets these
+  const keyIn = el('input', { type: 'text', className: 'combo', readOnly: true, value: keys ? combo(keys) : '', placeholder: 'Press keys…', ariaLabel: 'Key for ' + b.label });
+  keyIn.dataset.keys = keys;
+  const numIn = el('input', { type: 'number', className: 'num', value: n });
+  const numLabel = el('span', { className: 'val' });
+  const send = () => { const a = joinAction(sel.value, keyIn.dataset.keys, numIn.value); if (a) assign(b.name, a); };
+  let lone = null;
+  keyIn.onkeydown = e => {
+    if (e.key === 'Tab') return;
+    e.preventDefault();
+    if (MOD_CODES[e.code]) { lone = MOD_CODES[e.code]; return; }
+    const k = keyName(e.code); if (!k) return;
+    lone = null;
+    const mods = [e.ctrlKey && 'ctrl', e.shiftKey && 'shift', e.altKey && 'alt', e.metaKey && 'win'].filter(Boolean);
+    keyIn.dataset.keys = [...mods, k].join('+'); keyIn.value = combo(keyIn.dataset.keys); send();
+  };
+  keyIn.onkeyup = e => { if (lone && MOD_CODES[e.code] === lone) { keyIn.dataset.keys = lone; keyIn.value = combo(lone); lone = null; send(); } };
+  const extras = () => {
+    const v = sel.value, clutch = v === 'dpi-clutch', turbo = v === 'turbo-left' || v === 'turbo-right' || v === 'turbo-key';
+    keyIn.hidden = !(v === 'key' || v === 'turbo-key');
+    numIn.hidden = numLabel.hidden = !(turbo || clutch);
+    Object.assign(numIn, clutch ? { min: 100, max: dev.dpi ? dev.dpi.max : 30000, step: 50, ariaLabel: 'DPI while held' }
+      : { min: 1, max: 50, step: 1, ariaLabel: 'Presses per second' });
+    numLabel.textContent = clutch ? 'DPI while held' : 'presses / second';
+    if (!numIn.value || (clutch && +numIn.value < 100) || (turbo && +numIn.value > 50)) numIn.value = clutch ? 400 : 7;
+  };
+  sel.onchange = () => {
+    extras();
+    if (sel.value === 'key' || sel.value === 'turbo-key') { keyIn.value = ''; keyIn.dataset.keys = ''; keyIn.focus(); return toast('Now press the key or shortcut'); }
+    send();
+  };
+  numIn.onchange = send;
+  extras();
+  const saved = b.saved && b.saved[btnLayer];
+  box.append(el('div', { className: 'edgroup' },
+    el('h3', { textContent: b.label + (btnLayer === 'hypershift' ? ' · while HyperShift is held' : '') }),
+    el('div', { className: 'row' }, sel, keyIn, numIn, numLabel)));
+  if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Saved in the mouse' }),
+    el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'link', textContent: 'Reset to this', onclick: () => assign(b.name, '') }))));
+}
+
+async function assign(button, action) {
+  try {
+    const r = await api('/api/button', { button, layer: btnLayer, assign: action });
+    btnData[dev.id] = r.buttons;
+    const skey = btnLayer === 'normal' ? button : button + '/hypershift';
+    dev.profile.buttons = dev.profile.buttons || {};
+    if (action) dev.profile.buttons[skey] = action; else delete dev.profile.buttons[skey];
+    if (!action) { renderSheet(); focusCell('btn:' + button, dev.active); } else refreshCell('btn:' + button);
+    toast(action ? 'Saved to ' + dev.active : 'Back to the saved setting');
+  } catch (err) { toast(err.message, true); renderSheet(); }
+}
+
+// ---------- Lighting, DPI, keys: send and record ----------
+
+function record(name, patch) {
+  dev.profile.lighting = dev.profile.lighting || {};
+  dev.profile.lighting[name] = { ...zoneOf(dev.profile, name), ...patch };
+  if (dev.matrix && (patch.color || patch.off)) dev.profile.keys = [];
+  paintPreview(); refreshCell('zone:' + name); if (dev.matrix) { refreshCell('keys'); paintKeys(); }
+}
+const sendColor = {};
+function setColor(hex, name) {
+  record(name, { color: hex, off: false });
+  const on = $('zoneOn'); if (on) on.checked = true;
+  const br = $('zoneBright'), bv = $('zoneBrightVal');
+  if (br && br.disabled) { br.disabled = false; bv.textContent = (zoneOf(dev.profile, name).brightness ?? 100) + '%'; }
+  (sendColor[name] ||= live(c => api('/api/color', { zone: name, color: c })))(hex);
+}
+const sendBright = live(([name, value]) => api('/api/brightness', { zone: name, value }));
+const sendDpi = live(v => api('/api/dpi', { x: v, y: v }).then(r => { dev.dpi.x = dev.dpi.y = r.dpi[0]; dev.profile.dpi = r.dpi; refreshCell('dpi'); }));
+function setDpi(v) {
+  v = Math.round(Number(v)); if (!v) return;
+  const n = $('dpiNum'), s = $('dpiSlider');
+  if (n) n.value = v; if (s) s.value = v;
+  document.querySelectorAll('#dpiPills .pill').forEach(p => p.ariaPressed = +p.textContent === v);
+  sendDpi(v);
+}
 
 // Colors on the keys: painted keys, else the whole-keyboard color, else off.
 function frame() {
-  const keys = dev.profile && dev.profile.keys;
+  const keys = dev.profile.keys;
   if (keys && keys.length === keyCount()) return keys;
-  const z = dev.leds[0] ? zoneState(dev.leds[0].name) : {};
+  const z = dev.leds[0] ? zoneOf(dev.profile, dev.leds[0].name) : {};
   return Array(keyCount()).fill(!z.off && z.color ? z.color : '000000');
 }
-
-function renderKb() {
-  const svg = $('kb'), keys = layout(dev.matrix), cols = dev.matrix.cols;
+function renderKb(svg) {
+  const keys = layout(dev.matrix), cols = dev.matrix.cols;
   const w = Math.max(...keys.map(k => k.x + k.w)), h = Math.max(...keys.map(k => k.y + k.h));
   svg.setAttribute('viewBox', `-0.05 -0.05 ${w + 0.1} ${h + 0.1}`);
   svg.innerHTML = keys.map(k =>
     `<g data-i="${k.row * cols + k.col}"><rect x="${k.x + .05}" y="${k.y + .05}" width="${k.w - .1}" height="${k.h - .1}" rx=".12"/>` +
     `<text x="${k.x + k.w / 2}" y="${k.y + k.h / 2}">${esc(k.label)}</text></g>`).join('');
+  svg.onpointerdown = e => { painting = true; paintAt(e.target); e.preventDefault(); };
+  svg.onpointermove = e => { if (painting) paintAt(document.elementFromPoint(e.clientX, e.clientY)); };
   paintKeys();
 }
-
 function paintKeys() {
-  if (!dev.matrix) return;
+  const svg = $('kb'); if (!svg || !dev.matrix) return;
   const f = frame();
-  $('kb').querySelectorAll('g').forEach(g => {
+  svg.querySelectorAll('g').forEach(g => {
     const c = f[g.dataset.i] || '000000', n = parseInt(c, 16);
     const lum = 0.3 * (n >> 16) + 0.59 * (n >> 8 & 255) + 0.11 * (n & 255);
     g.firstChild.style.fill = c === '000000' ? '' : '#' + c;
     g.lastChild.style.fill = lum > 150 ? '#000000aa' : '';
   });
 }
-
 const sendKeys = live(keys => api('/api/keys', { keys }));
 function setKeys(keys) {
-  dev.profile = dev.profile || {};
   dev.profile.keys = keys;
   for (const z of Object.values(dev.profile.lighting || {})) { delete z.color; z.off = false; }
-  paintKeys(); sendKeys(keys);
+  paintKeys(); refreshCell('keys'); dev.leds.forEach(l => refreshCell('zone:' + l.name)); sendKeys(keys);
 }
-function paintAt(el) {
-  const g = el && el.closest && el.closest('#kb g'); if (!g) return;
+function paintAt(target) {
+  const g = target && target.closest && target.closest('#kb g'); if (!g) return;
   const f = frame().slice(), i = +g.dataset.i;
   if (f[i] === brush) return;
   f[i] = brush; setKeys(f);
 }
-$('kb').onpointerdown = e => {
-  if (mode !== 'keys') setMode('keys');
-  painting = true; paintAt(e.target); e.preventDefault();
-};
-$('kb').onpointermove = e => { if (painting) paintAt(document.elementFromPoint(e.clientX, e.clientY)); };
 window.addEventListener('pointerup', () => painting = false);
 
-function showBrush() {
-  $('color').value = '#' + brush.toLowerCase(); $('hex').value = '#' + brush;
-  document.documentElement.style.setProperty('--accent', '#' + brush);
+// ---------- Profiles ----------
+
+async function activate(name, quiet) {
+  try {
+    const r = await api('/api/profile', { action: 'use', name });
+    adopt(r.device);
+    if (dev.kind === 'mouse') { btnData[dev.id] = undefined; if (!quiet) loadButtons(dev); }
+    if (!quiet) open = null;
+    render();
+    toast(r.failures.length ? 'Some settings failed: ' + r.failures.join('; ') : (quiet ? 'Switched to ' + name + ' to edit it' : name + ' is active'), r.failures.length > 0);
+    return true;
+  } catch (err) { toast(err.message, true); render(); return false; }
 }
-function setMode(m) {
-  mode = m;
-  document.querySelectorAll('#mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
-  const keys = !!dev.matrix && mode === 'keys';
-  $('kbHint').hidden = !keys;
-  $('allBtn').textContent = keys ? 'Fill all keys' : 'Apply to all zones';
-  $('allBtn').hidden = !keys && dev.leds.length < 2;
-  if (keys) showBrush(); else if (zone) renderZone();
+async function createProfile(name) {
+  try {
+    await api('/api/profile', { action: 'new', name });
+    await activate(name, true);
+    toast('Created ' + name + ' (a copy of the previous profile)');
+  } catch (err) { toast(err.message, true); }
 }
-document.querySelectorAll('#mode button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+async function deleteProfile(name) {
+  const other = name === dev.active ? dev.profiles.find(p => p !== name) : null;
+  if (!confirm(`Delete the profile "${name}"?` + (other ? ` "${other}" becomes active.` : ' Games tied to it go back to the active profile.'))) return;
+  try {
+    if (other) await api('/api/profile', { action: 'use', name: other });
+    const r = await api('/api/profile', { action: 'delete', name }); adopt(r.device);
+    if (other && dev.kind === 'mouse') btnData[dev.id] = undefined;
+    open = null; render(); toast('Deleted ' + name);
+  } catch (err) { toast(err.message, true); }
+}
+async function saveApps(name, apps, msg) {
+  try {
+    const r = await api('/api/profile', { action: 'apps', name, apps });
+    adopt(r.device);
+    // The response carries every profile, so other columns update too (a game moves between profiles).
+    renderSheet(); toast(msg);
+  } catch (err) { toast(err.message, true); }
+}
+$('mProfile').onchange = e => activate(e.target.value);
 
-const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
-  headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
-const zoneOf = (d, name) => (d.profile && d.profile.lighting && d.profile.lighting[name]) || {};
+// ---------- Overview ----------
 
-// Several units of one model: add the end of the serial so they can be told apart.
-const devLabel = d => devices.filter(x => x.pid === d.pid).length > 1 && d.serial ? d.name + ' (' + d.serial.slice(-4) + ')' : d.name;
-
-function openDevice(d) { dev = d; zone = null; showAll = false; render(); }
-
-// One card per device: what it is, its colors, battery and active settings at a glance.
 function renderOverview() {
   const zones = devices.reduce((n, d) => n + d.leds.length, 0);
   $('ovSummary').textContent = [plural(devices.length, 'device'), zones && plural(zones, 'lighting zone'),
@@ -543,206 +974,71 @@ function renderOverview() {
   const grid = $('ovGrid');
   grid.innerHTML = '';
   devices.forEach(d => {
-    const c = document.createElement('button');
-    c.className = 'dcard';
-    const top = document.createElement('div');
-    top.className = 'dtop';
-    top.append(KINDS[d.kind] || 'Device');
+    const top = el('div', { className: 'dtop' }, KINDS[d.kind] || 'Device');
     if (d.battery != null) {
-      const b = document.createElement('span');
-      b.className = 'batt' + (d.battery < 20 ? ' low' : '');
-      b.innerHTML = '<b></b>';
-      b.firstChild.style.setProperty('--lvl', d.battery / 100);
-      b.append(d.battery + '%');
-      top.append(b);
+      const b = el('span', { className: 'batt num' + (d.battery < 20 ? ' low' : ''), innerHTML: '<b></b>' });
+      b.firstChild.style.setProperty('--lvl', d.battery / 100); b.append(d.battery + '%'); top.append(b);
     }
-    const h = document.createElement('h3');
-    h.textContent = devLabel(d);
-    const dots = document.createElement('div');
-    dots.className = 'dots';
-    const keys = d.profile && d.profile.keys;
-    const colors = keys && keys.length
-      ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k }))
-      : d.leds.map(l => zoneOf(d, l.name));
-    colors.forEach(z => {
-      const i = document.createElement('i');
-      if (z.off || !z.color) i.className = 'off'; else i.style.color = '#' + z.color;
-      dots.append(i);
-    });
-    const meta = document.createElement('div');
-    meta.className = 'dmeta';
-    meta.textContent = ['Profile ' + d.active, d.dpi && d.dpi.x + ' DPI',
-      d.polling && (d.polling.hz >= 1000 ? d.polling.hz / 1000 + 'k Hz' : d.polling.hz + ' Hz'),
-      keys && keys.length && 'per-key'].filter(Boolean).join(' · ');
-    c.append(top, h, dots, meta);
-    c.onclick = () => openDevice(d);
-    grid.append(c);
+    const dots = el('div', { className: 'dots' });
+    const p = d.profile || {}, keys = p.keys;
+    const colors = keys && keys.length ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
+    colors.forEach(z => { const i = el('i'); if (z.off || !z.color) i.className = 'off'; else i.style.color = '#' + z.color; dots.append(i); });
+    const meta = el('div', { className: 'dmeta num', textContent: [d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
+    grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, el('h3', { textContent: devLabel(d) }), dots, meta));
   });
-  unsupported.forEach(u => {
-    const c = document.createElement('div');
-    c.className = 'dcard muted';
-    const h = document.createElement('h3');
-    h.textContent = u.name;
-    const meta = document.createElement('div');
-    meta.className = 'dmeta';
-    meta.textContent = 'Connected · ' + u.reason;
-    const top = document.createElement('div');
-    top.className = 'dtop';
-    top.textContent = u.pid;
-    c.append(top, h, meta);
-    grid.append(c);
-  });
+  unsupported.forEach(u => grid.append(el('div', { className: 'dcard muted' },
+    el('div', { className: 'dtop', textContent: u.pid }), el('h3', { textContent: u.name }), el('div', { className: 'dmeta', textContent: 'Connected · ' + u.reason }))));
 }
 
-function record(name, patch) {
-  dev.profile = dev.profile || {};
-  dev.profile.lighting = dev.profile.lighting || {};
-  dev.profile.lighting[name] = { ...zoneState(name), ...patch };
-  if (dev.matrix && (patch.color || patch.off)) dev.profile.keys = [];
-  paintZone(name); paintKeys();
-}
+// ---------- Live updates, loading, global actions ----------
 
-const sendColor = {};
-function setColor(hex, name = zone) {
-  hex = hex.replace('#', '').toUpperCase();
-  if (!/^[0-9A-F]{6}$/.test(hex)) return;
-  if (dev.matrix && mode === 'keys') { brush = hex; showBrush(); return; }
-  record(name, { color: hex, off: false });
-  if (name === zone) renderZone();
-  (sendColor[name] ||= live(c => api('/api/color', { zone: name, color: c })))(hex);
+// Follow DPI changes made with the mouse's own DPI button. The tray answers from memory
+// (no device access), and only reports newer than the last poll are applied, so a DPI
+// just set here is never undone. Paused while the page is hidden.
+let liveSeq = null;
+async function pollLive() {
+  if (document.hidden) return;
+  try {
+    const r = await api('/api/live');
+    if (liveSeq !== null && r.seq !== liveSeq) {
+      for (const d of devices) {
+        const v = r.dpi[d.id];
+        if (v && d.dpi && (d.dpi.x !== v[0] || d.dpi.y !== v[1])) {
+          d.dpi.x = v[0]; d.dpi.y = v[1];
+          if (d.profile) d.profile.dpi = [v[0], v[1]];
+          if (showAll) renderOverview(); else if (dev && d.id === dev.id) showDpi();
+        }
+      }
+    }
+    liveSeq = r.seq;
+  } catch { /* the tray may be busy; try again next tick */ }
 }
-
-const sendBright = live(([name, value]) => api('/api/brightness', { zone: name, value }));
-const sendDpi = live(v => api('/api/dpi', { x: v, y: v }).then(r => { dev.dpi.x = r.dpi[0]; }));
-function setDpi(v) {
-  v = Math.round(Number(v)); if (!v) return;
-  $('dpi').value = v; $('dpiNum').value = v;
-  document.querySelectorAll('#dpiPresets .pill').forEach(p => p.setAttribute('aria-pressed', +p.textContent === v));
-  sendDpi(v);
-}
-
-$('color').oninput = e => setColor(e.target.value);
-$('hex').onchange = e => setColor(e.target.value);
-$('presets').append(...PRESETS.map(([c, name]) => {
-  const b = document.createElement('button');
-  b.style.background = c; b.title = name + ' ' + c; b.setAttribute('aria-label', name);
-  b.onclick = () => setColor(c);
-  return b;
-}));
-$('bright').oninput = e => {
-  const v = +e.target.value;
-  $('brightVal').textContent = v + '%';
-  record(zone, { brightness: v });
-  sendBright([zone, v]);
-};
-$('on').onchange = async e => {
-  const z = zoneState(zone);
-  try {
-    if (e.target.checked) setColor(z.color || 'E8782A');
-    else { record(zone, { off: true }); renderZone(); await api('/api/off', { zone }); toast(label(zone) + ' off · saved to ' + dev.active); }
-  } catch (err) { toast(err.message, true); }
-};
-$('allBtn').onclick = () => {
-  if (dev.matrix && mode === 'keys') return setKeys(Array(keyCount()).fill(brush));
-  const hex = $('hex').value;
-  dev.leds.forEach(l => setColor(hex, l.name));
-};
-$('dpi').oninput = e => setDpi(e.target.value);
-$('dpiNum').onchange = e => setDpi(e.target.value);
-
-$('profile').onchange = async e => {
-  try {
-    const r = await api('/api/profile', { action: 'use', name: e.target.value });
-    Object.assign(dev, r.device); render();
-    toast(r.failures.length ? 'Some settings failed: ' + r.failures.join('; ') : 'Switched to ' + dev.active, r.failures.length > 0);
-  } catch (err) { toast(err.message, true); render(); }
-};
-const closeNew = () => { $('newName').value = ''; $('newForm').classList.remove('open'); };
-$('newBtn').onclick = () => { $('newForm').classList.toggle('open'); $('newName').focus(); };
-$('cancelNew').onclick = closeNew;
-$('newName').onkeydown = e => { if (e.key === 'Escape') closeNew(); };
-$('newForm').onsubmit = async e => {
-  e.preventDefault();
-  const name = $('newName').value.trim(); if (!name) return;
-  try {
-    await api('/api/profile', { action: 'new', name });
-    const r = await api('/api/profile', { action: 'use', name });
-    Object.assign(dev, r.device); closeNew();
-    render(); toast('Created ' + name + ' (copy of the previous profile)');
-  } catch (err) { toast(err.message, true); }
-};
-$('delBtn').onclick = async () => {
-  const name = dev.active, other = dev.profiles.find(p => p !== name);
-  if (!other) return toast('This is the only profile', true);
-  if (!confirm(`Delete profile "${name}"? You'll switch to "${other}".`)) return;
-  try {
-    await api('/api/profile', { action: 'use', name: other });
-    const r = await api('/api/profile', { action: 'delete', name });
-    Object.assign(dev, r.device); render(); toast('Deleted ' + name);
-  } catch (err) { toast(err.message, true); }
-};
-
-// Programs that bring up the active profile while they are in front.
-const appsOf = () => (dev.profile && dev.profile.apps) || [];
-function renderApps() {
-  const apps = appsOf();
-  $('appsHint').textContent = apps.length
-    ? `Switches to "${dev.active}" while one of these is in front, and back when you leave it:`
-    : `Add a game or app to switch to "${dev.active}" automatically while it is in front.`;
-  $('appTags').innerHTML = '';
-  apps.forEach(a => {
-    const t = document.createElement('span'), x = document.createElement('button');
-    t.className = 'app-tag'; t.textContent = a;
-    x.type = 'button'; x.textContent = '×'; x.title = 'Remove ' + a; x.setAttribute('aria-label', 'Remove ' + a);
-    x.onclick = () => saveApps(apps.filter(v => v !== a), 'Removed ' + a);
-    t.append(x); $('appTags').append(t);
-  });
-}
-async function saveApps(apps, msg) {
-  try {
-    const r = await api('/api/profile', { action: 'apps', name: dev.active, apps });
-    Object.assign(dev, r.device); renderApps(); toast(msg);
-  } catch (err) { toast(err.message, true); }
-}
-// Suggest programs with an open window, fetched when the field is focused.
-$('appName').onfocus = async () => {
-  try {
-    const r = await api('/api/apps');
-    $('appList').innerHTML = '';
-    r.apps.filter(a => !appsOf().includes(a)).forEach(a => $('appList').append(new Option(a)));
-  } catch { /* suggestions are optional */ }
-};
-$('appForm').onsubmit = e => {
-  e.preventDefault();
-  const name = $('appName').value.trim(); if (!name) return;
-  $('appName').value = '';
-  saveApps([...appsOf(), name], 'Added ' + name + ' to ' + dev.active);
-};
+setInterval(pollLive, 1000);
 
 async function load(path = '/api/state', body) {
   try {
     const s = body ? await api(path, body) : await api(path);
     devices = s.devices; unsupported = s.unsupported || []; synapse = s.synapse || [];
+    devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
     if (s.version) $('home').title = 'Secretarybird ' + s.version + ': all devices';
     const want = new URLSearchParams(location.search).get('d');
     const wanted = d => d.pid === want || d.id === want;
     dev = devices.find(d => dev && d.id === dev.id) || devices.find(wanted) || devices[0] || null;
-    // Several devices: start on the overview, unless the URL asked for one.
     if (showAll === null) showAll = !devices.some(wanted) && (devices.length > 1 || unsupported.length > 0);
+    if (open && (!dev || open.profile !== dev.active)) open = null;
     render();
   } catch (e) { toast(e.message, true); }
 }
 // Sync: one color on every zone of every device. Dragging the swatch syncs live.
-const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
 const sendSync = live(async color => {
   const r = await api('/api/sync', { color });
   devices = r.state.devices; unsupported = r.state.unsupported || []; synapse = r.state.synapse || [];
+  devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
   dev = devices.find(d => d.id === dev.id) || devices[0];
   render();
   if (r.failed.length) throw new Error('Some zones failed: ' + r.failed.join('; '));
   return r;
 }, r => '#' + $('syncColor').value.slice(1).toUpperCase() + ' on ' + plural(r.zones, 'zone') + ' across ' + plural(r.devices, 'device'));
-let syncPicked = false;
 // Theme: Windows decides until the button is used; the choice is remembered in this browser.
 const themeKey = 'secbird-theme';
 try { const t = localStorage.getItem(themeKey); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -752,19 +1048,17 @@ $('theme').onclick = () => {
   root.dataset.theme = dark ? 'light' : 'dark';
   try { localStorage.setItem(themeKey, root.dataset.theme); } catch (e) {}
 };
-// The logo goes home: the overview of every device.
-$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; render(); } };
+$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; open = null; render(); } };
 $('syncColor').oninput = e => { syncPicked = true; sendSync(e.target.value.slice(1).toUpperCase()); };
 $('syncBtn').onclick = () => sendSync($('syncColor').value.slice(1).toUpperCase());
-
 // Many devices: the mouse wheel scrolls the tab row sideways.
 $('tabs').addEventListener('wheel', e => {
   if (!e.deltaY || $('tabs').scrollWidth <= $('tabs').clientWidth) return;
   $('tabs').scrollLeft += e.deltaY; e.preventDefault();
 }, { passive: false });
-
-$('rescan').onclick = () => load('/api/rescan', {});
-window.addEventListener('focus', () => load());
+$('rescan').onclick = () => { btnData = {}; load('/api/rescan', {}); };
+// Coming back to the window: refresh, but leave an open editor alone.
+window.addEventListener('focus', () => { if (!open) load(); });
 load();
 </script>
 </body>

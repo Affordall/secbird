@@ -10,6 +10,7 @@
 //! ```
 
 pub mod actions;
+pub mod buttons;
 pub mod commands;
 #[cfg(windows)]
 pub mod debloat;

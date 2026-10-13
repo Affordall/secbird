@@ -216,6 +216,10 @@ impl Server {
         let result = match (req.method.as_str(), req.path.as_str()) {
             ("GET", "/api/state") => Ok(state(&engine)),
             ("GET", "/api/apps") => Ok(json!({ "apps": crate::apps::running() })),
+            ("GET", "/api/live") => {
+                let (seq, dpi) = engine.live_dpi();
+                Ok(json!({ "seq": seq, "dpi": dpi.iter().map(|(k, (x, y))| (k.clone(), json!([x, y]))).collect::<serde_json::Map<_, _>>() }))
+            }
             ("POST", "/api/rescan") => {
                 engine.rescan();
                 Ok(state(&engine))
@@ -257,6 +261,46 @@ struct Body {
     keys: Vec<String>,
     #[serde(default)]
     apps: Vec<String>,
+    /// Button name, layer ("normal" / "hypershift") and action text ("" = reset).
+    #[serde(default)]
+    button: String,
+    #[serde(default)]
+    layer: String,
+    #[serde(default)]
+    assign: String,
+}
+
+/// Every button of a mouse with what it does on each layer, and which ones the active
+/// profile remaps.
+fn buttons_json(dev: &Device, store: &mut Store) -> Value {
+    use secbird_core::buttons::{button_label, button_name, setting_key, Layer};
+    let remapped = &store.for_device(dev).active().buttons;
+    let list: Vec<Value> = dev
+        .buttons()
+        .into_iter()
+        .map(|(id, normal)| {
+            let name = button_name(id).unwrap_or("?");
+            let hyper = dev.button(id, Layer::HyperShift).map(|a| a.to_string()).ok();
+            let is_remapped = |layer| remapped.contains_key(&setting_key(name, layer));
+            // What the mouse itself holds: the live value unless the active profile remapped it.
+            let saved = |layer, live: Option<String>| match is_remapped(layer) {
+                true => dev.saved_button(id, layer).map(|a| a.to_string()).ok(),
+                false => live,
+            };
+            json!({
+                "name": name,
+                "label": button_label(id),
+                "normal": normal.to_string(),
+                "hypershift": hyper,
+                "remapped": { "normal": is_remapped(Layer::Normal), "hypershift": is_remapped(Layer::HyperShift) },
+                "saved": {
+                    "normal": saved(Layer::Normal, Some(normal.to_string())),
+                    "hypershift": saved(Layer::HyperShift, hyper.clone()),
+                },
+            })
+        })
+        .collect();
+    json!({ "buttons": list })
 }
 
 fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
@@ -289,6 +333,19 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                 let keys = b.keys.iter().map(|k| k.parse::<Rgb>()).collect::<Result<Vec<_>, _>>()?;
                 actions::set_keys(dev, &mut store, keys).map(|_| json!({}))
             }
+            "/api/buttons" => Ok(buttons_json(dev, &mut store)),
+            "/api/button" => {
+                let layer = match b.layer.as_str() {
+                    "hypershift" => secbird_core::buttons::Layer::HyperShift,
+                    _ => secbird_core::buttons::Layer::Normal,
+                };
+                let action = match b.assign.trim() {
+                    "" => None,
+                    text => Some(text.parse()?),
+                };
+                actions::set_button(dev, &mut store, &b.button, layer, action)?;
+                Ok(buttons_json(dev, &mut store))
+            }
             "/api/profile" => {
                 let profiles = store.for_device(dev);
                 match b.action.as_str() {
@@ -299,11 +356,11 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                     other => return Err(Error::InvalidArg(format!("unknown action '{other}'"))),
                 }
                 let switched = b.action == "use";
-                let profile = profiles.active().clone();
+                let profiles = profiles.clone();
                 store.save()?;
                 let failures: Vec<String> = if switched {
-                    profile
-                        .apply(dev)
+                    profiles
+                        .apply(&profiles.active, dev)
                         .into_iter()
                         .filter_map(|a| a.result.err().map(|e| format!("{}: {e}", a.setting)))
                         .collect()
@@ -354,10 +411,10 @@ fn state(engine: &Engine) -> Value {
 fn device_json(dev: &Device) -> Value {
     let spec = dev.spec.as_ref();
     let (profile_names, active) = Engine::profiles(dev);
-    let profile = Store::load(&config_dir().join("profiles.json"))
-        .ok()
-        .and_then(|mut s| serde_json::to_value(s.for_device(dev).active()).ok())
-        .unwrap_or(Value::Null);
+    let all = Store::load(&config_dir().join("profiles.json")).ok().map(|mut s| s.for_device(dev).clone());
+    let profile = all.as_ref().and_then(|p| serde_json::to_value(p.active()).ok()).unwrap_or(Value::Null);
+    // Every profile's settings, so the editor can show them side by side.
+    let profiles_data = all.and_then(|p| serde_json::to_value(p.profiles).ok()).unwrap_or(Value::Null);
     let dpi_range = spec.and_then(|s| s.dpi.as_ref());
     let polling_options: &[u32] = match spec.and_then(|s| s.polling) {
         Some(secbird_core::db::Polling::High) => &[125, 250, 500, 1000, 2000, 4000, 8000],
@@ -394,6 +451,7 @@ fn device_json(dev: &Device) -> Value {
         "profiles": profile_names,
         "active": active,
         "profile": profile,
+        "profilesData": profiles_data,
     })
 }
 
