@@ -120,8 +120,8 @@ numbers. Reports are how devices move from "listed" to "verified".
 
 | Status | Devices |
 |---|---|
-| Verified on real hardware (by us) | Basilisk V3 |
-| Reported working by users | Cobra (wired), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
+| Verified on real hardware | Basilisk V3 (ours), Cobra wired ([report](https://github.com/infinityInfinite/secbird/issues/1)) |
+| Reported working by users | Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
 | Listed, waiting for reports | 268 more mice, keyboards, keypads, mousepads, laptops and accessories |
 | Not supported yet | Kraken headsets, laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
 

@@ -79,7 +79,7 @@
 {"pid":"009E","name":"Viper Mini SE (Wired)","kind":"mouse","txid":"1F","dpi":{"min":100,"max":30000,"step":50},"polling":"standard","wireless":true,"source":"openrazer"},
 {"pid":"009F","name":"Viper Mini SE (Wireless)","kind":"mouse","txid":"1F","dpi":{"min":100,"max":30000,"step":50},"polling":"high","wireless":true,"source":"openrazer"},
 {"pid":"00A1","name":"DeathAdder V2 Lite","kind":"mouse","txid":"1F","dpi":{"min":100,"max":8500,"step":50},"polling":"standard","lighting":"extended","leds":[{"name":"logo","id":4}],"source":"openrazer"},
-{"pid":"00A3","name":"Cobra","kind":"mouse","txid":"FF","dpi":{"min":100,"max":8500,"step":50},"polling":"standard","lighting":"extended","leds":[{"name":"logo","id":4}],"source":"openrazer"},
+{"pid":"00A3","name":"Cobra","kind":"mouse","txid":"1F","dpi":{"min":100,"max":8500,"step":50},"polling":"standard","lighting":"extended","leds":[{"name":"logo","id":4}],"source":"openrazer"},
 {"pid":"00A4","name":"Mouse Dock Pro","kind":"accessory","txid":"FF","lighting":"extended","leds":[{"name":"all","id":0}],"matrix":{"rows":1,"cols":8},"source":"openrazer"},
 {"pid":"00A5","name":"Viper V2 Pro (Wired)","kind":"mouse","txid":"1F","dpi":{"min":100,"max":30000,"step":50},"polling":"standard","wireless":true,"source":"openrazer"},
 {"pid":"00A6","name":"Viper V2 Pro (Wireless)","kind":"mouse","txid":"1F","dpi":{"min":100,"max":30000,"step":50},"polling":"standard","wireless":true,"source":"openrazer"},

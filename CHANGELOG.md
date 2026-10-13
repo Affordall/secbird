@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2] - 2026-10-14
+
+### Fixed
+- Cobra (wired): the device list now has its real transaction id (1F, was FF), from a user's
+  `secbird report`. It worked before only because discovery falls back to the other ids.
+
+### Changed
+- Cobra (wired) is verified on real hardware: logo lighting, DPI and polling rate (issue #1).
+
 ## [0.3.1] - 2026-10-14
 
 ### Fixed
