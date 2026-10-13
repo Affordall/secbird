@@ -444,7 +444,13 @@ fn device_json(dev: &Device) -> Value {
             "max": dpi_range.map_or(20000, |r| r.max),
             "step": dpi_range.map_or(50, |r| r.step),
         })),
-        "polling": dev.polling_rate().ok().map(|hz| json!({ "hz": hz, "options": polling_options })),
+        // Mousepads and docks answer the polling question too, but have no polling rate to
+        // set: only show it where the device list says there is one (or the model is unknown).
+        "polling": spec
+            .is_none_or(|s| s.polling.is_some())
+            .then(|| dev.polling_rate().ok())
+            .flatten()
+            .map(|hz| json!({ "hz": hz, "options": polling_options })),
         "battery": dev.battery().ok().flatten(),
         "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols })),
         "leds": spec.map(|s| s.leds.iter().map(|l| json!({ "name": l.name, "id": l.id })).collect::<Vec<_>>()).unwrap_or_default(),

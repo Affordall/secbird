@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.1] - 2026-10-14
+
+### Fixed
+- Mousepads and docks no longer show a polling rate in the editor; it only appears where the
+  device list says the device has one.
+
+### Changed
+- README lists devices users reported working (Cobra wired, Basilisk V3 Pro 35K Phantom,
+  BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma), separate from
+  the ones verified on our own hardware.
+
 ## [0.3.0] - 2026-10-13
 
 ### Added
