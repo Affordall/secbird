@@ -55,6 +55,9 @@ and run `secbird-tray.exe`.
   keyboards with per-key lighting.
 - **Profiles** are saved per physical device, so two identical mice keep their own settings.
   Back them up with `secbird export backup.json`.
+- **Per-app profiles:** tie a profile to games or apps (in the editor's Profile card, or
+  `secbird profile apps Gaming cs2.exe`). It switches while that program is in front and goes
+  back when you leave it. Windows tells the tray when the window in front changes, so nothing polls.
 
 ## Moving from Synapse
 
@@ -78,6 +81,7 @@ secbird color logo FF8800       static color for a zone
 secbird keys 00FFAA             every key one color (per-key keyboards)
 secbird sync 00FFAA             same color on every device
 secbird profile new gaming      profiles per device
+secbird profile apps gaming cs2.exe   switch to a profile while a program is in front
 secbird export backup.json      save all profiles to a file
 secbird report                  read-only description of your hardware, for issues
 secbird --version

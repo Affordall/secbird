@@ -34,6 +34,20 @@ pub struct Profile {
     /// Per-key colors, row-major over the device's matrix. Empty when unused.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keys: Vec<Rgb>,
+    /// Programs (lowercase exe names, e.g. `cs2.exe`) that switch the device to this
+    /// profile while their window is in front.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apps: Vec<String>,
+}
+
+/// `C:\Games\CS2.exe`, `cs2` or ` CS2.EXE ` -> `cs2.exe`. Empty when nothing is left.
+pub fn normalize_app(name: &str) -> String {
+    let name = name.trim().rsplit(['\\', '/']).next().unwrap_or("").trim().to_lowercase();
+    if name.is_empty() || name.ends_with(".exe") {
+        name
+    } else {
+        format!("{name}.exe")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,9 +79,38 @@ impl DeviceProfiles {
         if self.profiles.contains_key(name) {
             return Err(Error::InvalidArg(format!("profile '{name}' already exists")));
         }
-        let copy = self.active().clone();
+        // A program belongs to one profile, so the copy starts without any.
+        let copy = Profile { apps: Vec::new(), ..self.active().clone() };
         self.profiles.insert(name.into(), copy);
         Ok(())
+    }
+
+    /// Set the programs that bring up profile `name`. A program listed here is taken
+    /// off any other profile of this device.
+    pub fn set_apps(&mut self, name: &str, apps: &[String]) -> Result<()> {
+        if !self.profiles.contains_key(name) {
+            return Err(Error::NotFound(format!("profile '{name}'")));
+        }
+        let mut list: Vec<String> = apps.iter().map(|a| normalize_app(a)).filter(|a| !a.is_empty()).collect();
+        list.sort();
+        list.dedup();
+        for (other, p) in self.profiles.iter_mut() {
+            if other != name {
+                p.apps.retain(|a| !list.contains(a));
+            }
+        }
+        self.profiles.get_mut(name).expect("checked above").apps = list;
+        Ok(())
+    }
+
+    /// The profile tied to a program (a normalized exe name), if any.
+    pub fn for_app(&self, exe: &str) -> Option<&str> {
+        self.profiles.iter().find(|(_, p)| p.apps.iter().any(|a| a == exe)).map(|(n, _)| n.as_str())
+    }
+
+    /// The profile to show right now: the one tied to the program in front, else the active one.
+    pub fn effective(&self, foreground: Option<&str>) -> &str {
+        foreground.and_then(|exe| self.for_app(exe)).unwrap_or(&self.active)
     }
 
     pub fn switch(&mut self, name: &str) -> Result<()> {
@@ -170,6 +213,11 @@ impl Store {
     pub fn device(&mut self, pid: u16) -> &mut DeviceProfiles {
         self.devices.entry(format!("{pid:04X}")).or_default()
     }
+
+    /// Every program tied to a profile of any device.
+    pub fn apps(&self) -> std::collections::HashSet<String> {
+        self.devices.values().flat_map(|d| d.profiles.values()).flat_map(|p| p.apps.iter().cloned()).collect()
+    }
 }
 
 /// Outcome of applying one setting from a profile.
@@ -240,6 +288,38 @@ mod tests {
         assert_eq!(p.active().dpi, Some((800, 800)));
         p.active_mut().dpi = Some((1600, 1600));
         assert_eq!(p.profiles[DEFAULT_PROFILE].dpi, Some((800, 800)));
+    }
+
+    #[test]
+    fn app_names_are_normalized() {
+        assert_eq!(normalize_app(r"C:\Games\CS2.exe"), "cs2.exe");
+        assert_eq!(normalize_app(" dota2 "), "dota2.exe");
+        assert_eq!(normalize_app("  "), "");
+    }
+
+    #[test]
+    fn an_app_belongs_to_one_profile() {
+        let mut p = DeviceProfiles::default();
+        p.create("Gaming").unwrap();
+        p.create("Work").unwrap();
+        p.set_apps("Gaming", &["CS2.exe".into(), "dota2".into(), "cs2.exe".into()]).unwrap();
+        assert_eq!(p.profiles["Gaming"].apps, ["cs2.exe", "dota2.exe"]);
+        p.set_apps("Work", &["dota2.exe".into()]).unwrap();
+        assert_eq!(p.profiles["Gaming"].apps, ["cs2.exe"]);
+        assert_eq!(p.for_app("dota2.exe"), Some("Work"));
+        assert_eq!(p.effective(Some("cs2.exe")), "Gaming");
+        assert_eq!(p.effective(Some("notepad.exe")), DEFAULT_PROFILE);
+        assert_eq!(p.effective(None), DEFAULT_PROFILE);
+        assert!(p.set_apps("Missing", &[]).is_err());
+    }
+
+    #[test]
+    fn new_profile_does_not_copy_apps() {
+        let mut p = DeviceProfiles::default();
+        p.set_apps(DEFAULT_PROFILE, &["cs2.exe".into()]).unwrap();
+        p.create("Copy").unwrap();
+        assert!(p.profiles["Copy"].apps.is_empty());
+        assert_eq!(p.for_app("cs2.exe"), Some(DEFAULT_PROFILE));
     }
 
     #[test]

@@ -28,6 +28,9 @@ PROFILES:
   profile use <name>        Switch to a profile and apply it
   profile delete <name>     Delete a profile
   profile show [name]       Settings stored in a profile
+  profile apps <name> [program ...]
+                            Switch to <name> while one of these programs is in front
+                            (e.g. cs2.exe); no programs clears the list
   apply                     Re-send the active profile to the device
   export <file>             Save all profiles of all devices to a file
   import <file>             Add profiles from an exported file (keeps yours)
@@ -292,6 +295,9 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
                 let bright = z.brightness.map(|b| format!(", {b}%")).unwrap_or_default();
                 println!("  {zone:<10} {state}{bright}");
             }
+            if !p.apps.is_empty() {
+                println!("  apps       {}", p.apps.join(", "));
+            }
             if *p == Default::default() {
                 println!("  (empty: change a setting to record it)");
             }
@@ -311,6 +317,19 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
             store.save()?;
             println!("Active profile: {name}");
             report_apply(dev, &profile)
+        }
+        "apps" => {
+            let name = name.ok_or_else(|| Error::InvalidArg("usage: profile apps <name> [program ...]".into()))?;
+            profiles.set_apps(name, &rest[2..])?;
+            let apps = profiles.profiles[name].apps.join(", ");
+            store.save()?;
+            if apps.is_empty() {
+                println!("Profile '{name}' no longer switches with any program.");
+            } else {
+                println!("Profile '{name}' comes up while one of these is in front: {apps}");
+                println!("(The tray app does the switching; it goes back to the active profile afterwards.)");
+            }
+            Ok(())
         }
         "delete" => {
             let name = name.ok_or_else(need_name)?;

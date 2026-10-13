@@ -1,19 +1,20 @@
 use crate::engine::{ApplyReport, Battery, Engine};
 use secbird_core::log;
 use std::collections::HashSet;
-use crate::server;
+use crate::{apps, server};
 use secbird_core::config_dir;
 use std::cell::RefCell;
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
 use std::ptr::{null, null_mut};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Registry::*;
 use windows_sys::Win32::System::Threading::CreateMutexW;
+use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
@@ -32,6 +33,10 @@ const BATTERY_MS: u32 = 5 * 60 * 1000;
 const LOW_BATTERY: u8 = 15;
 /// Devices need a moment after arrival or resume before they answer reliably.
 const SETTLE_MS: u32 = 1500;
+/// Wait for the window in front to settle, so Alt+Tab through several windows sends
+/// one profile instead of one per window passed.
+const TIMER_FOREGROUND: usize = 4;
+const FOREGROUND_MS: u32 = 300;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
@@ -45,6 +50,8 @@ const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// "TaskbarCreated" is broadcast when Explorer restarts; the icon must be re-added.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+/// The tray window, for the foreground hook (which gets no user data).
+static TRAY_HWND: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 
 struct App {
     hwnd: HWND,
@@ -142,6 +149,18 @@ pub fn run() {
         );
         TASKBAR_CREATED.store(RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()), Ordering::Relaxed);
         register_hid_notifications(hwnd);
+        // Event-driven, no polling: Windows calls back on this thread when the window
+        // in front changes, and nothing runs in between.
+        TRAY_HWND.store(hwnd, Ordering::Relaxed);
+        SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            null_mut(),
+            Some(on_foreground),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
 
         let icon = load_icon();
         add_icon(hwnd, icon);
@@ -228,6 +247,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             with_app(|app| app.check_battery());
             0
         }
+        WM_TIMER if wparam == TIMER_FOREGROUND => {
+            KillTimer(hwnd, TIMER_FOREGROUND);
+            if with_app(|app| app.foreground_changed()).is_none() {
+                SetTimer(hwnd, TIMER_FOREGROUND, FOREGROUND_MS, None);
+            }
+            0
+        }
         WM_DESTROY => {
             with_app(|app| remove_icon(app.hwnd));
             PostQuitMessage(0);
@@ -241,6 +267,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             0
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+/// A window came to the front: (re)start the settle timer.
+unsafe extern "system" fn on_foreground(_: HWINEVENTHOOK, _: u32, _: HWND, _: i32, _: i32, _: u32, _: u32) {
+    let hwnd = TRAY_HWND.load(Ordering::Relaxed);
+    if !hwnd.is_null() {
+        SetTimer(hwnd, TIMER_FOREGROUND, FOREGROUND_MS, None);
     }
 }
 
@@ -277,6 +311,19 @@ impl App {
         self.notify_failures(&reports);
         self.warn_synapse(&synapse);
         self.check_battery();
+    }
+
+    /// Switch devices to the profile tied to the program now in front, or back.
+    fn foreground_changed(&mut self) {
+        let exe = apps::foreground();
+        let reports = self.engine().set_foreground(exe.clone());
+        if reports.is_empty() {
+            return;
+        }
+        let what: Vec<String> = reports.iter().map(|r| format!("{} -> {}", r.device, r.profile)).collect();
+        log::append(&format!("{} in front: {}", exe.as_deref().unwrap_or("?"), what.join(", ")));
+        self.notify_failures(&reports);
+        self.update_tooltip();
     }
 
     /// Synapse re-sends its own settings and holds devices open; say so once per run of it.
@@ -334,7 +381,13 @@ impl App {
             text.push_str("\nNo Razer devices");
         }
         for dev in engine.devices() {
-            let (_, active) = Engine::profiles(dev);
+            let (_, mut active) = Engine::profiles(dev);
+            if let Some(exe) = engine.foreground() {
+                let now = engine.effective_profile(dev);
+                if now != active {
+                    active = format!("{now} (auto: {exe})");
+                }
+            }
             let battery = match self.batteries.iter().find(|b| b.key == dev.key()) {
                 Some(b) if b.charging => format!(" · {}% charging", b.percent),
                 Some(b) => format!(" · {}%", b.percent),

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0] - 2026-10-13
+
+### Added
+- Per-app profiles: tie a profile to games or apps and it switches while that program is
+  in front, then goes back to the active profile. Set it in the editor's Profile card (with
+  suggestions from programs that have a window open) or with `secbird profile apps`.
+  Event-driven (Windows foreground notifications, no polling); adds about 27 KB to the tray.
+
 ## [0.1.0] - 2026-10-13
 
 First public beta. Tested on real hardware with the Basilisk V3 only; other devices are

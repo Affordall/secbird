@@ -105,6 +105,12 @@
   .link { background: none; border: 0; color: var(--accent-text); cursor: pointer; padding: 0; font-size: 12.5px; text-transform: none; letter-spacing: 0; }
   .newform { display: none; }
   .newform.open { display: flex; }
+  .apps-hint { color: var(--muted); font-size: 12.5px; margin: 16px 0 8px; }
+  .app-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .app-tags:not(:empty) { margin-bottom: 10px; }
+  .app-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 11px; font-size: 13px; font-family: ui-monospace, Consolas, monospace; }
+  .app-tag button { background: none; border: 0; color: var(--muted); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; padding: 0; font-size: 15px; line-height: 1; }
+  .app-tag button:hover { color: var(--text); background: var(--line); }
 
   .empty { grid-column: 1 / -1; text-align: center; padding: 80px 0; color: var(--muted); }
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--toast); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; opacity: 0; transition: .2s; pointer-events: none; font-size: 13px; }
@@ -207,6 +213,13 @@
         <input type="text" id="newName" placeholder="Profile name" maxlength="32" style="flex:1" aria-label="New profile name">
         <button class="ghost" type="submit">Create</button>
         <button class="ghost" type="button" id="cancelNew">Cancel</button>
+      </form>
+      <p class="apps-hint" id="appsHint"></p>
+      <div class="app-tags" id="appTags"></div>
+      <form class="row" id="appForm">
+        <input type="text" id="appName" list="appList" placeholder="Game or app, e.g. cs2.exe" style="flex:1" aria-label="Program that switches to this profile" autocomplete="off">
+        <datalist id="appList"></datalist>
+        <button class="ghost" type="submit">Add</button>
       </form>
     </div>
 
@@ -387,6 +400,7 @@ function render() {
 
   $('profile').innerHTML = '';
   dev.profiles.forEach(p => $('profile').add(new Option(p, p, false, p === dev.active)));
+  renderApps();
 
   const leds = dev.leds.map(l => l.name);
   $('lightCard').hidden = leds.length === 0;
@@ -666,6 +680,43 @@ $('delBtn').onclick = async () => {
     const r = await api('/api/profile', { action: 'delete', name });
     Object.assign(dev, r.device); render(); toast('Deleted ' + name);
   } catch (err) { toast(err.message, true); }
+};
+
+// Programs that bring up the active profile while they are in front.
+const appsOf = () => (dev.profile && dev.profile.apps) || [];
+function renderApps() {
+  const apps = appsOf();
+  $('appsHint').textContent = apps.length
+    ? `Switches to "${dev.active}" while one of these is in front, and back when you leave it:`
+    : `Add a game or app to switch to "${dev.active}" automatically while it is in front.`;
+  $('appTags').innerHTML = '';
+  apps.forEach(a => {
+    const t = document.createElement('span'), x = document.createElement('button');
+    t.className = 'app-tag'; t.textContent = a;
+    x.type = 'button'; x.textContent = '×'; x.title = 'Remove ' + a; x.setAttribute('aria-label', 'Remove ' + a);
+    x.onclick = () => saveApps(apps.filter(v => v !== a), 'Removed ' + a);
+    t.append(x); $('appTags').append(t);
+  });
+}
+async function saveApps(apps, msg) {
+  try {
+    const r = await api('/api/profile', { action: 'apps', name: dev.active, apps });
+    Object.assign(dev, r.device); renderApps(); toast(msg);
+  } catch (err) { toast(err.message, true); }
+}
+// Suggest programs with an open window, fetched when the field is focused.
+$('appName').onfocus = async () => {
+  try {
+    const r = await api('/api/apps');
+    $('appList').innerHTML = '';
+    r.apps.filter(a => !appsOf().includes(a)).forEach(a => $('appList').append(new Option(a)));
+  } catch { /* suggestions are optional */ }
+};
+$('appForm').onsubmit = e => {
+  e.preventDefault();
+  const name = $('appName').value.trim(); if (!name) return;
+  $('appName').value = '';
+  saveApps([...appsOf(), name], 'Added ' + name + ' to ' + dev.active);
 };
 
 async function load(path = '/api/state', body) {

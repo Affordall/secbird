@@ -215,6 +215,7 @@ impl Server {
         };
         let result = match (req.method.as_str(), req.path.as_str()) {
             ("GET", "/api/state") => Ok(state(&engine)),
+            ("GET", "/api/apps") => Ok(json!({ "apps": crate::apps::running() })),
             ("POST", "/api/rescan") => {
                 engine.rescan();
                 Ok(state(&engine))
@@ -254,6 +255,8 @@ struct Body {
     name: String,
     #[serde(default)]
     keys: Vec<String>,
+    #[serde(default)]
+    apps: Vec<String>,
 }
 
 fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
@@ -292,6 +295,7 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                     "new" => profiles.create(b.name.trim())?,
                     "delete" => profiles.delete(&b.name)?,
                     "use" => profiles.switch(&b.name)?,
+                    "apps" => profiles.set_apps(&b.name, &b.apps)?,
                     other => return Err(Error::InvalidArg(format!("unknown action '{other}'"))),
                 }
                 let switched = b.action == "use";

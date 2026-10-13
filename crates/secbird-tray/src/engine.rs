@@ -2,6 +2,7 @@
 
 use secbird_core::{config_dir, discover, hidapi::HidApi, Db, Device, Result, Store};
 use std::collections::HashSet;
+use std::time::SystemTime;
 
 pub struct Engine {
     api: HidApi,
@@ -9,6 +10,11 @@ pub struct Engine {
     unsupported: Vec<Unsupported>,
     /// Synapse processes seen at the last rescan.
     synapse: Vec<String>,
+    /// The program in front, when some profile is tied to it.
+    foreground: Option<String>,
+    /// Programs tied to any profile, and the profiles.json timestamp they were read at.
+    apps: HashSet<String>,
+    apps_read: Option<SystemTime>,
 }
 
 /// Battery state of one wireless device.
@@ -35,7 +41,52 @@ pub struct ApplyReport {
 
 impl Engine {
     pub fn new() -> Result<Self> {
-        Ok(Self { api: HidApi::new()?, devices: Vec::new(), unsupported: Vec::new(), synapse: Vec::new() })
+        Ok(Self {
+            api: HidApi::new()?,
+            devices: Vec::new(),
+            unsupported: Vec::new(),
+            synapse: Vec::new(),
+            foreground: None,
+            apps: HashSet::new(),
+            apps_read: None,
+        })
+    }
+
+    pub fn foreground(&self) -> Option<&str> {
+        self.foreground.as_deref()
+    }
+
+    /// Called when another window comes to the front, with its exe name. Devices whose
+    /// profile depends on the program in front get that profile; nothing is sent when
+    /// neither the old nor the new program is tied to a profile.
+    pub fn set_foreground(&mut self, exe: Option<String>) -> Vec<ApplyReport> {
+        self.refresh_apps();
+        let exe = exe.map(|e| secbird_core::profile::normalize_app(&e)).filter(|e| self.apps.contains(e));
+        if exe == self.foreground {
+            return Vec::new();
+        }
+        let before = std::mem::replace(&mut self.foreground, exe);
+        let Ok(mut store) = Self::store() else { return Vec::new() };
+        let changed: Vec<String> = self
+            .devices
+            .iter()
+            .filter(|d| {
+                let p = store.for_device(d);
+                p.effective(before.as_deref()) != p.effective(self.foreground.as_deref())
+            })
+            .map(|d| d.key())
+            .collect();
+        self.apply(&changed)
+    }
+
+    /// Re-read the tied programs only when profiles.json has changed: a foreground switch
+    /// then costs one file-time lookup.
+    fn refresh_apps(&mut self) {
+        let stamp = std::fs::metadata(config_dir().join("profiles.json")).and_then(|m| m.modified()).ok();
+        if stamp != self.apps_read || stamp.is_none() {
+            self.apps = Self::store().map(|s| s.apps()).unwrap_or_default();
+            self.apps_read = stamp;
+        }
     }
 
     pub fn devices(&self) -> &[Device] {
@@ -100,7 +151,13 @@ impl Engine {
         }
     }
 
-    /// Apply the active profile of each listed device (by [`Device::key`]).
+    /// The profile a device shows right now (see [`Engine::set_foreground`]).
+    pub fn effective_profile(&self, dev: &Device) -> String {
+        Self::store().map(|mut s| s.for_device(dev).effective(self.foreground()).to_string()).unwrap_or_default()
+    }
+
+    /// Apply the current profile of each listed device (by [`Device::key`]): the one tied
+    /// to the program in front, else the active one.
     pub fn apply(&self, keys: &[String]) -> Vec<ApplyReport> {
         let mut store = Self::store();
         self.devices
@@ -109,13 +166,13 @@ impl Engine {
             .map(|dev| match &mut store {
                 Ok(store) => {
                     let p = store.for_device(dev);
-                    let failures = p
-                        .active()
+                    let name = p.effective(self.foreground()).to_string();
+                    let failures = p.profiles[&name]
                         .apply(dev)
                         .into_iter()
                         .filter_map(|a| a.result.err().map(|e| format!("{}: {e}", a.setting)))
                         .collect();
-                    ApplyReport { device: dev.name(), profile: p.active.clone(), failures }
+                    ApplyReport { device: dev.name(), profile: name, failures }
                 }
                 Err(e) => ApplyReport {
                     device: dev.name(),
