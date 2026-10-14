@@ -4,6 +4,7 @@ description = "Talk to Razer peripherals over USB HID (Protocol 2.5)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

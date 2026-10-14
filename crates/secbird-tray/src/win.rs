@@ -5,6 +5,7 @@ use crate::{apps, osd, server};
 use std::ffi::CString;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use secbird_core::config_dir;
+use secbird_core::update::Release;
 use std::cell::RefCell;
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
@@ -30,6 +31,8 @@ const WM_DEVICE_EVENT: u32 = WM_APP + 3;
 const WM_FIRMWARE: u32 = WM_APP + 4;
 /// Sent by the report thread: `wparam` is 1 when the report is on the clipboard.
 const WM_REPORT_READY: u32 = WM_APP + 5;
+/// Sent by the new-version check thread: the result is waiting in `App::updates`.
+const WM_UPDATE: u32 = WM_APP + 6;
 const CLASS_NAME: &str = "SecretarybirdTray";
 const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
@@ -45,11 +48,13 @@ const SETTLE_MS: u32 = 1500;
 /// one profile instead of one per window passed.
 const TIMER_FOREGROUND: usize = 4;
 const FOREGROUND_MS: u32 = 300;
-/// Weekly firmware check (opt-in): looked at every few hours, runs when a week has passed.
+/// Weekly firmware check (opt-in) and daily new-version check (on unless turned off):
+/// looked at every few hours, each runs when its time has passed.
 const TIMER_FIRMWARE: usize = 5;
 const FIRMWARE_TIMER_MS: u32 = 6 * 60 * 60 * 1000;
 const FIRMWARE_FIRST_MS: u32 = 2 * 60 * 1000;
 const FIRMWARE_EVERY_SECS: u64 = 7 * 24 * 60 * 60;
+const UPDATE_EVERY_SECS: u64 = 24 * 60 * 60;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
@@ -59,6 +64,9 @@ const ID_EDITOR: u32 = 5;
 const ID_FIRMWARE: u32 = 6;
 const ID_REPORT: u32 = 7;
 const ID_RESTORE_BUTTONS: u32 = 8;
+const ID_CHECK_UPDATE: u32 = 9;
+const ID_UPDATE_NOTIFY: u32 = 10;
+const ID_GET_UPDATE: u32 = 11;
 const ID_PROFILE_BASE: u32 = 1000;
 
 const GUID_DEVINTERFACE_HID: GUID = GUID::from_u128(0x4d1e55b2_f16f_11cf_88cb_001111000030);
@@ -94,6 +102,19 @@ struct App {
     events: Receiver<DeviceEvent>,
     firmware_tx: Sender<Vec<FirmwareNews>>,
     firmware: Receiver<Vec<FirmwareNews>>,
+    updates_tx: Sender<UpdateResult>,
+    updates: Receiver<UpdateResult>,
+    /// A newer Secretarybird, once a check found one: offered at the top of the menu.
+    update: Option<Release>,
+    /// Opened when the last notification is clicked (the update's release page).
+    balloon_url: RefCell<Option<String>>,
+}
+
+/// A new-version check's answer, and whether it was asked for from the menu (then
+/// "you're up to date" and errors are shown too).
+struct UpdateResult {
+    manual: bool,
+    found: Result<Option<Release>, String>,
 }
 
 /// Tray settings in `tray.json`.
@@ -108,6 +129,15 @@ struct TraySettings {
     /// Device key -> firmware version already announced, so each is announced once.
     #[serde(default)]
     firmware_notified: std::collections::BTreeMap<String, String>,
+    /// Don't check GitHub for a newer Secretarybird. The check is on unless turned off.
+    #[serde(default)]
+    updates_off: bool,
+    /// Unix time of the last daily new-version check.
+    #[serde(default)]
+    update_checked: u64,
+    /// The newest version already announced, so each is announced once.
+    #[serde(default)]
+    update_notified: String,
 }
 
 impl TraySettings {
@@ -243,6 +273,7 @@ pub fn run() {
         add_icon(hwnd, icon);
         let (events_tx, events) = channel();
         let (firmware_tx, firmware) = channel();
+        let (updates_tx, updates) = channel();
         APP.with(|cell| {
             *cell.borrow_mut() = Some(App {
                 hwnd,
@@ -260,6 +291,10 @@ pub fn run() {
                 events,
                 firmware_tx,
                 firmware,
+                updates_tx,
+                updates,
+                update: None,
+                balloon_url: RefCell::new(None),
             })
         });
         log::append("tray started");
@@ -287,6 +322,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 show_menu(hwnd);
             } else if event == WM_LBUTTONDBLCLK {
                 with_app(|app| app.open_editor());
+            } else if event == NIN_BALLOONUSERCLICK {
+                with_app(|app| {
+                    if let Some(url) = app.balloon_url.take() {
+                        open_url(&url);
+                    }
+                });
             }
             0
         }
@@ -300,6 +341,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_FIRMWARE => {
             with_app(|app| app.firmware_news());
+            0
+        }
+        WM_UPDATE => {
+            with_app(|app| app.update_news());
             0
         }
         WM_REPORT_READY => {
@@ -351,7 +396,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TIMER if wparam == TIMER_FIRMWARE => {
             SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_TIMER_MS, None);
-            with_app(|app| app.check_firmware(false));
+            with_app(|app| {
+                app.check_firmware(false);
+                app.check_update(false);
+            });
             0
         }
         WM_TIMER if wparam == TIMER_BATTERY => {
@@ -588,10 +636,16 @@ impl App {
     }
 
     fn balloon(&self, title: &str, body: &str) {
+        self.notify(title, body, NIIF_WARNING, None);
+    }
+
+    /// A tray notification; clicking it opens `url` when there is one.
+    fn notify(&self, title: &str, body: &str, icon: NOTIFY_ICON_INFOTIP_FLAGS, url: Option<String>) {
+        self.balloon_url.replace(url);
         unsafe {
             let mut nid = icon_data(self.hwnd, self.icon);
             nid.uFlags = NIF_INFO;
-            nid.dwInfoFlags = NIIF_WARNING;
+            nid.dwInfoFlags = icon;
             copy_wide(&mut nid.szInfoTitle, title);
             copy_wide(&mut nid.szInfo, body);
             Shell_NotifyIconW(NIM_MODIFY, &nid);
@@ -637,6 +691,61 @@ impl App {
         });
     }
 
+    /// The daily new-version check, unless turned off and unless asked from the menu
+    /// (`manual`). Asks GitHub on a background thread so the tray never waits.
+    fn check_update(&mut self, manual: bool) {
+        let mut settings = TraySettings::load();
+        if !manual && (settings.updates_off || now_secs().saturating_sub(settings.update_checked) < UPDATE_EVERY_SECS) {
+            return;
+        }
+        settings.update_checked = now_secs();
+        settings.save();
+        let tx = self.updates_tx.clone();
+        let hwnd = self.hwnd as usize;
+        std::thread::spawn(move || {
+            let found = secbird_core::update::check().map_err(|e| e.to_string());
+            match &found {
+                Ok(Some(r)) => log::append(&format!("new version check: {} is out", r.version)),
+                Ok(None) => log::append("new version check: up to date"),
+                Err(e) => log::append(&format!("new version check failed: {e}")),
+            }
+            if tx.send(UpdateResult { manual, found }).is_ok() {
+                unsafe { PostMessageW(hwnd as HWND, WM_UPDATE, 0, 0) };
+            }
+        });
+    }
+
+    /// Announce a newer version once (or always, when asked from the menu).
+    fn update_news(&mut self) {
+        while let Ok(UpdateResult { manual, found }) = self.updates.try_recv() {
+            let current = secbird_core::update::CURRENT;
+            match found {
+                Ok(Some(r)) => {
+                    let mut settings = TraySettings::load();
+                    if manual || settings.update_notified != r.version {
+                        settings.update_notified = r.version.clone();
+                        settings.save();
+                        self.notify(
+                            &format!("Secretarybird {} is out", r.version),
+                            &format!("You have {current}. Click here for the download; the installer keeps your settings and profiles."),
+                            NIIF_INFO,
+                            Some(r.url.clone()),
+                        );
+                    }
+                    self.update = Some(r);
+                }
+                Ok(None) => {
+                    self.update = None;
+                    if manual {
+                        self.notify("You're up to date", &format!("Secretarybird {current} is the latest version."), NIIF_INFO, None);
+                    }
+                }
+                Err(e) if manual => self.balloon("Could not check for updates", &e),
+                Err(_) => {}
+            }
+        }
+    }
+
     /// Build `secbird report` (a few seconds of read-only USB requests) on a background
     /// thread, put it on the clipboard and open the GitHub device report form.
     fn make_report(&mut self) {
@@ -677,6 +786,10 @@ impl App {
     unsafe fn build_menu(&mut self) -> HMENU {
         let menu = CreatePopupMenu();
         self.profile_items.clear();
+        if let Some(r) = &self.update {
+            append(menu, MF_STRING, ID_GET_UPDATE as usize, &format!("Get Secretarybird {}…", r.version));
+            AppendMenuW(menu, MF_SEPARATOR, 0, null());
+        }
         append(menu, MF_STRING, ID_EDITOR as usize, "Open editor");
         SetMenuDefaultItem(menu, ID_EDITOR, 0);
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
@@ -704,6 +817,9 @@ impl App {
         append(menu, MF_STRING | auto, ID_AUTOSTART as usize, "Start with Windows");
         let fw = if TraySettings::load().firmware_weekly { MF_CHECKED } else { MF_UNCHECKED };
         append(menu, MF_STRING | fw, ID_FIRMWARE as usize, "Check for firmware updates weekly");
+        let notify = if TraySettings::load().updates_off { MF_UNCHECKED } else { MF_CHECKED };
+        append(menu, MF_STRING | notify, ID_UPDATE_NOTIFY as usize, "Tell me when a new version is out");
+        append(menu, MF_STRING, ID_CHECK_UPDATE as usize, "Check for updates now");
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         append(menu, MF_STRING, ID_EXIT as usize, "Exit");
         menu
@@ -732,6 +848,22 @@ impl App {
                 self.balloon("Mouse buttons restored", &body);
             }
             ID_AUTOSTART => set_autostart(!autostart_enabled()),
+            ID_CHECK_UPDATE => self.check_update(true),
+            ID_GET_UPDATE => {
+                if let Some(r) = &self.update {
+                    open_url(&r.url);
+                }
+            }
+            ID_UPDATE_NOTIFY => {
+                let mut s = TraySettings::load();
+                s.updates_off = !s.updates_off;
+                s.save();
+                if s.updates_off {
+                    self.update = None;
+                } else {
+                    self.check_update(true);
+                }
+            }
             ID_FIRMWARE => {
                 let mut s = TraySettings::load();
                 s.firmware_weekly = !s.firmware_weekly;
@@ -761,6 +893,11 @@ impl App {
             _ => {}
         }
     }
+}
+
+/// Open a web page in the default browser.
+fn open_url(url: &str) {
+    unsafe { ShellExecuteW(null_mut(), wide("open").as_ptr(), wide(url).as_ptr(), null(), null(), SW_SHOWNORMAL) };
 }
 
 unsafe fn append(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {

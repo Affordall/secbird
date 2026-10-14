@@ -22,11 +22,13 @@ pub mod firmware;
 pub mod features;
 pub mod log;
 pub mod macros;
+pub mod net;
 pub mod profile;
 pub mod proto;
 pub mod report;
 pub mod sim;
 pub mod transport;
+pub mod update;
 
 pub use db::{Db, DeviceSpec, Kind, Lighting, Matrix};
 pub use device::{discover, Device};

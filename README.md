@@ -8,8 +8,9 @@ keyboard and other peripherals: lighting, DPI, polling rate, button remapping an
 Synapse's background services, account, ads, pop-ups or restart prompts.
 
 - **Light:** a 780 KB tray app using about 11 MB of RAM, next to the hundreds of MB Synapse keeps running.
-- **Quiet:** no services, no updater, no telemetry, no internet. It sits in the tray and
-  applies your settings when you sign in, plug a device in or wake the PC.
+- **Quiet:** no services, no account, no telemetry. It sits in the tray and
+  applies your settings when you sign in, plug a device in or wake the PC. The only time it goes
+  online is a daily check for a new Secretarybird version, which you can turn off.
 - **Built for many devices:** one screen for all of them, and one click to sync a color everywhere.
 
 > **Beta.** Only the Basilisk V3 is tested by us on real hardware; a few more are confirmed by
@@ -76,6 +77,9 @@ and run `secbird-tray.exe`.
   the Basilisk V3.
 - **Firmware check:** asks Razer's public product page whether newer firmware is out and links to
   Razer's updater (on request, or weekly if you turn it on in the tray). Nothing is installed.
+- **New versions:** once a day the tray asks GitHub whether a newer Secretarybird is out and tells
+  you once per version; click the notice for the download. It sends nothing but that request and
+  installs nothing. Turn it off with "Tell me when a new version is out" in the tray menu.
 - **Popups:** a small popup above the clock when you change DPI with the mouse's button, switch
   its on-board profile, or when a per-app profile kicks in. The editor follows DPI changes too.
 - **Profiles** are saved per physical device, so two identical mice keep their own settings.
@@ -114,6 +118,7 @@ secbird color logo FF8800       static color for a zone
 secbird effect logo spectrum    built-in effect: spectrum, wave, breathing, reactive, starlight
 secbird keys 00FFAA             every key one color (per-key keyboards)
 secbird firmware                is newer firmware out? (links to Razer's updater)
+secbird update                  is a newer Secretarybird out?
 secbird sync 00FFAA             same color on every device
 secbird profile new gaming      profiles per device
 secbird profile apps gaming cs2.exe   switch to a profile while a program is in front

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.1] - 2026-10-14
+
+### Added
+- New-version notice: once a day the tray asks GitHub whether a newer Secretarybird is out and
+  shows a notification once per version; click it, or "Get Secretarybird …" at the top of the
+  tray menu, for the download. On by default; turn it off with "Tell me when a new version is
+  out" in the tray menu. "Check for updates now" checks right away, and `secbird update` does
+  the same from the command line. It sends nothing but the request and installs nothing.
+
+### Fixed
+- Compare showed buttons that play a macro as "Macro #1"; it now shows the macro's name.
+
 ## [0.4.0] - 2026-10-14
 
 ### Changed

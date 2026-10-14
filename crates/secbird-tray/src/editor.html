@@ -860,6 +860,8 @@ function refreshCell(row) {
 function renderCompare() {
   const t = $('sheet'), names = dev.profiles, secs = sections().filter(s => !['macros', 'profile', 'device'].includes(s.id));
   if (secs.some(s => s.id === 'buttons')) loadButtons(dev);
+  // Buttons that play a macro show its name, so the list is needed here too.
+  if (dev.macros && macroData[dev.id] === undefined) loadMacros(dev);
   t.innerHTML = '';
   const head = el('tr');
   head.append(el('th', { scope: 'col' }, el('span', { className: 'hint', textContent: 'Setting' })));

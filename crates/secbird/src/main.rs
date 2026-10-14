@@ -71,6 +71,10 @@ CLEANUP (Razer's background services and startup entries; drivers are never touc
   debloat apply [-y]        Turn it off. Needs administrator. Prints every command first
   debloat undo [-y]         Put back exactly what `debloat apply` changed
 
+UPDATES:
+  update                    Is a newer Secretarybird out? Asks GitHub (api.github.com);
+                            never installs anything
+
 OPTIONS:
   -V       Show the version (also --version)
   -d ID    Pick a device by USB product id (0099) or serial, when several are connected
@@ -116,6 +120,14 @@ fn run(mut args: Vec<String>) -> Result<(), Error> {
         return Ok(());
     }
 
+    if command == "update" {
+        match secbird_core::update::check()? {
+            Some(r) => println!("Secretarybird {} is out (you have {}).
+Download: {}", r.version, secbird_core::update::CURRENT, r.url),
+            None => println!("Secretarybird {} is the latest version.", secbird_core::update::CURRENT),
+        }
+        return Ok(());
+    }
     if command == "debloat" {
         return debloat_cmd(&args[1..]);
     }
