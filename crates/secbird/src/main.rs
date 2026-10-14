@@ -10,15 +10,25 @@ DEVICE:
   list                      Connected devices
   info                      Firmware, serial, DPI, polling rate, battery
   battery                   Battery level and charging state
+  firmware                  Is newer firmware out? Asks Razer's public product page
+                            (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
 
 SETTINGS (saved to the active profile):
   dpi [X[xY]]               Show or set DPI (e.g. 1600 or 1600x800)
   poll [HZ]                 Show or set polling rate (125, 500, 1000, ...)
+  stages [DPI ...] [--use N]
+                            Show or set the DPI stages the DPI button cycles through
+                            (1-5, each 1600 or 1600x800); --use picks the active one
+  sleep [MINUTES|on|off]    Show or set how long a wireless device waits before it
+                            sleeps; on/off where the device can stop sleeping
   color <zone> <RRGGBB>     Static color for a lighting zone (name or id)
   brightness <zone> <0-100> Brightness for a lighting zone
   off <zone>                Turn a lighting zone off
+  effect <zone> <effect>    Built-in effect: spectrum, breathing:RRGGBB[,RRGGBB]|random,
+                            wave:left|right[@speed 1-5], reactive:RRGGBB[@1-3],
+                            starlight:RRGGBB[,RRGGBB]|random[@1-3]
   keys <RRGGBB>             Every key one color (keyboards with per-key lighting)
   sync <RRGGBB>             Same color on every zone of every connected device
 
@@ -26,12 +36,22 @@ BUTTONS (mice with on-board button memory; add --hypershift for the HyperShift l
   button [list]             Buttons and what they do now
   button <button> <action>  Remap a button, e.g. `button side-forward key:ctrl+c`
   button <button> reset     Back to its saved setting (Synapse's or the factory one)
+  button restore-all        Every remapped button back to its saved setting at once
   Actions: left right middle back forward scroll-up scroll-down scroll-left scroll-right
            double-click  key:<combo> (key:a, key:ctrl+shift+f13, key:space)
            turbo:<button or key:..>[@presses-per-second]  (turbo:left@15)
            dpi-up dpi-down dpi-cycle-up dpi-cycle-down dpi-clutch:<dpi>
            hypershift  media:volume-up|volume-down|mute|play-pause|next-track|previous-track
            profile-cycle-up  disabled
+           macro:<id>[@times|@hold|@toggle]  (macro:3, macro:3@5, macro:3@hold)
+
+MACROS (stored on the device, shared by all profiles):
+  macro [list]              Macros on the device and free memory
+  macro show <id>           A macro's steps
+  macro new <name> <steps>  Store a macro, e.g. `macro new Copy 'tap:ctrl+c wait:30'`
+                            Steps: tap:<key or combo> down:<key> up:<key> wait:<ms>
+                            click:<button> press:<button> release:<button> wheel:up|down
+  macro delete <id>         Delete a macro
 
 PROFILES:
   profile [list]            Profiles for this device (* = active)
@@ -55,7 +75,8 @@ OPTIONS:
   -V       Show the version (also --version)
   -d ID    Pick a device by USB product id (0099) or serial, when several are connected
 
-Set SECBIRD_SIM=mouse,wireless,keyboard,old-keyboard to add simulated devices (no hardware needed).
+Set SECBIRD_SIM=all (or a list: mouse,wireless,keyboard,old-keyboard,naga,cobra,dock,blackwidow,
+goliathus,firefly,blade,base-station) to add simulated devices (no hardware needed).
 
 Files live in %APPDATA%\\Secretarybird (profiles.json, devices.json).
 ";
@@ -168,6 +189,28 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
         return Ok(());
     }
 
+    if command == "firmware" {
+        use secbird_core::firmware::{latest_for, status, Status};
+        if devices.is_empty() {
+            return Err(Error::NotFound("no matching Razer device".into()));
+        }
+        let connected: Vec<u16> = devices.iter().map(|d| d.pid).collect();
+        for dev in &devices {
+            let current = dev.firmware_version()?;
+            match status(current, latest_for(dev.pid)?, &connected) {
+                Status::UpToDate { current } => println!("{}: {current}, up to date", dev.name()),
+                Status::NoneListed { current } => println!("{}: {current} (Razer lists no firmware for it)", dev.name()),
+                Status::Update { current, latest } => {
+                    println!("{}: {current} -> {} available", dev.name(), latest.version);
+                    println!("  Download: {}", latest.url);
+                    if let Some(guide) = latest.guide.filter(|g| *g != latest.url) {
+                        println!("  Guide:    {guide}");
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
     if command == "sync" {
         let color: Rgb = args.get(1).ok_or_else(|| Error::InvalidArg("usage: sync <RRGGBB>".into()))?.parse()?;
         let mut store = Store::load(&dir.join("profiles.json"))?;
@@ -229,6 +272,55 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
                 Ok(())
             }
         },
+        "stages" => {
+            if rest.is_empty() {
+                let s = dev.dpi_stages()?;
+                for (i, (x, y)) in s.stages.iter().enumerate() {
+                    let mark = if i + 1 == s.active as usize { "*" } else { " " };
+                    println!("{mark} {}  {x}x{y}", i + 1);
+                }
+                return Ok(());
+            }
+            let mut values = rest.to_vec();
+            let active = match values.iter().position(|a| a == "--use") {
+                Some(i) => {
+                    let v = values.get(i + 1).ok_or_else(|| Error::InvalidArg("--use needs a stage number".into()))?;
+                    let n = v.parse().map_err(|_| Error::InvalidArg(format!("bad stage '{v}'")))?;
+                    values.drain(i..=i + 1);
+                    n
+                }
+                None => 1,
+            };
+            let stages = values.iter().map(|v| parse_dpi(v)).collect::<Result<Vec<_>, _>>()?;
+            let sent = actions::set_dpi_stages(dev, &mut store, &secbird_core::DpiStages { active, stages })?;
+            let list: Vec<String> = sent.stages.iter().map(|(x, y)| if x == y { x.to_string() } else { format!("{x}x{y}") }).collect();
+            println!("DPI stages set to {} (stage {} in use)", list.join(", "), sent.active);
+            Ok(())
+        }
+        "sleep" => match rest.first().map(String::as_str) {
+            None => {
+                match dev.sleep_timer()? {
+                    None => println!("Wired device, no sleep timer."),
+                    Some(t) => {
+                        let off = if t.auto_sleep == Some(false) { " (sleeping is off)" } else { "" };
+                        println!("Sleeps after {} min{off}; 1 to {} min allowed", t.minutes, t.max_minutes);
+                    }
+                }
+                Ok(())
+            }
+            Some(v @ ("on" | "off")) => {
+                actions::set_auto_sleep(dev, &mut store, v == "on")?;
+                println!("Sleeping when idle is {v}");
+                Ok(())
+            }
+            Some(v) => {
+                let minutes = v.parse().map_err(|_| Error::InvalidArg(format!("bad minutes '{v}'")))?;
+                actions::set_sleep_minutes(dev, &mut store, minutes)?;
+                println!("Sleeps after {minutes} min");
+                Ok(())
+            }
+        },
+        "macro" => macro_cmd(dev, &mut store, rest),
         "poll" => match rest.first() {
             None => {
                 println!("{} Hz", dev.polling_rate()?);
@@ -249,6 +341,12 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
             let (zone, pct) = two(rest, "brightness <zone> <0-100>")?;
             let pct: u8 = pct.parse().map_err(|_| Error::InvalidArg(format!("bad brightness '{pct}'")))?;
             actions::set_brightness(dev, &mut store, zone, pct)
+        }
+        "effect" => {
+            let (zone, effect) = two(rest, "effect <zone> <effect>")?;
+            actions::set_effect(dev, &mut store, zone, effect.parse()?)?;
+            println!("{zone}: {effect}");
+            Ok(())
         }
         "off" => {
             let zone = rest.first().ok_or_else(|| Error::InvalidArg("usage: off <zone>".into()))?;
@@ -297,6 +395,16 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
             }
             if let Some(hz) = p.polling {
                 println!("  polling    {hz} Hz");
+            }
+            if let Some(s) = &p.dpi_stages {
+                let list: Vec<String> = s.stages.iter().map(|(x, y)| format!("{x}x{y}")).collect();
+                println!("  stages     {} (stage {} in use)", list.join(", "), s.active);
+            }
+            if let Some(m) = p.sleep_minutes {
+                println!("  sleep      after {m} min");
+            }
+            if let Some(on) = p.auto_sleep {
+                println!("  sleeping   {}", if on { "on" } else { "off" });
             }
             for (zone, z) in &p.lighting {
                 let state = match (z.off, z.color) {
@@ -357,6 +465,63 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
     }
 }
 
+fn macro_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error> {
+    use secbird_core::macros::Script;
+    let id = |v: Option<&String>| -> Result<u16, Error> {
+        let v = v.ok_or_else(|| Error::InvalidArg("which macro? (see `secbird macro`)".into()))?;
+        v.parse().map_err(|_| Error::InvalidArg(format!("bad macro id '{v}'")))
+    };
+    match rest.first().map(String::as_str) {
+        None | Some("list") => {
+            let st = dev.macro_storage()?;
+            let list = dev.macros()?;
+            if list.is_empty() {
+                println!("No macros on {}.", dev.name());
+            }
+            for m in &list {
+                println!("  {:>3}  {:<32} {} bytes", m.id, m.name, m.size);
+            }
+            let recyclable = match st.recyclable_bytes {
+                0 => String::new(),
+                n => format!(" ({n} more from deleted macros, not reusable yet)"),
+            };
+            println!("Memory: {} of {} bytes free{recyclable}", st.free_bytes, st.max_bytes);
+            Ok(())
+        }
+        Some("show") => {
+            let id = id(rest.get(1))?;
+            let info = dev.macro_info(id)?;
+            println!("{} ({id}): {}", info.name, Script(dev.macro_steps(id)?));
+            Ok(())
+        }
+        Some("new") => {
+            let name = rest.get(1).ok_or_else(|| Error::InvalidArg("usage: macro new <name> <steps>".into()))?;
+            let script: Script = rest[2..].join(" ").parse()?;
+            let id = dev.create_macro(name, &script.0)?;
+            println!("Stored macro {id} \"{name}\" ({} steps). Play it from a button: button <name> macro:{id}", script.0.len());
+            Ok(())
+        }
+        Some("delete") => {
+            let id = id(rest.get(1))?;
+            let plays = |a: &String| a.strip_prefix("macro:").and_then(|v| v.split('@').next()) == Some(id.to_string().as_str());
+            let used: Vec<String> = store
+                .for_device(dev)
+                .profiles
+                .iter()
+                .filter(|(_, p)| p.buttons.values().any(plays))
+                .map(|(name, _)| name.clone())
+                .collect();
+            if !used.is_empty() {
+                return Err(Error::InvalidArg(format!("a button in {} plays macro {id}; change that button first", used.join(", "))));
+            }
+            dev.delete_macro(id)?;
+            println!("Deleted macro {id}");
+            Ok(())
+        }
+        Some(other) => Err(Error::InvalidArg(format!("unknown macro command '{other}'"))),
+    }
+}
+
 fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error> {
     use secbird_core::buttons::{button_id, button_label, button_name, Layer};
     let layer = if rest.iter().any(|a| a == "--hypershift") { Layer::HyperShift } else { Layer::Normal };
@@ -375,6 +540,11 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
                 };
                 println!("  {name:<14} {action:<24} {}", button_label(id));
             }
+            Ok(())
+        }
+        ["restore-all"] => {
+            let n = actions::restore_all_buttons(dev, store)?;
+            println!("Restored {n} button(s) to what the mouse stores.");
             Ok(())
         }
         [button, "reset"] => {
@@ -429,6 +599,14 @@ fn info(dev: &Device, store: &mut Store) -> Result<(), Error> {
     }
     if let Some(p) = dev.battery()? {
         println!("Battery   {p}%");
+    }
+    if let Ok(s) = dev.dpi_stages() {
+        let list: Vec<String> = s.stages.iter().map(|(x, _)| x.to_string()).collect();
+        println!("Stages    {} (stage {} in use)", list.join(", "), s.active);
+    }
+    if let Ok(Some(t)) = dev.sleep_timer() {
+        let off = if t.auto_sleep == Some(false) { ", sleeping off" } else { "" };
+        println!("Sleep     after {} min{off}", t.minutes);
     }
     if let Some(spec) = &dev.spec {
         if !spec.leds.is_empty() {

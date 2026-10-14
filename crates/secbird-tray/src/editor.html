@@ -6,198 +6,276 @@
 <title>Secretarybird</title>
 <link rel="icon" type="image/png" href="{{LOGO}}">
 <style>
-  :root {
-    --bg: #0d0d10; --panel: #15151a; --raise: #1b1b21; --line: #25252d; --line-strong: #3a3a44;
-    --text: #ececf1; --muted: #9a9aa6; --faint: #6c6c78;
-    --accent: #e8782a; --accent-text: #f2a066; --band: #e8782a14; --band-edge: #e8782a;
-    --toast: #222229; --zone-off: #2a2a31;
-    --body-fill: #141418; --body-stroke: #2b2b33; --button-fill: #1d1d23;
-    --key-fill: #1b1b21; --key-stroke: #2e2e37; --key-text: #ffffff99;
-    --warn-line: #ffd60a55; --warn-bg: #ffd60a12; --warn-text: #ffe58a; --err: #ff453a; --err-text: #ffb4ae;
-    --shadow: 0 10px 30px -12px #000000cc;
-    color-scheme: dark;
-  }
-  /* Light: follows Windows unless the header button picked a theme. */
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --bg: #f4f4f7; --panel: #ffffff; --raise: #f7f7fa; --line: #e1e1e8; --line-strong: #c3c3cc;
-      --text: #18181d; --muted: #5f5f6b; --faint: #8a8a96;
-      --accent-text: #b4530f; --band: #e8782a12;
-      --toast: #ffffff; --zone-off: #d9d9df;
-      --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea;
-      --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099;
-      --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e;
-      --shadow: 0 10px 30px -14px #1b1b3040;
-      color-scheme: light;
-    }
-  }
-  :root[data-theme="light"] {
-    --bg: #f4f4f7; --panel: #ffffff; --raise: #f7f7fa; --line: #e1e1e8; --line-strong: #c3c3cc;
-    --text: #18181d; --muted: #5f5f6b; --faint: #8a8a96;
-    --accent-text: #b4530f; --band: #e8782a12;
-    --toast: #ffffff; --zone-off: #d9d9df;
-    --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea;
-    --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099;
-    --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e;
-    --shadow: 0 10px 30px -14px #1b1b3040;
-    color-scheme: light;
+  /* Themes. Each sets every token; the accent means live, selected, changed or focused, and
+     the value colour carries numbers. Auto follows Windows: Bridge when dark, Light when light. */
+  :root, :root[data-theme="bridge"] { --bg: #050505; --bar: #0d0d0e; --panel: #131314; --raise: #1b1b1d; --line: #242426; --line-strong: #4a4440; --text: #f4efe9; --muted: #b8aea3; --faint: #9c9287; --value: #ffb85d; --accent: #ff5412; --accent-text: #ff7a45; --lit: #ff541224; --lit-edge: #ff5412; --toast: #1b1b1d; --zone-off: #242426; --body-fill: #131314; --body-stroke: #3a3632; --button-fill: #1b1b1d; --key-fill: #1b1b1d; --key-stroke: #34312e; --key-text: #f4efe999; --warn-line: #ffb85d55; --warn-bg: #ffb85d14; --warn-text: #ffb85d; --err: #ff4a5a; --err-text: #ffb4bb; --shadow: 0 12px 32px -14px #000000e6; color-scheme: dark; }
+  :root[data-theme="roast"] { --bg: #150d05; --bar: #1e1007; --panel: #201002; --raise: #2b1909; --line: #3a2916; --line-strong: #64492b; --text: #f5e0d3; --muted: #b58754; --faint: #ad8150; --value: #e2aa6b; --accent: #c35724; --accent-text: #f57032; --lit: #c3572426; --lit-edge: #c35724; --toast: #2b1909; --zone-off: #3a2916; --body-fill: #201002; --body-stroke: #4a2b09; --button-fill: #2b1909; --key-fill: #2b1909; --key-stroke: #4a2b09; --key-text: #f5e0d399; --warn-line: #f8ac6055; --warn-bg: #f8ac6014; --warn-text: #f8ac60; --err: #ff5a4e; --err-text: #ffb4a8; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme]) { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #c35724; --accent-text: #9a3f14; --lit: #c357241a; --lit-edge: #c35724; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; } }
+  :root[data-theme="classic"] { --bg: #0d0d10; --bar: #111115; --panel: #15151a; --raise: #1b1b21; --line: #25252d; --line-strong: #3a3a44; --text: #ececf1; --muted: #9a9aa6; --faint: #858591; --value: #ececf1; --accent: #e8782a; --accent-text: #f2a066; --lit: #e8782a1f; --lit-edge: #e8782a; --toast: #222229; --zone-off: #2a2a31; --body-fill: #141418; --body-stroke: #2b2b33; --button-fill: #1d1d23; --key-fill: #1b1b21; --key-stroke: #2e2e37; --key-text: #ffffff99; --warn-line: #ffd60a55; --warn-bg: #ffd60a12; --warn-text: #ffe58a; --err: #ff453a; --err-text: #ffb4ae; --shadow: 0 10px 30px -12px #000000cc; color-scheme: dark; }
+  :root[data-theme="light"] { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #c35724; --accent-text: #9a3f14; --lit: #c357241a; --lit-edge: #c35724; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; }
+  :root[data-theme="workshop"] { --bg: #ede7dc; --bar: #e0d7c7; --panel: #f7f3ec; --raise: #e8e0d2; --line: #d6ccb9; --line-strong: #b3a68d; --text: #3d362a; --muted: #5c5141; --faint: #62564a; --value: #8a3f1b; --accent: #d0643e; --accent-text: #913c1a; --lit: #e7a26542; --lit-edge: #d0643e; --toast: #f7f3ec; --zone-off: #d6ccb9; --body-fill: #e8e0d2; --body-stroke: #b3a68d; --button-fill: #e0d7c7; --key-fill: #e8e0d2; --key-stroke: #cbbfa8; --key-text: #3d362a99; --warn-line: #a6672255; --warn-bg: #e7a2652a; --warn-text: #5a3412; --err: #c2181a; --err-text: #a3171a; --shadow: 0 12px 32px -16px #3d362a40; color-scheme: light; }
+  :root[data-theme="neon"] { --bg: #160520; --bar: #1e0829; --panel: #250a33; --raise: #2f0d40; --line: #45185a; --line-strong: #6b2a85; --text: #f1e3d0; --muted: #c99ec6; --faint: #ad80ab; --value: #fbb550; --accent: #dd3290; --accent-text: #f26cb4; --lit: #dd32902e; --lit-edge: #dd3290; --toast: #2f0d40; --zone-off: #45185a; --body-fill: #250a33; --body-stroke: #5a1f73; --button-fill: #2f0d40; --key-fill: #2f0d40; --key-stroke: #5a1f73; --key-text: #f1e3d099; --warn-line: #fbb55055; --warn-bg: #fbb55014; --warn-text: #fbb550; --err: #ff5a6e; --err-text: #ffb4c0; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
+  /* Bridge goes bold: the live profile, current section and selected tile are solid red-orange with black text. */
+  :root[data-theme="bridge"] .tile[aria-pressed=true] { background: #ff5412; border-color: #ff5412; }
+  :root[data-theme="bridge"] .tile[aria-pressed=true] .tl, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv small, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv .unset,
+  :root[data-theme="bridge"] .tile[aria-pressed=true] .big, :root[data-theme="bridge"] .tile.changed[aria-pressed=true] .tl::after { color: #0a0a0b; }
+  :root[data-theme="bridge"] .pbtn[aria-current=true], :root[data-theme="bridge"] .pbtn[aria-current=true]:hover { background: #ff5412; color: #0a0a0b; }
+  :root[data-theme="bridge"] .pbtn[aria-current=true] .g { color: #0a0a0b; }
+  :root[data-theme="bridge"] .uline { display: none; }
+  :root[data-theme="bridge"] .sec[aria-current=true] { background: #ff5412; border-color: #ff5412; }
+  :root[data-theme="bridge"] .sec[aria-current=true] b, :root[data-theme="bridge"] .sec[aria-current=true] span { color: #0a0a0b; }
+  :root[data-theme="bridge"] .seg button[aria-pressed=true] { background: #ff5412; color: #0a0a0b; box-shadow: none; }
+  :root[data-theme="bridge"] .tab[aria-selected=true] { border-color: #ff5412; }
+  @media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .tile[aria-pressed=true] { background: #ff5412; border-color: #ff5412; }
+  :root:not([data-theme]) .tile[aria-pressed=true] .tl, :root:not([data-theme]) .tile[aria-pressed=true] .tv, :root:not([data-theme]) .tile[aria-pressed=true] .tv small, :root:not([data-theme]) .tile[aria-pressed=true] .tv .unset,
+  :root:not([data-theme]) .tile[aria-pressed=true] .big, :root:not([data-theme]) .tile.changed[aria-pressed=true] .tl::after { color: #0a0a0b; }
+  :root:not([data-theme]) .pbtn[aria-current=true], :root:not([data-theme]) .pbtn[aria-current=true]:hover { background: #ff5412; color: #0a0a0b; }
+  :root:not([data-theme]) .pbtn[aria-current=true] .g { color: #0a0a0b; }
+  :root:not([data-theme]) .uline { display: none; }
+  :root:not([data-theme]) .sec[aria-current=true] { background: #ff5412; border-color: #ff5412; }
+  :root:not([data-theme]) .sec[aria-current=true] b, :root:not([data-theme]) .sec[aria-current=true] span { color: #0a0a0b; }
+  :root:not([data-theme]) .seg button[aria-pressed=true] { background: #ff5412; color: #0a0a0b; box-shadow: none; }
+  :root:not([data-theme]) .tab[aria-selected=true] { border-color: #ff5412; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; }
-  button, input, select { font: inherit; color: inherit; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden; }
+  button, input, select, textarea { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  ::selection { background: #e8782a55; }
-  input { caret-color: var(--accent); }
+  ::selection { background: var(--lit); color: var(--text); }
+  input, textarea { caret-color: var(--accent); }
   html { scrollbar-color: var(--line-strong) transparent; accent-color: var(--accent); }
   [hidden] { display: none !important; }
   .num { font-variant-numeric: tabular-nums; }
+  .ico { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; flex: none; }
 
-  /* Header: brand, devices, the actions that span every device. */
-  header { display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; background: var(--bg); }
+  /* Top bar: brand, devices, actions for every device. */
+  header.top { display: flex; align-items: center; gap: 14px; padding: 0 20px; height: 52px; flex: none; background: var(--bar); border-bottom: 1px solid var(--line); }
   .brand { background: none; border: 0; padding: 4px 6px 4px 0; cursor: pointer; font-weight: 650; display: flex; align-items: center; gap: 10px; flex: none; }
-  .brand img { width: 26px; height: 26px; border-radius: 7px; }
+  .brand img { width: 24px; height: 24px; border-radius: 7px; }
   .tabs { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 1; }
+  /* A row that can hold more than fits (devices, profiles): arrows and a fade show there is more. */
+  .scrollrow { position: relative; display: flex; align-items: center; min-width: 0; flex: 1; }
+  .scrollrow > nav { scroll-behavior: smooth; }
+  .scrollrow.more-r > nav { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+  .scrollrow.more-l > nav { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+  .scrollrow.more-l.more-r > nav { -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+  .arrow { flex: none; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .arrow:hover { color: var(--text); border-color: var(--line-strong); }
+  .arrow .ico { width: 13px; height: 13px; }
+  .arrow.l { margin-right: 4px; }
+  .arrow.r { margin-left: 4px; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { white-space: nowrap; flex: none; background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 13px; color: var(--muted); cursor: pointer; }
+  .tab { white-space: nowrap; flex: none; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; color: var(--muted); cursor: pointer; }
   .tab:hover { color: var(--text); }
   .tab[aria-selected=true] { border-color: var(--line); color: var(--text); background: var(--panel); }
   .actions { display: flex; align-items: center; gap: 8px; flex: none; }
-  .ghost { white-space: nowrap; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; color: var(--muted); }
+  .ghost { white-space: nowrap; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
   .ghost:hover { color: var(--text); border-color: var(--line-strong); }
+  .ghost:disabled { opacity: .45; cursor: not-allowed; }
+  .ghost[aria-pressed=true] { color: var(--text); border-color: var(--accent); }
   .sync { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding-left: 9px; }
   .sync:hover { border-color: var(--line-strong); }
-  .sync button { background: none; border: 0; padding: 7px 12px 7px 8px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+  .sync button { background: none; border: 0; padding: 6px 12px 6px 8px; cursor: pointer; color: var(--muted); white-space: nowrap; }
   .sync button:hover { color: var(--text); }
   .mini { position: relative; width: 18px; height: 18px; border-radius: 5px; overflow: hidden; border: 1px solid #00000066; flex: none; cursor: pointer; }
   .mini input { position: absolute; inset: -8px; width: 34px; height: 34px; border: 0; padding: 0; cursor: pointer; }
-  .theme { width: 36px; padding: 7px 0; display: grid; place-items: center; }
-  .theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
-
-  main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 48px; }
-  .banner { margin: 0 0 18px; padding: 10px 14px; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; font-size: 13px; }
+  .themepick { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding-left: 9px; }
+  .themepick:hover { border-color: var(--line-strong); color: var(--text); }
+  .themepick svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; flex: none; }
+  .themepick select { border: 0; background-color: transparent; padding: 6px 28px 6px 2px; color: inherit; }
+  .banner { margin: 0; padding: 8px 20px; border-bottom: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-text); font-size: 13px; flex: none; }
   .banner code { font-family: ui-monospace, Consolas, monospace; }
-  .empty { text-align: center; padding: 96px 0; color: var(--muted); }
 
-  /* Device line: what this is, its live look, and (narrow screens) the profile picker. */
-  .devline { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
-  .devline svg { width: 46px; height: 69px; flex: none; }
-  .devline h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
-  .meta { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
-  .devactions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-  .addp { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 600; color: var(--text); }
-  .addp:hover { border-color: var(--accent); }
-  .addp .ico { width: 14px; height: 14px; }
-  .newform { display: flex; align-items: center; gap: 8px; }
-  .newform input { width: 180px; }
-  .newform .hint-games { white-space: nowrap; }
-  .mprof { margin-left: auto; display: none; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 40px 20px; }
+
+  /* Device bar: what this is, its live look, and which profile is live. */
+  .devbar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; flex: none; background: var(--bar); border-bottom: 1px solid var(--line); }
+  .devbar svg#preview { width: 30px; height: 45px; flex: none; }
+  .who { min-width: 0; flex: 0 1 auto; max-width: 34%; }
+  .who h1 { margin: 0; font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { color: var(--muted); font-size: 12.5px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .zone-shape { transition: fill .15s, stroke .15s, opacity .15s; cursor: pointer; }
   .m-body { fill: var(--body-fill); stroke: var(--body-stroke); }
   .m-line { stroke: var(--body-stroke); }
-  .m-button { fill: var(--button-fill); stroke: var(--body-stroke); }
 
-  /* The sheet: settings are rows, profiles are columns. */
-  .sheet-wrap { position: relative; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-  .band { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--band); border-top: 3px solid var(--band-edge); pointer-events: none;
-    transition: transform .5s cubic-bezier(.16, 1, .3, 1), width .5s cubic-bezier(.16, 1, .3, 1); }
-  @media (prefers-reduced-motion: reduce) { .band { transition: none; } }
-  table.sheet { position: relative; width: 100%; border-collapse: separate; border-spacing: 0; min-width: 640px; }
-  .sheet th, .sheet td { text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
-  .sheet tr:last-child > * { border-bottom: 0; }
-  .sheet thead th { vertical-align: top; padding: 16px 14px 14px; font-weight: 400; }
-  .sheet thead th:first-child { width: 190px; }
-  .sheet tbody th { font-weight: 400; color: var(--muted); padding: 0 16px; width: 190px; white-space: nowrap; }
-  .pname { font-weight: 650; font-size: 15px; display: flex; align-items: center; gap: 8px; min-height: 28px; }
-  .live { font-size: 11.5px; font-weight: 600; color: var(--accent-text); border: 1px solid #e8782a66; border-radius: 999px; padding: 1px 8px; }
-  .mk { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); cursor: pointer; }
-  .mk:hover { color: var(--text); border-color: var(--line-strong); }
-  .games { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
-  .game { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 3px 2px 10px; font-size: 12px; color: var(--muted); background: var(--bg); }
-  .game button { background: none; border: 0; color: var(--faint); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
-  .game button .ico { width: 10px; height: 10px; }
-  .game button:hover { color: var(--text); background: var(--line); }
-  .addgame, .del { background: none; border: 0; padding: 3px 2px; font-size: 12.5px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
-  .addgame:hover, .addgame:focus-visible { color: var(--accent-text); }
-  .ico { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; flex: none; }
-  .del { color: var(--faint); margin-top: 8px; display: flex; }
-  .del:hover { color: var(--err-text); }
-  .gamein { width: 150px; padding: 4px 9px !important; font-size: 12.5px; }
-  .hint-games { color: var(--faint); font-size: 12px; }
-  .grp th { padding: 14px 16px 8px; background: var(--raise); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-  .grp .gtools { display: inline-flex; margin-left: 18px; vertical-align: middle; text-transform: none; letter-spacing: 0; font-weight: 400; gap: 10px; align-items: center; }
-  .sheet td { padding: 3px 6px; }
-  .cell { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 9px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 42px; }
-  .cell:hover { border-color: var(--line-strong); background: var(--bg); }
-  .cell.open { border-color: var(--accent); background: var(--bg); }
-  .cell .unset { color: var(--faint); }
-  .cell.changed { color: var(--accent-text); }
-  /* Other profiles recede so the lit column leads; their differences still show. */
-  .c-other .cell { color: var(--muted); }
-  .c-other .cell .big { font-weight: 600; }
-  .c-other .cell.changed { color: var(--accent-text); }
-  .cell small { color: var(--muted); }
-  .sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid #00000066; flex: none; }
+  /* Profile switcher: the live profile carries the ember underline, which slides when it changes. */
+  .profiles { position: relative; display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  #profilesRow { flex: 1; }
+  .profiles::-webkit-scrollbar { display: none; }
+  .pbtn { position: relative; flex: none; white-space: nowrap; background: none; border: 0; border-radius: 8px; padding: 7px 12px 9px; color: var(--muted); cursor: pointer; font-weight: 600; }
+  .pbtn:hover { color: var(--text); background: var(--raise); }
+  .pbtn[aria-current=true] { color: var(--text); }
+  .pbtn .g { font-weight: 400; color: var(--faint); font-size: 12px; margin-left: 6px; }
+  .uline { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; border-radius: 3px; background: var(--accent); pointer-events: none;
+    transition: transform .35s cubic-bezier(.16, 1, .3, 1), width .35s cubic-bezier(.16, 1, .3, 1); }
+  .padd { flex: none; background: none; border: 1px dashed var(--line-strong); border-radius: 8px; padding: 6px 11px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; }
+  .padd:hover { color: var(--text); border-color: var(--muted); }
+  .newform { display: flex; align-items: center; gap: 6px; flex: none; margin-left: 6px; }
+  .newform input { width: 170px; }
+  .devright { display: flex; align-items: center; gap: 8px; flex: none; }
+
+  /* Workbench: sections, tiles, edit panel. Fills the window; nothing below the fold. */
+  .work { flex: 1; min-height: 0; display: grid; grid-template-columns: 196px minmax(0, 1fr) 384px; }
+  .work.wide { grid-template-columns: 196px minmax(0, 1fr); }
+  .work.wide .tiles { display: none; }
+  .rail { background: var(--bar); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .sec { display: grid; gap: 1px; text-align: left; background: none; border: 1px solid transparent; border-radius: 9px; padding: 8px 12px; cursor: pointer; color: var(--muted); }
+  .sec b { font-weight: 600; color: var(--text); font-size: 14px; }
+  .sec span { font-size: 12px; display: flex; align-items: center; gap: 5px; min-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sec:hover { background: var(--raise); }
+  .sec[aria-current=true] { background: var(--panel); border-color: var(--accent); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #00000066; flex: none; }
+  .dot.off { background: none; border: 1.5px dashed var(--line-strong); }
+
+  .tiles { overflow-y: auto; padding: 16px 20px 20px; min-width: 0; }
+  .sechead { display: flex; align-items: center; gap: 14px; margin: 0 0 12px; min-height: 30px; flex-wrap: wrap; }
+  .sechead h2 { margin: 0; font-size: 17px; font-weight: 650; }
+  .sechead .tools { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 8px; }
+  .tile { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px 10px; min-height: 62px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; transition: border-color .12s, background-color .12s; }
+  .tile:hover { border-color: var(--line-strong); }
+  .tile[aria-pressed=true] { border-color: var(--lit-edge); background: var(--lit); }
+  .tile:disabled { cursor: progress; }
+  .tl { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tv { display: block; min-height: 22px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tv .sw { vertical-align: -3px; margin-right: 7px; }
+  .tile.changed .tl::after { content: " · changed"; color: var(--accent-text); }
+  .tile.changed .tv { color: var(--accent-text); }
+  .tv .unset { color: var(--faint); font-weight: 400; }
+  .tv small { color: var(--muted); font-weight: 400; }
+  .big { font-size: 17px; font-weight: 650; color: var(--value); }
+  .sw { width: 16px; height: 16px; border-radius: 5px; border: 1px solid #00000066; flex: none; display: inline-block; }
   .sw.off { background: none; border: 1.5px dashed var(--line-strong); }
-  .big { font-size: 17px; font-weight: 650; }
-  td.empty-col { color: var(--faint); }
+  .subhead { margin: 18px 0 8px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  /* Naga side grid: a keypad, laid out like the mouse. */
+  .keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 168px)); gap: 6px; }
+  .keypad .tile { min-height: 52px; padding: 6px 10px 7px; }
+  .keypad .tl { color: var(--value); font-weight: 650; font-size: 13px; }
+  .skel { height: 62px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) { .uline { transition: none; } .skel { animation: none; } }
 
-  /* Editor row: opens under the cell, never a dialog. */
-  tr.ed > td { padding: 0; background: var(--bg); border-bottom: 1px solid var(--line); }
-  .edbox { padding: 18px 20px 20px; display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-start; }
-  .edbox h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
-  .edbox .note { flex-basis: 100%; margin: -4px 0 0; color: var(--muted); font-size: 12.5px; }
-  .edgroup { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  select, input[type=text], input[type=number] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
-  select:hover, input:hover { border-color: var(--line-strong); }
-  .presets { display: grid; grid-template-columns: repeat(10, 32px); gap: 7px; }
-  .presets button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #00000066; cursor: pointer; transition: transform .12s; }
+  .panel { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .phead { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid var(--line); flex: none; }
+  .phead h2 { margin: 0; font-size: 15px; font-weight: 650; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xbtn { background: none; border: 1px solid transparent; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; color: var(--muted); flex: none; }
+  .xbtn:hover { color: var(--text); border-color: var(--line); }
+  .xbtn .ico { width: 13px; height: 13px; }
+  .pbody { overflow-y: auto; padding: 16px 18px 20px; flex: 1; min-height: 0; }
+  .edbox { display: flex; flex-direction: column; gap: 20px; }
+  .work.wide .edbox { flex-direction: row; flex-wrap: wrap; gap: 18px 28px; }
+  .edbox h3 { margin: 0 0 9px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .edbox .note { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 60ch; }
+  .edgroup { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lead { font-size: 15px; font-weight: 650; margin: 0 0 4px; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; }
+  select, input[type=text], input[type=number], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+  textarea { width: 100%; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  select:hover, input:hover, textarea:hover { border-color: var(--line-strong); }
+  select { appearance: none; padding-right: 30px; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+  input[type=radio], input[type=checkbox]:not(.switch) { appearance: none; width: 16px; height: 16px; margin: 0; flex: none; cursor: pointer;
+    border: 1.5px solid var(--line-strong); background: var(--bg); }
+  input[type=radio] { border-radius: 50%; }
+  input[type=checkbox]:not(.switch) { border-radius: 4px; }
+  input[type=radio]:checked, input[type=checkbox]:not(.switch):checked { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 3px var(--bg); }
+  .presets { display: grid; grid-template-columns: repeat(5, 36px); gap: 7px; }
+  .presets button { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #00000066; cursor: pointer; transition: transform .12s; }
   .presets button:hover { transform: translateY(-2px); }
   .presets button[aria-pressed=true] { outline: 2px solid var(--text); outline-offset: 2px; }
-  .swatch { position: relative; width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--line-strong); overflow: hidden; flex: none; }
+  .swatch { position: relative; width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line-strong); overflow: hidden; flex: none; }
   .swatch input { position: absolute; inset: -10px; width: 60px; height: 60px; border: 0; padding: 0; cursor: pointer; }
   .swatch.none::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: var(--panel); border: 1.5px dashed var(--line-strong); pointer-events: none; }
   input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
   .hex { width: 96px; text-transform: uppercase; font-family: ui-monospace, Consolas, monospace; }
   .hex::placeholder { text-transform: none; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  input[type=range] { width: 220px; }
+  input[type=range] { width: 100%; max-width: 300px; }
   .val { min-width: 44px; color: var(--muted); }
   .switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; flex: none; margin: 0; }
   .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: var(--accent); }
   .switch:checked::after { left: 19px; }
-  .dpi { font-size: 30px; font-weight: 650; width: 120px; background: none !important; border: 0 !important; padding: 0 !important; }
+  .dpi { font-size: 30px; font-weight: 650; width: 130px; background: none !important; border: 0 !important; padding: 0 !important; color: var(--value); }
   .dpi::-webkit-inner-spin-button { display: none; }
+  #stageRows .dpi { font-size: 17px; width: 84px; }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; color: var(--muted); }
+  .pill { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; cursor: pointer; color: var(--muted); }
   .pill:hover { color: var(--text); }
   .pill[aria-pressed=true] { color: var(--text); border-color: var(--accent); }
-  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
-  .seg button { background: none; border: 0; border-radius: 7px; padding: 6px 14px; cursor: pointer; color: var(--muted); }
+  .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; flex-wrap: wrap; }
+  .seg button { background: none; border: 0; border-radius: 7px; padding: 5px 12px; cursor: pointer; color: var(--muted); }
   .seg button[aria-pressed=true] { background: var(--raise); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .grp .seg { padding: 2px; }
-  .grp .seg button { padding: 3px 11px; font-size: 12.5px; }
+  .sechead .seg button { padding: 3px 11px; font-size: 12.5px; }
   .link { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
-  .link:hover, .link:focus-visible { color: var(--accent-text); }
+  .link:hover, .link:focus-visible, a:hover { color: var(--text); text-decoration-color: currentColor; }
+  a { color: var(--value); text-underline-offset: 3px; }
   .combo { width: 150px; font-family: ui-monospace, Consolas, monospace; cursor: pointer; }
   .combo:focus { border-color: var(--accent); }
-  #kb { width: 100%; max-width: 980px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; flex-basis: 100%; }
+  .danger { color: var(--err-text); }
+  .danger:hover { color: var(--err-text); border-color: var(--err); }
+  .macro { display: grid; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); }
+  .macro .row { justify-content: space-between; flex-wrap: nowrap; }
+  .macro code { font-size: 12px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  .games { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .game { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 3px 3px 11px; font-size: 12.5px; background: var(--bg); }
+  .game button { background: none; border: 0; color: var(--faint); cursor: pointer; width: 22px; height: 22px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
+  .game button .ico { width: 10px; height: 10px; }
+  .game button:hover { color: var(--text); background: var(--line); }
+  #kb { width: 100%; max-width: 1040px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; flex-basis: 100%; }
   #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
   #kb g:hover rect { stroke: var(--muted); }
   #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
-  .foot { color: var(--faint); font-size: 12.5px; margin: 14px 2px 0; max-width: 75ch; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  .hint b { color: var(--text); font-weight: 600; }
 
-  /* Overview: every device at a glance. */
-  .ov-head { display: flex; align-items: baseline; gap: 12px; margin: 2px 0 16px; }
-  .ov-head h1 { margin: 0; font-size: 22px; font-weight: 650; }
+  /* Compare: every profile side by side (the old sheet), on request. */
+  .compare { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 24px; }
+  .sheet-wrap { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); width: max-content; min-width: 100%; }
+  .band { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--lit); border-top: 3px solid var(--lit-edge); pointer-events: none;
+    transition: transform .5s cubic-bezier(.16, 1, .3, 1), width .5s cubic-bezier(.16, 1, .3, 1); }
+  @media (prefers-reduced-motion: reduce) { .band { transition: none; } }
+  table.sheet { position: relative; width: 100%; border-collapse: separate; border-spacing: 0; }
+  .sheet th, .sheet td { text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  .sheet tr:last-child > * { border-bottom: 0; }
+  .sheet thead th { vertical-align: top; padding: 14px 14px 12px; font-weight: 400; min-width: 180px; }
+  .sheet thead th:first-child { min-width: 170px; }
+  .sheet tbody th { font-weight: 400; color: var(--muted); padding: 0 16px; white-space: nowrap; }
+  .pname { font-weight: 650; font-size: 15px; display: flex; align-items: center; gap: 8px; min-height: 28px; }
+  .live { font-size: 11.5px; font-weight: 600; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; }
+  .mk { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .mk:hover { color: var(--text); border-color: var(--line-strong); }
+  .sheet .games { margin-top: 6px; }
+  .grp th { padding: 12px 16px 7px; background: var(--raise); color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .sheet td { padding: 3px 6px; }
+  .cell { width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 40px; white-space: nowrap; }
+  .cell:hover { border-color: var(--line-strong); background: var(--bg); }
+  .cell .unset { color: var(--faint); }
+  .cell.changed { color: var(--accent-text); }
+  .c-other .cell { color: var(--muted); }
+  .c-other .cell.changed { color: var(--accent-text); }
+  .cell small { color: var(--muted); }
+
+  /* All devices. */
+  .overview { flex: 1; min-height: 0; overflow: auto; padding: 20px; }
+  .ov-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; }
+  .ov-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
   .ov-head span { color: var(--muted); font-size: 13px; }
-  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; cursor: pointer; display: flex; flex-direction: column; gap: 10px; transition: border-color .15s, transform .15s; }
+  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 9px; transition: border-color .15s, transform .15s; }
   .dcard:hover { border-color: var(--line-strong); transform: translateY(-2px); }
   .dcard.muted { cursor: default; opacity: .6; }
   .dcard.muted:hover { transform: none; border-color: var(--line); }
-  .dtop { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
-  .dcard h3 { margin: 0; font-size: 16px; font-weight: 650; }
+  .dtop { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+  .dcard h3 { margin: 0; font-size: 15px; font-weight: 650; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dots { display: flex; gap: 7px; min-height: 16px; flex-wrap: wrap; }
   .dots i { width: 16px; height: 16px; border-radius: 50%; background: currentColor; border: 1px solid #00000066; }
   .dots i.off { background: none; border: 1.5px dashed var(--line-strong); }
@@ -207,80 +285,105 @@
   .batt b::after { content: ""; position: absolute; left: 1px; top: 1px; bottom: 1px; width: calc((100% - 2px) * var(--lvl)); background: currentColor; border-radius: 1px; }
   .batt.low { color: var(--err); }
 
-  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--toast); border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; opacity: 0; transition: .2s; pointer-events: none; font-size: 13px; box-shadow: var(--shadow); z-index: 10; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--toast); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; opacity: 0; transition: .2s; pointer-events: none; font-size: 13px; box-shadow: var(--shadow); z-index: 20; max-width: calc(100vw - 32px); }
   #toast.show { opacity: 1; transform: translateX(-50%); }
   #toast.err { border-color: var(--err); color: var(--err-text); }
+  #toast.act { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding-right: 8px; }
+  #toast button { background: none; border: 1px solid var(--accent); color: var(--text); border-radius: 999px; padding: 3px 12px; cursor: pointer; font-weight: 600; }
 
-  /* Narrow windows: one profile at a time, picked from the device line. */
-  @media (max-width: 760px) {
-    header { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
-    .tabs { order: 3; flex-basis: 100%; }
+  /* Medium windows: a narrower panel. */
+  @media (max-width: 1180px) { .work { grid-template-columns: 172px minmax(0, 1fr) 330px; } .work.wide { grid-template-columns: 172px minmax(0, 1fr); } }
+  /* Small windows and phones: sections become tabs, the panel slides up from the bottom. */
+  @media (max-width: 820px) {
+    body { overflow: auto; display: block; }
+    header.top { padding: 8px 12px; gap: 8px 10px; height: auto; flex-wrap: wrap; }
+    #tabsRow { order: 3; flex-basis: 100%; }
     .actions { margin-left: auto; }
     .synclabel { display: none; }
-    main { padding: 16px 14px 40px; }
-    .mprof { display: flex; flex-basis: 100%; margin-left: 0; }
-    .devline { flex-wrap: wrap; }
-    .mprof select { flex: 1; }
-    table.sheet { min-width: 0; }
-    .sheet .c-other { display: none; }
-    .devactions { flex-basis: 100%; margin-left: 0; }
-    .newform { flex-wrap: wrap; width: 100%; }
-    .newform input { flex-basis: 100%; width: 100%; }
-    .newform .hint-games { flex-basis: 100%; order: 3; }
-    .sheet thead th:first-child, .sheet tbody th { width: 42%; white-space: normal; padding-right: 8px; }
-    .presets { grid-template-columns: repeat(5, 36px); }
-    .presets button { width: 36px; height: 36px; }
-    input[type=range] { width: 100%; }
-    .grp .gtools { display: flex; margin: 8px 0 0; }
+    .devbar { flex-wrap: wrap; padding: 10px 12px; gap: 10px; }
+    .who { max-width: none; flex: 1; }
+    #profilesRow { order: 3; flex-basis: 100%; }
+    .work, .work.wide { display: block; }
+    .rail { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; position: sticky; top: 0; z-index: 3; }
+    .sec { flex: none; padding: 6px 12px; }
+    .sec span { display: none; }
+    .rail.more-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+    .tiles { padding: 14px 12px 90px; }
+    .tgrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .keypad { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 58vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: var(--shadow); z-index: 10;
+      transform: translateY(105%); transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
+    .work.has-sel .panel { transform: none; }
+    .work.has-sel .tiles { padding-bottom: 60vh; }
+    .work.wide .tiles { display: block; }
+    .work.wide .edbox { flex-direction: column; }
+    .compare, .overview { padding: 14px 12px; }
   }
+  .addgame, .del { background: none; border: 0; padding: 3px 2px; font-size: 12.5px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .addgame:hover, .addgame:focus-visible { color: var(--text); }
+  .del { color: var(--faint); margin-top: 6px; display: flex; }
+  .del:hover { color: var(--err-text); }
+  .gamein { width: 150px; padding: 4px 9px !important; font-size: 12.5px; }
 </style>
 </head>
 <body>
-<header>
+<header class="top">
   <button class="brand" id="home" title="All devices"><img src="{{LOGO}}" alt="">Secretarybird</button>
-  <nav class="tabs" id="tabs" aria-label="Devices"></nav>
+  <div class="scrollrow" id="tabsRow"><nav class="tabs" id="tabs" aria-label="Devices"></nav></div>
   <div class="actions">
     <div class="sync" id="sync" hidden>
       <label class="mini" title="Color to sync"><input type="color" id="syncColor" value="#ff2800" aria-label="Color to sync"></label>
       <button id="syncBtn" title="Same color on every zone of every device">Sync<span class="synclabel"> color everywhere</span></button>
     </div>
     <button class="ghost" id="rescan">Rescan</button>
-    <button class="ghost theme" id="theme" title="Light or dark" aria-label="Switch light or dark"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
+    <label class="themepick" title="Theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
+      <select id="theme" aria-label="Theme">
+        <option value="">Auto</option><option value="bridge">Bridge</option><option value="roast">Roast</option><option value="classic">Classic</option>
+        <option value="light">Light</option><option value="workshop">Workshop</option><option value="neon">Neon</option>
+      </select></label>
   </div>
 </header>
+<p class="banner" id="synBanner" hidden>Razer Synapse is running and can overwrite these settings. Close it, or run <code>secbird debloat</code> to stop it starting with Windows.</p>
 
 <main id="main">
-  <p class="banner" id="synBanner" hidden>Razer Synapse is running and can overwrite these settings. Close it, or run <code>secbird debloat</code> to stop it starting with Windows.</p>
   <p class="empty" id="empty" hidden>No Razer devices found. Plug one in, then press Rescan.</p>
 
-  <section id="overview" hidden>
+  <section class="overview" id="overview" hidden>
     <div class="ov-head"><h1>All devices</h1><span id="ovSummary"></span></div>
     <div class="ov-grid" id="ovGrid"></div>
   </section>
 
-  <section id="device" hidden>
-    <div class="devline">
-      <svg viewBox="0 0 240 360" id="preview" aria-hidden="true">
-        <path id="z-underglow" class="zone-shape" fill="none" stroke-width="10"
-          d="M120 26C72 26 52 64 50 122c-2 68 8 124 24 172 13 34 79 34 92 0 16-48 26-104 24-172-2-58-22-96-70-96z"/>
-        <path class="m-body" stroke-width="5"
-          d="M120 18C70 18 46 60 44 120c-2 70 8 130 26 180 14 36 86 36 100 0 18-50 28-110 26-180-2-60-26-102-76-102z"/>
-        <path d="M120 22v112M47 132c40 14 106 14 146 0" fill="none" class="m-line" stroke-width="5"/>
-        <rect id="z-scroll" class="zone-shape" x="106" y="52" width="28" height="52" rx="14"/>
-        <circle id="z-logo" class="zone-shape" cx="120" cy="246" r="20"/>
-      </svg>
-      <div>
-        <h1 id="name"></h1>
-        <p class="meta" id="meta"></p>
-      </div>
-      <div class="devactions" id="devActions"></div>
-      <label class="mprof">Profile <select id="mProfile" aria-label="Profile"></select></label>
+  <div class="devbar" id="devbar" hidden>
+    <svg viewBox="0 0 240 360" id="preview" aria-hidden="true">
+      <path id="z-underglow" class="zone-shape" fill="none" stroke-width="12"
+        d="M120 26C72 26 52 64 50 122c-2 68 8 124 24 172 13 34 79 34 92 0 16-48 26-104 24-172-2-58-22-96-70-96z"/>
+      <path class="m-body" stroke-width="6"
+        d="M120 18C70 18 46 60 44 120c-2 70 8 130 26 180 14 36 86 36 100 0 18-50 28-110 26-180-2-60-26-102-76-102z"/>
+      <path d="M120 22v112M47 132c40 14 106 14 146 0" fill="none" class="m-line" stroke-width="6"/>
+      <rect id="z-scroll" class="zone-shape" x="104" y="50" width="32" height="56" rx="16"/>
+      <circle id="z-logo" class="zone-shape" cx="120" cy="246" r="24"/>
+    </svg>
+    <div class="who">
+      <h1 id="name"></h1>
+      <p class="meta" id="meta"></p>
     </div>
+    <div class="scrollrow" id="profilesRow"><nav class="profiles" id="profiles" aria-label="Profiles"></nav></div>
+    <div class="devright">
+      <button class="ghost" id="compareBtn" aria-pressed="false" title="Every profile side by side">Compare</button>
+    </div>
+  </div>
+
+  <div class="work" id="work" hidden>
+    <nav class="rail" id="rail" aria-label="Settings"></nav>
+    <section class="tiles" id="tiles" aria-live="polite"></section>
+    <aside class="panel" id="panel" aria-label="Edit"></aside>
+  </div>
+
+  <section class="compare" id="compare" hidden>
     <div class="sheet-wrap" id="sheetWrap">
       <div class="band" id="band"></div>
       <table class="sheet" id="sheet"></table>
     </div>
-    <p class="foot" id="foot"></p>
   </section>
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -297,8 +400,8 @@ const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', ba
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
-let open = null;          // the cell whose editor is showing: { row, profile }
-let btnData = {}, btnLayer = 'normal', brush = 'E8782A', painting = false, syncPicked = false;
+let sel = null, section = null, view = 'work'; // selected tile, rail section, 'work' or 'compare'
+let btnData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
 
 // Full-size ANSI keyboard on Razer's 6 x 22 per-key grid.
 // Each key: [label, matrix column, width, gap before, height], in key units.
@@ -338,10 +441,12 @@ async function api(path, body) {
 }
 
 let toastTimer;
-function toast(msg, err) {
+// `undo`: offer an Undo button for a while, so any change can be taken back in one click.
+function toast(msg, err, undo) {
   const t = $('toast');
-  t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 4500 : 1600);
+  t.textContent = msg; t.className = 'show' + (err ? ' err' : '') + (undo ? ' act' : '');
+  if (undo) t.append(el('button', { textContent: 'Undo', onclick: () => { t.className = ''; undo(); } }));
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', undo ? 10000 : err ? 4500 : 1600);
 }
 
 // Latest-value-wins sender: while a write is in flight, newer values replace older ones,
@@ -362,7 +467,42 @@ function live(send, done) {
   };
 }
 
-const ICONS = { plus: '<path d="M8 3v10M3 8h10"/>', x: '<path d="M4 4l8 8M12 4l-8 8"/>' };
+const ICONS = { plus: '<path d="M8 3v10M3 8h10"/>', x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+  left: '<path d="M10 3L5 8l5 5"/>', right: '<path d="M6 3l5 5-5 5"/>' };
+
+// Rows that can hold more than fits get arrows at the cut-off side; the wheel scrolls them too.
+function scrollRow(row) {
+  const nav = row.querySelector('nav');
+  const mk = (cls, dir, label) => {
+    const b = el('button', { className: 'arrow ' + cls, innerHTML: icon(dir), ariaLabel: label, title: label, hidden: true,
+      onclick: () => nav.scrollBy({ left: (cls === 'l' ? -1 : 1) * Math.max(120, nav.clientWidth * 0.7) }) });
+    return b;
+  };
+  const l = mk('l', 'left', 'Scroll left'), r = mk('r', 'right', 'Scroll right');
+  row.prepend(l); row.append(r);
+  const update = () => {
+    const more = nav.scrollWidth - nav.clientWidth > 1;
+    const atL = nav.scrollLeft <= 1, atR = nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 1;
+    l.hidden = !more || atL; r.hidden = !more || atR;
+    row.classList.toggle('more-l', more && !atL); row.classList.toggle('more-r', more && !atR);
+  };
+  nav.addEventListener('scroll', update, { passive: true });
+  nav.addEventListener('wheel', e => {
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollLeft += d; e.preventDefault();
+  }, { passive: false });
+  new ResizeObserver(update).observe(nav);
+  new MutationObserver(update).observe(nav, { childList: true });
+  return update;
+}
+// Keep the selected tab or the live profile in view without moving the page.
+function bringIntoView(nav, item) {
+  if (!item) return;
+  const l = item.offsetLeft, r = l + item.offsetWidth;
+  if (l < nav.scrollLeft + 8) nav.scrollLeft = Math.max(0, l - 40);
+  else if (r > nav.scrollLeft + nav.clientWidth - 8) nav.scrollLeft = r - nav.clientWidth + 40;
+}
 const icon = name => `<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const label = name => NAMES[name] || name.charAt(0).toUpperCase() + name.slice(1);
@@ -387,8 +527,11 @@ function render() {
   const has = devices.length > 0;
   if (!has) showAll = unsupported.length > 0;
   $('empty').hidden = has || unsupported.length > 0;
-  $('device').hidden = !has || showAll;
   $('overview').hidden = !showAll;
+  const onDevice = has && !showAll;
+  $('devbar').hidden = !onDevice;
+  $('work').hidden = !onDevice || view === 'compare';
+  $('compare').hidden = !onDevice || view !== 'compare';
   $('synBanner').hidden = !synapse.length;
   $('sync').hidden = !devices.some(d => d.leds.length);
   if (!syncPicked && dev) { // until a sync color is picked, offer the color on screen
@@ -398,27 +541,69 @@ function render() {
   $('tabs').innerHTML = '';
   const tab = (text, selected, onclick) => $('tabs').append(el('button', { className: 'tab', textContent: text, onclick, ariaSelected: selected }));
   if (devices.length || unsupported.length) {
-    tab('All devices', !!showAll, () => { showAll = true; open = null; render(); });
+    tab('All devices', !!showAll, () => { showAll = true; sel = null; render(); });
     devices.forEach(d => tab(devLabel(d), !showAll && d.id === dev.id, () => openDevice(d)));
   }
+  requestAnimationFrame(() => { bringIntoView($('tabs'), $('tabs').querySelector('[aria-selected=true]')); updateTabsRow(); });
   if (showAll) return renderOverview();
   if (!has) return;
-
-  $('name').textContent = devLabel(dev);
-  $('meta').textContent = [KINDS[dev.kind] || 'Device', dev.firmware && 'firmware ' + dev.firmware, dev.serial,
-    dev.battery != null && dev.battery + '% battery', !dev.known && 'not in the device database'].filter(Boolean).join(' · ');
-  $('mProfile').innerHTML = '';
-  dev.profiles.forEach(p => $('mProfile').add(new Option(p, p, false, p === dev.active)));
-  paintPreview();
-  renderNewProfile();
-  if (dev.kind === 'mouse' && btnData[dev.id] === undefined) loadButtons(dev);
-  renderSheet();
-  $('foot').textContent = 'Changes apply right away and are saved to the active profile. ' +
-    (dev.kind === 'mouse' ? 'Button changes go to the mouse’s live memory; Reset puts back what Synapse or the factory saved in it. ' : '') +
-    'Games listed under a profile switch to it while they are in front.';
+  renderDevbar();
+  if (view === 'compare') renderCompare(); else renderWork();
 }
 
-function openDevice(d) { dev = d; open = null; showAll = false; render(); }
+function openDevice(d) {
+  dev = d; sel = null; showAll = false;
+  section = null; // resolved (last used, else first) when the workbench draws
+  render();
+}
+
+// Per-browser conveniences: which section each device opens on.
+function remembered(key) { try { return localStorage.getItem('secbird-' + key); } catch { return null; } }
+function remember(key, value) { try { localStorage.setItem('secbird-' + key, value); } catch { } }
+
+function renderDevbar() {
+  $('name').textContent = devLabel(dev);
+  $('meta').textContent = [KINDS[dev.kind] || 'Device', dev.battery != null && dev.battery + '% battery',
+    !dev.known && 'not in the device database'].filter(Boolean).join(' · ');
+  paintPreview();
+  renderProfiles();
+  $('compareBtn').ariaPressed = view === 'compare';
+  $('compareBtn').hidden = dev.profiles.length < 2 && view !== 'compare';
+}
+
+// Profile switcher: one click makes a profile live. The ember underline slides to it.
+function renderProfiles(adding) {
+  const box = $('profiles');
+  box.innerHTML = '';
+  dev.profiles.forEach(n => {
+    const apps = (prof(n).apps || []).length;
+    const b = el('button', { className: 'pbtn', ariaCurrent: n === dev.active, title: n === dev.active ? n + ' is live' : 'Make ' + n + ' live',
+      onclick: () => { if (n !== dev.active) activate(n); } }, n, apps ? el('span', { className: 'g num', textContent: apps === 1 ? '1 game' : apps + ' games' }) : null);
+    b.dataset.p = n;
+    box.append(b);
+  });
+  if (adding) {
+    const input = el('input', { type: 'text', placeholder: 'Name, e.g. Valorant', maxLength: 32, ariaLabel: 'New profile name' });
+    const form = el('form', { className: 'newform', onsubmit: e => { e.preventDefault(); if (input.value.trim()) createProfile(input.value.trim()); } },
+      input, el('button', { className: 'ghost', textContent: 'Create', type: 'submit' }),
+      el('button', { className: 'ghost', textContent: 'Cancel', type: 'button', onclick: () => renderProfiles() }));
+    input.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); renderProfiles(); } };
+    box.append(form); input.focus();
+  } else {
+    box.append(el('button', { className: 'padd', innerHTML: icon('plus') + 'New', title: 'New profile, a copy of ' + dev.active, onclick: () => renderProfiles(true) }));
+  }
+  box.append(el('span', { className: 'uline', id: 'uline' }));
+  requestAnimationFrame(placeUnderline);
+}
+function placeUnderline() {
+  const b = $('profiles').querySelector('.pbtn[aria-current=true]'), u = $('uline');
+  if (!b || !u) return;
+  u.style.width = (b.offsetWidth - 20) + 'px';
+  u.style.transform = `translateX(${b.offsetLeft + 10}px)`;
+  bringIntoView($('profiles'), b);
+  updateProfilesRow();
+}
+window.addEventListener('resize', () => requestAnimationFrame(() => { placeUnderline(); placeBand(); }));
 
 function paintPreview() {
   const leds = dev.leds.map(l => l.name);
@@ -432,31 +617,287 @@ function paintPreview() {
   });
 }
 
-// Rows the sheet shows for this device, grouped.
-function rows() {
-  const g = [];
+// Sections of this device, each with its tiles. Only what the device has.
+function sections() {
+  const s = [];
   const light = dev.leds.map(l => ({ key: 'zone:' + l.name, label: label(l.name) }));
   if (dev.matrix) light.push({ key: 'keys', label: 'Per-key colors' });
-  if (light.length) g.push({ name: 'Lighting', rows: light, tools: dev.leds.length > 1 ? 'allzones' : null });
+  if (light.length) s.push({ id: 'light', name: 'Lighting', rows: light, tools: dev.leds.length > 1 ? 'allzones' : null });
   const sens = [];
   if (dev.dpi) sens.push({ key: 'dpi', label: 'DPI' });
+  if (dev.stages) sens.push({ key: 'stages', label: 'DPI stages' });
   if (dev.polling) sens.push({ key: 'polling', label: 'Polling rate' });
-  if (sens.length) g.push({ name: 'Sensitivity', rows: sens });
-  const list = btnData[dev.id];
-  if (dev.kind === 'mouse' && list !== undefined && (list === null || list.length)) {
-    g.push({ name: 'Buttons', tools: 'layer', rows: list === null ? [{ key: 'loading', label: 'Reading buttons…' }]
-      : list.filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label })) });
+  if (sens.length) s.push({ id: 'sens', name: 'Sensitivity', rows: sens });
+  if (dev.kind === 'mouse') {
+    const list = btnData[dev.id];
+    s.push({ id: 'buttons', name: 'Buttons', tools: 'layer', loading: !list,
+      rows: (list || []).filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label, name: b.name })) });
   }
-  return g;
+  if (dev.macros) s.push({ id: 'macros', name: 'Macros', rows: [{ key: 'macros', label: 'Macros on the device' }] });
+  if (dev.sleep) s.push({ id: 'power', name: 'Power', rows: [{ key: 'sleep', label: 'Sleep when idle' }] });
+  s.push({ id: 'profile', name: 'Profile', rows: [{ key: 'apps', label: 'Switches with' }] });
+  s.push({ id: 'device', name: 'Device', rows: [{ key: 'device', label: 'About this device' }] });
+  return s;
 }
+const sectionOf = key => (sections().find(s => s.rows.some(r => r.key === key))
+  || (key.startsWith('btn:') && { id: 'buttons' }) || {}).id;
+
+// One line under each section name: what it holds right now, read from memory only.
+function railSummary(s) {
+  const p = dev.profile;
+  if (s.id === 'light') {
+    if (p.keys && p.keys.length && dev.matrix) return 'Per-key colors';
+    const box = el('span');
+    dev.leds.forEach(l => { const z = zoneOf(p, l.name); const d = el('i', { className: 'dot' + (z.off || !z.color ? ' off' : '') });
+      if (z.color && !z.off) d.style.background = '#' + z.color; box.append(d); });
+    const fx = dev.leds.map(l => zoneOf(p, l.name).effect).find(Boolean);
+    const lit = dev.leds.map(l => zoneOf(p, l.name)).filter(z => z.color && !z.off);
+    box.append(fx ? effectLabel(fx) : lit.length === 1 ? '#' + lit[0].color : lit.length ? plural(lit.length, 'zone') + ' lit' : 'Off');
+    return box;
+  }
+  if (s.id === 'sens') return [dev.dpi && dev.dpi.x + ' DPI', dev.polling && hz(dev.polling.hz)].filter(Boolean).join(' · ');
+  if (s.id === 'buttons') {
+    const n = Object.keys(p.buttons || {}).length;
+    return n ? plural(n, 'button') + ' changed' : 'As saved in the mouse';
+  }
+  if (s.id === 'macros') { const m = macroData[dev.id]; return m ? (m.macros.length ? plural(m.macros.length, 'macro') : 'None yet') : 'On the device'; }
+  if (s.id === 'power') { const sl = dev.sleep; return sl.auto === false ? 'Never sleeps' : 'Sleeps after ' + sl.minutes + ' min'; }
+  if (s.id === 'profile') { const a = p.apps || []; return a.length ? a.join(', ') : 'No games yet'; }
+  if (s.id === 'device') return dev.firmware ? 'Firmware ' + dev.firmware : (KINDS[dev.kind] || 'Device');
+  return '';
+}
+
+function renderRail(secs) {
+  const rail = $('rail');
+  rail.innerHTML = '';
+  secs.forEach(s => {
+    const sum = railSummary(s);
+    const b = el('button', { className: 'sec', ariaCurrent: s.id === section, onclick: () => showSection(s.id) },
+      el('b', { textContent: s.name }), typeof sum === 'string' ? el('span', { textContent: sum }) : sum);
+    b.dataset.sec = s.id;
+    rail.append(b);
+  });
+}
+
+function showSection(id) {
+  if (section === id) return;
+  section = id;
+  sel = autoOpen(sections().find(s => s.id === id));
+  remember('section:' + dev.pid, id);
+  renderWork();
+}
+// A section with one setting opens straight into its editor: one click less.
+const autoOpen = s => (s && !s.loading && s.rows.length === 1 ? s.rows[0].key : null);
+
+// The workbench: rail, tiles of the section, edit panel. `keepPanel` leaves an open editor alone.
+function renderWork(keepPanel) {
+  const secs = sections();
+  let entering = false;
+  if (!secs.some(s => s.id === section)) {
+    const last = remembered('section:' + dev.pid);
+    section = secs.some(s => s.id === last) ? last : secs[0].id;
+    entering = true;
+  }
+  const cur = secs.find(s => s.id === section);
+  if (entering && !sel) sel = autoOpen(cur);
+  // Slow reads happen only when their section is open, once per device.
+  if (section === 'buttons') loadButtons(dev);
+  if ((section === 'buttons' || section === 'macros') && dev.macros && macroData[dev.id] === undefined) loadMacros(dev);
+  if (sel && sectionOf(sel) !== section) sel = null;
+  renderRail(secs);
+  renderTiles(cur);
+  $('work').classList.toggle('wide', sel === 'keys');
+  $('work').classList.toggle('has-sel', !!sel);
+  if (!keepPanel || !$('panel').childElementCount) renderPanel(cur);
+}
+
+function renderTiles(cur) {
+  const t = $('tiles');
+  t.innerHTML = '';
+  const head = el('div', { className: 'sechead' }, el('h2', { textContent: cur.name }));
+  const tools = el('div', { className: 'tools' });
+  if (cur.tools === 'layer') {
+    if (Object.keys(dev.profile.buttons || {}).length) tools.append(el('button', { className: 'ghost', textContent: 'Restore all',
+      title: 'Every changed button back to what the mouse stores', onclick: restoreAllButtons }));
+    const seg = el('span', { className: 'seg', role: 'group', ariaLabel: 'Button layer' });
+    [['normal', 'Normal'], ['hypershift', 'HyperShift']].forEach(([v, txt]) => seg.append(el('button', {
+      textContent: txt, ariaPressed: btnLayer === v, title: v === 'hypershift' ? 'What each button does while a button set to HyperShift is held' : 'What each button does',
+      onclick: () => { btnLayer = v; sel = null; renderWork(); } })));
+    tools.append(seg);
+  } else if (cur.tools === 'allzones') {
+    tools.append(el('button', { className: 'link', textContent: 'Same color on all zones',
+      onclick: () => { const z = dev.leds.map(l => zoneOf(dev.profile, l.name)).find(z => z.color); if (z) dev.leds.forEach(l => setColor(z.color, l.name)); else toast('Pick a color for one zone first', true); } }));
+  }
+  head.append(tools);
+  t.append(head);
+  if (cur.loading) {
+    const g = el('div', { className: 'tgrid' });
+    for (let i = 0; i < 8; i++) g.append(el('div', { className: 'skel' }));
+    t.append(g, el('p', { className: 'hint', textContent: 'Reading the buttons from the mouse…' }));
+    return;
+  }
+  // Side plates (Naga) are drawn as keypads, the way they sit on the mouse.
+  const plain = cur.rows.filter(r => !/^btn:(grid|hex)-/.test(r.key));
+  const grid = cur.rows.filter(r => /^btn:grid-/.test(r.key));
+  const hex = cur.rows.filter(r => /^btn:hex-/.test(r.key));
+  const g = el('div', { className: 'tgrid' });
+  plain.forEach(r => g.append(tile(r)));
+  t.append(g);
+  if (grid.length) {
+    t.append(el('p', { className: 'subhead', textContent: 'Side grid' }));
+    const k = el('div', { className: 'keypad' });
+    grid.forEach(r => k.append(tile(r, r.key.slice(9))));
+    t.append(k);
+  }
+  if (hex.length) {
+    t.append(el('p', { className: 'subhead', textContent: '6-button side plate' }));
+    const k = el('div', { className: 'keypad' });
+    hex.forEach(r => k.append(tile(r, r.key.slice(8))));
+    t.append(k);
+  }
+}
+
+function tile(r, short) {
+  const [html, changed] = cellView(r.key, dev.active);
+  const b = el('button', { className: 'tile' + (changed ? ' changed' : ''), ariaPressed: sel === r.key,
+    ariaLabel: r.label + (changed ? ' (changed)' : ''), onclick: () => select(r.key) },
+    el('span', { className: 'tl', textContent: short || r.label }), el('span', { className: 'tv', innerHTML: html }));
+  b.dataset.row = r.key;
+  if (short) b.title = r.label;
+  return b;
+}
+
+function select(key) {
+  sel = sel === key ? null : key;
+  renderWork();
+  if (sel && matchMedia('(max-width: 820px)').matches) { // keep the tile in sight above the sheet
+    const t = document.querySelector(`.tile[data-row="${CSS.escape(sel)}"]`);
+    if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  if (sel) {
+    const first = $('panel').querySelector('.pbody button, .pbody input, .pbody select, .pbody textarea');
+    if (first && matchMedia('(min-width: 821px)').matches) first.focus({ preventScroll: true });
+  }
+}
+
+function renderPanel(cur) {
+  const p = $('panel');
+  p.innerHTML = '';
+  const r = sel && cur.rows.find(x => x.key === sel);
+  if (!r) {
+    p.append(el('div', { className: 'phead' }, el('h2', { textContent: 'Live now: ' + dev.active })),
+      el('div', { className: 'pbody' }, liveSummary()));
+    return;
+  }
+  const title = r.label + (r.key.startsWith('btn:') && btnLayer === 'hypershift' ? ' · HyperShift' : '');
+  p.append(el('div', { className: 'phead' },
+    el('h2', { textContent: title }),
+    el('button', { className: 'xbtn', innerHTML: icon('x'), title: 'Close (Esc)', ariaLabel: 'Close', onclick: closePanel })));
+  const body = el('div', { className: 'pbody' });
+  p.append(body);
+  buildEditor(body, r);
+}
+
+function closePanel() {
+  const was = sel; sel = null; renderWork();
+  const t = was && document.querySelector(`.tile[data-row="${CSS.escape(was)}"]`);
+  if (t) t.focus({ preventScroll: true });
+}
+
+// The panel with nothing selected: what is live, and how saving works.
+function liveSummary() {
+  const p = dev.profile, apps = p.apps || [];
+  const box = el('div', { className: 'edbox' });
+  box.append(el('div', { className: 'edgroup' },
+    el('p', { className: 'hint', innerHTML: `<b>${esc(dev.active)}</b> is live on this ${esc((KINDS[dev.kind] || 'device').toLowerCase())}.` +
+      (apps.length ? ` It also comes up while ${esc(apps.join(', '))} ${apps.length === 1 ? 'is' : 'are'} in front.` : '') }),
+    el('p', { className: 'hint', textContent: 'Pick a setting to change it. Changes apply right away and are saved to ' + dev.active + '; there is nothing to save or close.' })));
+  if (dev.kind === 'mouse') box.append(el('p', { className: 'note', textContent: 'Button changes go to the mouse’s live memory; Restore puts back what Synapse or the factory stored in it.' }));
+  if (dev.profiles.length > 1) box.append(el('p', { className: 'note', textContent: 'Compare shows every profile side by side.' }));
+  return box;
+}
+
+// Esc closes the panel (and returns to its tile), or leaves Compare.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || e.target.classList.contains('combo')) return;
+  if (view === 'compare') { view = 'work'; render(); return; }
+  if (sel) closePanel();
+});
+
+// Open a setting from anywhere (the live preview, a Compare cell): switch profile if needed.
+async function toggleEditor(row, name) {
+  if (name !== dev.active) {
+    const ok = await activate(name, true); if (!ok) return;
+  }
+  view = 'work';
+  section = sectionOf(row) || section;
+  sel = null;
+  render();
+  select(row);
+}
+function focusCell(row) {
+  const t = document.querySelector(`.tile[data-row="${CSS.escape(row)}"]`);
+  if (t) t.focus({ preventScroll: true });
+}
+// Data changed: redraw what shows it, leaving an open editor alone.
+function renderSheet() {
+  if (!dev || showAll) return;
+  if (view === 'compare') renderCompare(); else renderWork(true);
+}
+// One value changed: update its tile, the rail line, and its Compare cell.
+function refreshCell(row) {
+  if (view === 'compare') return renderCompare();
+  const t = document.querySelector(`.tile[data-row="${CSS.escape(row)}"]`);
+  if (t) {
+    const [html, changed] = cellView(row, dev.active);
+    t.querySelector('.tv').innerHTML = html; t.classList.toggle('changed', !!changed);
+  }
+  renderRail(sections());
+}
+
+// ---------- Compare: every profile side by side ----------
+
+function renderCompare() {
+  const t = $('sheet'), names = dev.profiles, secs = sections().filter(s => !['macros', 'profile', 'device'].includes(s.id));
+  if (secs.some(s => s.id === 'buttons')) loadButtons(dev);
+  t.innerHTML = '';
+  const head = el('tr');
+  head.append(el('th', { scope: 'col' }, el('span', { className: 'hint', textContent: 'Setting' })));
+  names.forEach(n => head.append(profileHeader(n)));
+  t.append(el('thead', {}, head));
+  const span = names.length + 1;
+  secs.forEach(s => {
+    const body = el('tbody');
+    body.append(el('tr', { className: 'grp' }, el('th', { colSpan: span, scope: 'rowgroup', textContent: s.name + (s.id === 'buttons' && btnLayer === 'hypershift' ? ' · HyperShift' : '') })));
+    const rowsOf = s.loading ? [{ key: 'loading', label: 'Reading buttons…' }] : s.rows;
+    rowsOf.forEach(r => {
+      const tr = el('tr');
+      tr.append(el('th', { scope: 'row', textContent: r.label }));
+      names.forEach(n => {
+        const [html, remapped] = cellView(r.key, n);
+        const changed = n === dev.active ? remapped : differs(r.key, n);
+        const b = el('button', { className: 'cell' + (changed ? ' changed' : ''), innerHTML: html, disabled: r.key === 'loading',
+          ariaLabel: `${r.label} in ${n}` + (n === dev.active ? '' : ' (makes it live)'), onclick: () => toggleEditor(r.key, n) });
+        tr.append(el('td', { className: n === dev.active ? 'c-on' : 'c-other' }, b));
+      });
+      body.append(tr);
+    });
+    t.append(body);
+  });
+  requestAnimationFrame(placeBand);
+}
+$('compareBtn').onclick = () => { view = view === 'compare' ? 'work' : 'compare'; sel = null; render(); };
 
 // Comparable value of a cell, to mark where another profile differs from the active one.
 function cellValue(key, name) {
   const p = prof(name), active = name === dev.active;
-  if (key.startsWith('zone:')) { const z = zoneOf(p, key.slice(5)); return p.keys && p.keys.length && dev.matrix ? 'keys' : z.off ? 'off' : (z.color || '') + '/' + (z.brightness ?? 100); }
+  if (key.startsWith('zone:')) { const z = zoneOf(p, key.slice(5)); return p.keys && p.keys.length && dev.matrix ? 'keys' : z.off ? 'off' : (z.effect || z.color || '') + '/' + (z.brightness ?? 100); }
   if (key === 'keys') return (p.keys || []).join();
   if (key === 'dpi') return String(active && dev.dpi ? [dev.dpi.x, dev.dpi.y] : p.dpi || '');
   if (key === 'polling') return String(active && dev.polling ? dev.polling.hz : p.polling || '');
+  if (key === 'stages') { const st = stagesOf(name); return st ? st.active + ':' + st.list.join(' ') : ''; }
+  if (key === 'sleep') { const sl = sleepOf(name); return sl ? sl.auto + ':' + sl.minutes : ''; }
+  if (key === 'macros') return 'shared'; // the device's, the same in every profile
   if (key.startsWith('btn:')) {
     const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return '';
     const skey = btnLayer === 'normal' ? b.name : b.name + '/hypershift';
@@ -474,6 +915,7 @@ function cellView(key, name) {
     const z = zoneOf(p, key.slice(5));
     if (p.keys && p.keys.length && dev.matrix) return ['<span class="unset">Per-key colors</span>'];
     if (z.off) return ['<span class="sw off"></span>Off'];
+    if (z.effect) return [esc(effectLabel(z.effect))];
     if (!z.color) return ['<span class="unset">Not set</span>'];
     return [`<span class="sw" style="background:#${esc(z.color)}"></span><span class="num">#${esc(z.color)}</span>` +
       (z.brightness != null && z.brightness !== 100 ? ` <small class="num">${z.brightness}%</small>` : '')];
@@ -492,7 +934,25 @@ function cellView(key, name) {
     const v = active && dev.polling ? dev.polling.hz : p.polling;
     return v ? [`<span class="num">${hz(v)}</span>`] : ['<span class="unset">Not set</span>'];
   }
+  if (key === 'stages') {
+    const st = stagesOf(name);
+    if (!st) return ['<span class="unset">Not set</span>'];
+    return [st.list.map((d, i) => { const v = d[0] === d[1] ? d[0] : d[0] + '×' + d[1];
+      return i + 1 === st.active ? `<b class="num">${v}</b>` : `<span class="num">${v}</span>`; }).join(' · ')];
+  }
+  if (key === 'sleep') {
+    const sl = sleepOf(name);
+    if (!sl) return ['<span class="unset">Not set</span>'];
+    return [sl.auto === false ? 'Never' : `After <span class="num">${sl.minutes}</span> min`];
+  }
+  if (key === 'macros') {
+    const m = macroData[dev.id];
+    if (!m) return ['<span class="unset">…</span>'];
+    return [m.macros.length ? `${plural(m.macros.length, 'macro')} <small>· every profile</small>` : '<span class="unset">None yet</span>'];
+  }
   if (key === 'loading') return ['<span class="unset">…</span>'];
+  if (key === 'apps') { const a = p.apps || []; return [a.length ? esc(a.join(', ')) : '<span class="unset">No games yet</span>']; }
+  if (key === 'device') return [esc(dev.firmware ? 'Firmware ' + dev.firmware : KINDS[dev.kind] || 'Device')];
   if (key.startsWith('btn:')) {
     const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return [''];
     const skey = btnLayer === 'normal' ? b.name : b.name + '/hypershift';
@@ -503,54 +963,6 @@ function cellView(key, name) {
   return [''];
 }
 
-function renderSheet() {
-  const t = $('sheet'), names = dev.profiles, groups = rows();
-  t.innerHTML = '';
-  const head = el('tr');
-  head.append(el('th', { scope: 'col' }, el('span', { className: 'hint-games', textContent: 'Setting' })));
-  names.forEach(n => head.append(profileHeader(n)));
-  t.append(el('thead', {}, head));
-  const span = names.length + 1;
-  groups.forEach(g => {
-    const body = el('tbody');
-    const gth = el('th', { colSpan: span, scope: 'rowgroup' }, g.name);
-    if (g.tools === 'layer') {
-      const seg = el('span', { className: 'seg', role: 'group', ariaLabel: 'Button layer' });
-      [['normal', 'Normal'], ['hypershift', 'HyperShift']].forEach(([v, txt]) => seg.append(el('button', {
-        textContent: txt, ariaPressed: btnLayer === v, title: v === 'hypershift' ? 'What each button does while a button set to HyperShift is held' : '',
-        onclick: () => { btnLayer = v; if (open && open.row.startsWith('btn:')) open = null; renderSheet(); } })));
-      gth.append(el('span', { className: 'gtools' }, seg));
-    } else if (g.tools === 'allzones') {
-      gth.append(el('span', { className: 'gtools' }, el('button', { className: 'link', textContent: 'Same color on all zones',
-        onclick: () => { const z = dev.leds.map(l => zoneOf(dev.profile, l.name)).find(z => z.color); if (z) dev.leds.forEach(l => setColor(z.color, l.name)); else toast('Pick a color for one zone first', true); } })));
-    }
-    body.append(el('tr', { className: 'grp' }, gth));
-    g.rows.forEach(r => {
-      const tr = el('tr');
-      tr.dataset.row = r.key;
-      tr.append(el('th', { scope: 'row', textContent: r.label }));
-      names.forEach(n => {
-        const [html, remapped] = cellView(r.key, n);
-        const changed = n === dev.active ? remapped : differs(r.key, n);
-        const isOpen = open && open.row === r.key && open.profile === n;
-        const b = el('button', { className: 'cell' + (changed ? ' changed' : '') + (isOpen ? ' open' : ''), innerHTML: html,
-          ariaExpanded: isOpen, ariaLabel: `${r.label} in ${n}` + (n === dev.active ? '' : ' (switches to this profile)'),
-          disabled: r.key === 'loading', onclick: () => toggleEditor(r.key, n) });
-        b.dataset.profile = n;
-        tr.append(el('td', { className: n === dev.active ? 'c-on' : 'c-other' }, b));
-      });
-      body.append(tr);
-      if (open && open.row === r.key && open.profile === dev.active) {
-        const td = el('td', { colSpan: span });
-        body.append(el('tr', { className: 'ed' }, td));
-        buildEditor(td, r);
-      }
-    });
-    t.append(body);
-  });
-  requestAnimationFrame(placeBand);
-}
-
 // The lit band sits behind the active profile's column and slides when it changes.
 function placeBand() {
   const th = $('sheet').querySelector('thead th.c-on'), band = $('band');
@@ -558,7 +970,6 @@ function placeBand() {
   band.style.width = th.offsetWidth + 'px';
   band.style.transform = `translateX(${th.offsetLeft}px)`;
 }
-window.addEventListener('resize', () => requestAnimationFrame(placeBand));
 
 function profileHeader(n) {
   const active = n === dev.active, p = prof(n);
@@ -590,62 +1001,53 @@ function profileHeader(n) {
   return th;
 }
 
-// "New profile" lives beside the device name: a button that turns into a name field.
-function renderNewProfile() {
-  const box = $('devActions'); box.innerHTML = '';
-  const btn = el('button', { className: 'addp', title: 'A copy of the active profile',
-    innerHTML: icon('plus') + 'New profile' });
-  btn.onclick = () => {
-    const input = el('input', { type: 'text', placeholder: 'Name, e.g. Valorant', maxLength: 32, ariaLabel: 'New profile name' });
-    const create = el('button', { className: 'ghost', textContent: 'Create', type: 'submit' });
-    const cancel = el('button', { className: 'ghost', textContent: 'Cancel', type: 'button', onclick: () => renderNewProfile() });
-    const form = el('form', { className: 'newform', onsubmit: e => { e.preventDefault(); if (input.value.trim()) createProfile(input.value.trim()); } },
-      input, create, cancel, el('span', { className: 'hint-games', textContent: 'copies ' + dev.active }));
-    input.onkeydown = e => { if (e.key === 'Escape') { renderNewProfile(); box.querySelector('.addp').focus(); } };
-    box.innerHTML = ''; box.append(form); input.focus();
-  };
-  box.append(btn);
-}
+// ---------- Editors (drawn in the panel) ----------
 
-async function toggleEditor(row, name) {
-  if (open && open.row === row && open.profile === name) { open = null; renderSheet(); return focusCell(row, name); }
-  if (name !== dev.active) {
-    const ok = await activate(name, true); if (!ok) return;
-    if (row.startsWith('btn:')) await loadButtons(dev, true);
-  }
-  open = { row, profile: dev.active };
-  renderSheet();
-  const first = document.querySelector('tr.ed button, tr.ed input, tr.ed select');
-  if (first) first.focus({ preventScroll: false });
-}
-function focusCell(row, name) {
-  const c = [...document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .cell`)].find(b => b.dataset.profile === name);
-  if (c) c.focus();
-}
-// Esc closes the editor and returns to its cell.
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && open && !e.target.classList.contains('combo')) { const o = open; open = null; renderSheet(); focusCell(o.row, o.profile); }
-});
-
-// Refresh just the active column's cell (keeps focus inside an open editor).
-function refreshCell(row) {
-  const c = [...document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .cell`)].find(b => b.dataset.profile === dev.active);
-  if (!c) return;
-  const [html, changed] = cellView(row, dev.active);
-  c.innerHTML = html; c.classList.toggle('changed', !!changed);
-  document.querySelectorAll(`tr[data-row="${CSS.escape(row)}"] .c-other .cell`).forEach(o => o.classList.toggle('changed', differs(row, o.dataset.profile)));
-}
-
-// ---------- Editors ----------
-
-function buildEditor(td, r) {
+function buildEditor(host, r) {
   const box = el('div', { className: 'edbox' });
-  td.append(box);
+  host.append(box);
   if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
   else if (r.key === 'keys') keysEditor(box);
   else if (r.key === 'dpi') dpiEditor(box);
   else if (r.key === 'polling') pollingEditor(box);
+  else if (r.key === 'stages') stagesEditor(box);
+  else if (r.key === 'sleep') sleepEditor(box);
+  else if (r.key === 'macros') macrosEditor(box);
+  else if (r.key === 'apps') appsEditor(box);
+  else if (r.key === 'device') deviceEditor(box);
   else if (r.key.startsWith('btn:')) buttonEditor(box, r.key.slice(4));
+}
+
+// The live profile's games and apps: while one is in front, this profile comes up.
+function appsEditor(box) {
+  const n = dev.active, apps = dev.profile.apps || [];
+  const games = el('div', { className: 'games' });
+  apps.forEach(a => games.append(el('span', { className: 'game' }, a,
+    el('button', { innerHTML: icon('x'), title: 'Remove ' + a, ariaLabel: `Remove ${a}`, onclick: () => saveApps(n, apps.filter(v => v !== a), 'Removed ' + a) }))));
+  if (!apps.length) games.append(el('span', { className: 'hint', textContent: 'No games or apps yet.' }));
+  const input = el('input', { type: 'text', placeholder: 'cs2.exe', autocomplete: 'off', ariaLabel: 'Program that brings up ' + n });
+  input.setAttribute('list', 'appList');
+  const list = el('datalist', { id: 'appList' });
+  api('/api/apps').then(r => r.apps.filter(a => !apps.includes(a)).forEach(a => list.append(new Option(a)))).catch(() => {});
+  const add = () => { const v = input.value.trim(); if (v) saveApps(n, [...apps, v], 'Added ' + v + ' to ' + n); };
+  input.onkeydown = e => { if (e.key === 'Enter') add(); };
+  box.append(
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Games and apps that bring up ' + n }), games),
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Add one' }),
+      el('div', { className: 'row' }, input, list, el('button', { className: 'ghost', innerHTML: icon('plus') + 'Add', onclick: add }))),
+    el('p', { className: 'note', textContent: 'Running programs are suggested as you type. While one is in front, the tray switches to this profile, then back when you leave it.' }));
+  if (dev.profiles.length > 1) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'This profile' }),
+    el('div', { className: 'row' }, el('button', { className: 'ghost danger', textContent: 'Delete ' + n, onclick: () => deleteProfile(n) }))));
+}
+
+function deviceEditor(box) {
+  const facts = el('dl', { className: 'facts' });
+  [['Kind', KINDS[dev.kind] || 'Device'], ['Firmware', dev.firmware], ['Serial', dev.serial], ['Battery', dev.battery != null && dev.battery + '%'],
+   ['Product id', dev.pid], ['Device list', dev.known ? 'Known model' : 'Not in the device database yet']]
+    .filter(([, v]) => v).forEach(([k, v]) => facts.append(el('dt', { textContent: k }), el('dd', { className: 'num', textContent: v })));
+  box.append(el('div', { className: 'edgroup' }, el('p', { className: 'lead', textContent: devLabel(dev) }), facts));
+  if (dev.firmware) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Firmware' }), firmwareCheck(),
+    el('p', { className: 'note', textContent: 'Asks apps.razer.com, the page Synapse uses, and links to Razer’s updater. Nothing is installed from here.' })));
 }
 
 function colorPicker(current, onPick) {
@@ -678,10 +1080,61 @@ function zoneEditor(box, name) {
       else { record(name, { off: true }); await api('/api/off', { zone: name }); toast(label(name) + ' off · saved to ' + dev.active); }
     } catch (err) { toast(err.message, true); }
   };
-  box.append(
+  box.append(effectGroup(name),
     el('div', { className: 'edgroup' }, el('h3', { textContent: label(name) + ' color' }), presets, custom),
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Brightness' }), el('div', { className: 'row' }, bright, val),
       el('div', { className: 'row' }, on, el('label', { htmlFor: 'zoneOn', textContent: 'Lit' }))));
+}
+
+// Built-in effects the device runs by itself. Colors come from the zone's color above.
+const EFFECTS = [['static', 'Static color'], ['spectrum', 'Spectrum cycling'], ['wave', 'Wave'],
+  ['breathing', 'Breathing'], ['reactive', 'Reactive'], ['starlight', 'Starlight']];
+function effectLabel(e) {
+  const [kind, rest = ''] = e.split(':'), [arg, n] = rest.split('@');
+  const name = (EFFECTS.find(x => x[0] === kind) || [kind, kind])[1];
+  if (kind === 'wave') return `${name} ${arg === 'left' ? '←' : '→'}`;
+  if (arg && arg !== 'random') return name + ' #' + arg.split(',')[0];
+  return arg === 'random' ? name + ' · random' : name;
+}
+function effectGroup(name) {
+  const z = zoneOf(dev.profile, name), cur = z.effect || '';
+  const [kind0, rest = ''] = cur.split(':'), [arg0, n0] = rest.split('@');
+  const kind = cur ? kind0 : 'static';
+  const sel = el('select', { id: 'zoneFx', ariaLabel: 'Effect' });
+  EFFECTS.forEach(([v, t]) => sel.append(new Option(t, v, false, v === kind)));
+  const dir = el('select', { ariaLabel: 'Wave direction' });
+  [['right', 'Right →'], ['left', '← Left']].forEach(([v, t]) => dir.append(new Option(t, v, false, kind === 'wave' && v === (arg0 || 'right'))));
+  const speed = el('input', { type: 'range', min: 1, max: 5, step: 1, value: kind === 'wave' ? (n0 || 3) : 3, ariaLabel: 'Wave speed' });
+  const dur = el('select', { ariaLabel: 'Duration' });
+  [['1', 'Short'], ['2', 'Medium'], ['3', 'Long']].forEach(([v, t]) => dur.append(new Option(t, v, false, v === (n0 || '2'))));
+  const rnd = el('input', { type: 'checkbox', id: 'fxRandom', checked: arg0 === 'random' });
+  const rndLabel = el('label', { htmlFor: 'fxRandom', textContent: 'Random colors' });
+  const show = () => {
+    const k = sel.value;
+    dir.hidden = speed.hidden = k !== 'wave';
+    dur.hidden = !(k === 'reactive' || k === 'starlight');
+    rnd.hidden = rndLabel.hidden = !(k === 'breathing' || k === 'starlight');
+  };
+  const send = async () => {
+    show();
+    const k = sel.value, color = zoneOf(dev.profile, name).color || '00FF00';
+    if (k === 'static') return setColor(color, name);
+    const text = k === 'spectrum' ? 'spectrum'
+      : k === 'wave' ? `wave:${dir.value}@${speed.value}`
+      : k === 'reactive' ? `reactive:${color}@${dur.value}`
+      : k === 'breathing' ? `breathing:${rnd.checked ? 'random' : color}`
+      : `starlight:${rnd.checked ? 'random' : color}@${dur.value}`;
+    try {
+      await api('/api/effect', { zone: name, effect: text });
+      record(name, { effect: text, off: false });
+      toast(effectLabel(text) + ' · saved to ' + dev.active);
+    } catch (e) { toast(e.message, true); sel.value = (zoneOf(dev.profile, name).effect || 'static').split(':')[0]; show(); }
+  };
+  [sel, dir, speed, dur, rnd].forEach(c => c.onchange = send);
+  show();
+  return el('div', { className: 'edgroup' }, el('h3', { textContent: 'Effect' }),
+    el('div', { className: 'row' }, sel, dir, speed, dur, rnd, rndLabel),
+    el('p', { className: 'note', textContent: 'Runs on the device itself. Not every device has every effect; it says so if not.' }));
 }
 
 function keysEditor(box) {
@@ -709,10 +1162,10 @@ function dpiEditor(box) {
   slider.oninput = e => setDpi(e.target.value);
   box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'DPI' }), el('div', { className: 'row' }, num, el('span', { className: 'val', textContent: d.min + '–' + d.max })), slider),
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Presets' }), pills),
-    el('p', { className: 'note', textContent: 'The DPI button on the mouse changes this too; the sheet follows it.' }));
+    el('p', { className: 'note', textContent: 'The DPI button on the mouse changes this too; this follows it.' }));
 }
 function showDpi() { // the mouse changed DPI by itself
-  refreshCell('dpi');
+  refreshCell('dpi'); refreshCell('stages');
   const n = $('dpiNum'), s = $('dpiSlider');
   if (n && !n.dataset.dirty) n.value = dev.dpi.x; // follow the mouse unless a new value is being typed
   if (s && document.activeElement !== s) s.value = dev.dpi.x;
@@ -731,6 +1184,110 @@ function pollingEditor(box) {
     el('p', { className: 'note', textContent: 'Higher is smoother and uses a little more CPU. 1000 Hz suits almost everyone.' }));
 }
 
+// DPI stages of a profile: the active column shows the mouse, following its DPI button.
+function stagesOf(name) {
+  if (name !== dev.active || !dev.stages) {
+    const s = prof(name).dpi_stages;
+    return s ? { active: s.active, list: s.stages } : null;
+  }
+  const list = dev.stages.list;
+  const at = dev.dpi ? list.findIndex(d => d[0] === dev.dpi.x && d[1] === dev.dpi.y) : -1;
+  return { active: at >= 0 ? at + 1 : dev.stages.active, list };
+}
+
+function stagesEditor(box) {
+  const d = dev.dpi || { min: 100, max: 30000, step: 50 };
+  const st = stagesOf(dev.active), list = st.list.map(v => v.slice());
+  let active = st.active;
+  const rowsBox = el('div', { className: 'edgroup', id: 'stageRows' });
+  const add = el('button', { className: 'ghost', innerHTML: icon('plus') + 'Add stage' });
+  const draw = () => {
+    rowsBox.innerHTML = '';
+    list.forEach((v, i) => {
+      const num = el('input', { type: 'number', className: 'dpi num', min: d.min, max: d.max, step: d.step, value: v[0],
+        ariaLabel: 'Stage ' + (i + 1) + ' DPI', onchange: e => { const n = Math.round(+e.target.value); if (n) { list[i] = [n, n]; save(); } } });
+      const use = el('input', { type: 'radio', name: 'stageUse', checked: i + 1 === active, id: 'stageUse' + i,
+        onchange: () => { active = i + 1; save(); } });
+      const del = el('button', { className: 'ghost', innerHTML: icon('x'), title: 'Remove stage ' + (i + 1), ariaLabel: 'Remove stage ' + (i + 1),
+        disabled: list.length === 1, onclick: () => { list.splice(i, 1); if (active > i + 1 || active > list.length) active = Math.max(1, active - 1); save(); } });
+      rowsBox.append(el('div', { className: 'row' }, el('span', { className: 'val num', textContent: i + 1 }), num, use,
+        el('label', { htmlFor: 'stageUse' + i, textContent: 'In use' }), del));
+    });
+    add.disabled = list.length >= dev.stages.max;
+  };
+  add.onclick = () => { const next = Math.min(d.max, list[list.length - 1][0] * 2); list.push([next, next]); save(); };
+  const save = async () => {
+    draw();
+    try {
+      const r = await api('/api/stages', { active, stages: list });
+      dev.stages.list = r.stages.list; dev.stages.active = r.stages.active;
+      dev.profile.dpi_stages = { active: r.stages.active, stages: r.stages.list };
+      if (dev.dpi) { dev.dpi.x = r.dpi[0]; dev.dpi.y = r.dpi[1]; dev.profile.dpi = r.dpi; }
+      r.stages.list.forEach((v, i) => { list[i] = v.slice(); });
+      draw(); refreshCell('stages'); refreshCell('dpi');
+      toast('DPI stages · saved to ' + dev.active);
+    } catch (e) { toast(e.message, true); }
+  };
+  draw();
+  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Stages the DPI button cycles through' }), rowsBox, el('div', { className: 'row' }, add)),
+    el('p', { className: 'note', textContent: 'Up to ' + dev.stages.max + ' stages, stored on the mouse. The stage in use sets the DPI right away.' }));
+}
+
+function sleepOf(name) {
+  if (name === dev.active && dev.sleep) return dev.sleep;
+  const p = prof(name);
+  return p.sleep_minutes || p.auto_sleep != null ? { minutes: p.sleep_minutes, auto: p.auto_sleep } : null;
+}
+
+function sleepEditor(box) {
+  const sl = dev.sleep;
+  const val = el('span', { className: 'val num', textContent: sl.minutes + ' min' });
+  const slider = el('input', { type: 'range', min: 1, max: sl.max, step: 1, value: sl.minutes, ariaLabel: 'Minutes before sleeping',
+    disabled: sl.auto === false, oninput: e => { val.textContent = e.target.value + ' min'; }, onchange: e => send({ minutes: +e.target.value }) });
+  const group = el('div', { className: 'edgroup' }, el('h3', { textContent: 'Sleep after' }), el('div', { className: 'row' }, slider, val));
+  if (sl.auto != null) {
+    const on = el('input', { type: 'checkbox', className: 'switch', checked: sl.auto, id: 'autoSleep',
+      onchange: e => { slider.disabled = !e.target.checked; send({ auto: e.target.checked }); } });
+    group.append(el('div', { className: 'row' }, on, el('label', { htmlFor: 'autoSleep', textContent: 'Sleep when idle' })));
+  }
+  async function send(body) {
+    try {
+      const r = await api('/api/sleep', body);
+      dev.sleep = r.sleep;
+      if (body.minutes) dev.profile.sleep_minutes = body.minutes;
+      if (body.auto != null) dev.profile.auto_sleep = body.auto;
+      refreshCell('sleep');
+      toast((body.auto === false ? 'Never sleeps' : 'Sleeps after ' + r.sleep.minutes + ' min') + ' · saved to ' + dev.active);
+    } catch (e) { toast(e.message, true); }
+  }
+  box.append(group, el('p', { className: 'note', textContent: sl.auto != null
+    ? 'Up to ' + sl.max + ' minutes on this device, or turn sleeping off. Never sleeping drains the battery faster.'
+    : 'How long the device waits, untouched, before it sleeps to save battery (1 to ' + sl.max + ' minutes).' }));
+}
+
+// Asks Razer's public product page whether newer firmware is out. Never installs anything.
+const fwResult = {};
+function firmwareCheck() {
+  const box = el('span', { className: 'fwcheck' });
+  const show = r => {
+    box.innerHTML = '';
+    if (r.state === 'update') {
+      box.append(el('b', { textContent: 'Firmware ' + r.version + ' is out' }), ' · ',
+        el('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', textContent: 'Download from Razer' }));
+      if (r.guide && r.guide !== r.url) box.append(' · ', el('a', { href: r.guide, target: '_blank', rel: 'noopener noreferrer', textContent: 'Install guide' }));
+    } else box.append(r.state === 'current' ? 'Firmware is up to date' : 'Razer lists no firmware updates for it');
+  };
+  if (fwResult[dev.id]) show(fwResult[dev.id]);
+  else box.append(el('button', { className: 'link', textContent: 'Check for firmware update',
+    title: 'Asks apps.razer.com, the page Synapse uses. Nothing is installed.',
+    onclick: async e => {
+      e.target.disabled = true; e.target.textContent = 'Checking…';
+      try { fwResult[dev.id] = await api('/api/firmware', {}); show(fwResult[dev.id]); }
+      catch (err) { toast(err.message, true); e.target.disabled = false; e.target.textContent = 'Check for firmware update'; }
+    } }));
+  return box;
+}
+
 // ---------- Buttons ----------
 // Values are action texts, as in `secbird button`.
 const BTN_CHOICES = [
@@ -743,6 +1300,7 @@ const BTN_CHOICES = [
     ['dpi-cycle-down', 'DPI cycle down'], ['dpi-clutch', 'Sniper (DPI while held)…']]],
   ['Media', [['media:volume-up', 'Volume up'], ['media:volume-down', 'Volume down'], ['media:mute', 'Mute'],
     ['media:play-pause', 'Play / pause'], ['media:next-track', 'Next track'], ['media:previous-track', 'Previous track']]],
+  ['Macro', [['macro', 'Play a macro…']]],
   ['Other', [['hypershift', 'HyperShift (hold)'], ['profile-cycle-up', 'Next on-board profile'],
     ['scroll-mode:1', 'Switch wheel free-spin'], ['disabled', 'Disabled']]],
 ];
@@ -765,6 +1323,7 @@ function splitAction(a) {
   if ((m = /^turbo:(left|right)@(\d+)$/.exec(a))) return ['turbo-' + m[1], '', m[2]];
   if ((m = /^key:(.+)$/.exec(a))) return ['key', m[1], ''];
   if ((m = /^dpi-clutch:(\d+)/.exec(a))) return ['dpi-clutch', '', m[1]];
+  if ((m = /^macro:(\d+)(?:@(\w+))?$/.exec(a))) return ['macro', m[1], m[2] || '1'];
   return [a, '', ''];
 }
 function joinAction(choice, keys, n) {
@@ -772,6 +1331,7 @@ function joinAction(choice, keys, n) {
   if (choice === 'turbo-key') return keys ? `turbo:key:${keys}@${n || 7}` : null;
   if (choice === 'turbo-left' || choice === 'turbo-right') return `turbo:${choice.slice(6)}@${n || 7}`;
   if (choice === 'dpi-clutch') return 'dpi-clutch:' + (n || 400);
+  if (choice === 'macro') return keys ? 'macro:' + keys + (n && n !== '1' ? '@' + n : '') : null;
   return choice;
 }
 // Plain words for any action text.
@@ -782,6 +1342,11 @@ function actionLabel(a) {
   if ((m = /^turbo:key:(.+)@(\d+)$/.exec(a))) return `Turbo key ${combo(m[1])} · ${m[2]}/s`;
   if ((m = /^turbo:(.+)@(\d+)$/.exec(a))) return `Turbo ${(CHOICE_LABEL[m[1]] || m[1].replace(/-/g, ' ')).toLowerCase()} · ${m[2]}/s`;
   if ((m = /^dpi-clutch:(\d+)/.exec(a))) return `Sniper · ${m[1]} DPI`;
+  if ((m = /^macro:(\d+)(?:@(\w+))?$/.exec(a))) {
+    const mac = (macroData[dev.id] && macroData[dev.id].macros.find(x => x.id === +m[1]));
+    const how = { hold: ' · while held', toggle: ' · toggle' }[m[2]] || (m[2] && m[2] !== '1' ? ` · ${m[2]}×` : '');
+    return 'Macro ' + (mac ? `“${mac.name}”` : '#' + m[1]) + how;
+  }
   if (CHOICE_LABEL[a]) return CHOICE_LABEL[a];
   return a.replace(/[-:]/g, ' ').replace(/^./, c => c.toUpperCase());
 }
@@ -809,7 +1374,21 @@ function buttonEditor(box, name) {
   keyIn.dataset.keys = keys;
   const numIn = el('input', { type: 'number', className: 'num', value: n });
   const numLabel = el('span', { className: 'val' });
-  const send = () => { const a = joinAction(sel.value, keyIn.dataset.keys, numIn.value); if (a) assign(b.name, a); };
+  // Which macro, and how it plays: once, N times, while held, toggle.
+  const macros = (macroData[dev.id] && macroData[dev.id].macros) || [];
+  const macroSel = el('select', { ariaLabel: 'Macro for ' + b.label });
+  macros.forEach(mc => macroSel.append(new Option(mc.name, mc.id, false, choice === 'macro' && String(mc.id) === keys)));
+  const playSel = el('select', { ariaLabel: 'How the macro plays' });
+  [['1', 'Once'], ['times', 'Several times'], ['hold', 'While held'], ['toggle', 'Toggle on / off']].forEach(([v, t]) =>
+    playSel.append(new Option(t, v, false, choice === 'macro' && (v === n || (v === 'times' && /^\d+$/.test(n) && n !== '1')))));
+  const macroArgs = () => {
+    const play = playSel.value === 'times' ? String(Math.max(2, Math.min(255, +numIn.value || 2))) : playSel.value;
+    return [macroSel.value, play];
+  };
+  const send = () => {
+    const a = sel.value === 'macro' ? joinAction('macro', ...macroArgs()) : joinAction(sel.value, keyIn.dataset.keys, numIn.value);
+    if (a) assign(b.name, a);
+  };
   let lone = null;
   keyIn.onkeydown = e => {
     if (e.key === 'Tab') return;
@@ -823,38 +1402,118 @@ function buttonEditor(box, name) {
   keyIn.onkeyup = e => { if (lone && MOD_CODES[e.code] === lone) { keyIn.dataset.keys = lone; keyIn.value = combo(lone); lone = null; send(); } };
   const extras = () => {
     const v = sel.value, clutch = v === 'dpi-clutch', turbo = v === 'turbo-left' || v === 'turbo-right' || v === 'turbo-key';
+    const mac = v === 'macro', times = mac && playSel.value === 'times';
     keyIn.hidden = !(v === 'key' || v === 'turbo-key');
-    numIn.hidden = numLabel.hidden = !(turbo || clutch);
+    macroSel.hidden = playSel.hidden = !mac;
+    numIn.hidden = numLabel.hidden = !(turbo || clutch || times);
     Object.assign(numIn, clutch ? { min: 100, max: dev.dpi ? dev.dpi.max : 30000, step: 50, ariaLabel: 'DPI while held' }
-      : { min: 1, max: 50, step: 1, ariaLabel: 'Presses per second' });
-    numLabel.textContent = clutch ? 'DPI while held' : 'presses / second';
-    if (!numIn.value || (clutch && +numIn.value < 100) || (turbo && +numIn.value > 50)) numIn.value = clutch ? 400 : 7;
+      : times ? { min: 2, max: 255, step: 1, ariaLabel: 'Times to play' } : { min: 1, max: 50, step: 1, ariaLabel: 'Presses per second' });
+    numLabel.textContent = clutch ? 'DPI while held' : times ? 'times' : 'presses / second';
+    if (times && /^\d+$/.test(n) && +n > 1 && !numIn.dataset.touched) numIn.value = n;
+    if (!numIn.value || (clutch && +numIn.value < 100) || (turbo && +numIn.value > 50)) numIn.value = clutch ? 400 : times ? 2 : 7;
   };
   sel.onchange = () => {
     extras();
     if (sel.value === 'key' || sel.value === 'turbo-key') { keyIn.value = ''; keyIn.dataset.keys = ''; keyIn.focus(); return toast('Now press the key or shortcut'); }
+    if (sel.value === 'macro' && !macros.length) return toast('Make a macro first, in the Macros section', true);
     send();
   };
-  numIn.onchange = send;
+  numIn.onchange = () => { numIn.dataset.touched = '1'; send(); };
+  macroSel.onchange = send;
+  playSel.onchange = () => { extras(); send(); };
   extras();
   const saved = b.saved && b.saved[btnLayer];
   box.append(el('div', { className: 'edgroup' },
-    el('h3', { textContent: b.label + (btnLayer === 'hypershift' ? ' · while HyperShift is held' : '') }),
-    el('div', { className: 'row' }, sel, keyIn, numIn, numLabel)));
-  if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Saved in the mouse' }),
-    el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'link', textContent: 'Reset to this', onclick: () => assign(b.name, '') }))));
+    el('h3', { textContent: 'What it does' + (btnLayer === 'hypershift' ? ' while HyperShift is held' : '') }),
+    el('div', { className: 'row' }, sel, keyIn, macroSel, playSel, numIn, numLabel)));
+  if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Stored on the mouse' }),
+    el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'ghost', textContent: 'Restore', title: 'Put back what the mouse stores', onclick: () => assign(b.name, '') }))));
 }
 
-async function assign(button, action) {
+async function loadMacros(d) {
+  macroData[d.id] = null;
+  try { macroData[d.id] = await api('/api/macros', { id: d.id }); } catch { macroData[d.id] = { macros: [], free: 0, max: 0, recyclable: 0 }; }
+  // An open macro editor was drawn before the list arrived: draw it again.
+  if (dev && dev.id === d.id && !showAll) { if (sel === 'macros') renderWork(); else renderSheet(); }
+}
+
+function macrosEditor(box) {
+  const data = macroData[dev.id];
+  if (!data) return box.append(el('p', { className: 'hint', textContent: 'Reading the macros from the device…' }));
+  const list = el('div', { className: 'edgroup' }, el('h3', { textContent: 'On this device' }));
+  if (!data.macros.length) list.append(el('p', { className: 'note', textContent: 'No macros yet.' }));
+  data.macros.forEach(mc => list.append(el('div', { className: 'macro' },
+    el('div', { className: 'row' }, el('b', { textContent: mc.name }),
+      el('button', { className: 'ghost', innerHTML: icon('x') + 'Delete', ariaLabel: 'Delete ' + mc.name, onclick: () => macroCall({ action: 'delete', macro_id: mc.id }, 'Deleted ' + mc.name) })),
+    el('code', { textContent: mc.steps || mc.error || '' }))));
+  list.append(el('p', { className: 'note', textContent: `${Math.round(data.free / 1024)} KB free of ${Math.round(data.max / 1024)} KB` +
+    (data.recyclable ? ` (${Math.round(data.recyclable / 1024)} KB from deleted macros isn't reusable yet)` : '') }));
+
+  const name = el('input', { type: 'text', placeholder: 'Name, e.g. Build order', maxLength: 60, ariaLabel: 'Macro name' });
+  const steps = el('textarea', { rows: 3, placeholder: 'tap:ctrl+c wait:50 click:left', ariaLabel: 'Macro steps', spellcheck: false });
+  const rec = el('button', { className: 'ghost', textContent: 'Record' });
+  const save = el('button', { className: 'ghost', textContent: 'Save to device', onclick: () => {
+    if (!name.value.trim() || !steps.value.trim()) return toast('Give the macro a name and some steps', true);
+    macroCall({ action: 'new', name: name.value.trim(), script: steps.value.trim() }, 'Saved ' + name.value.trim());
+  } });
+  // Recording: keys pressed and mouse buttons clicked on the steps box, with the real gaps.
+  let recording = false, last = 0, out = [];
+  const gap = () => { const now = performance.now(); if (last && now - last >= 10) out.push('wait:' + Math.round(now - last)); last = now; };
+  const BTN = ['left', 'middle', 'right', 'back', 'forward'];
+  const onKey = e => {
+    if (!recording) return;
+    e.preventDefault();
+    const k = MOD_CODES[e.code] || keyName(e.code); if (!k || (e.type === 'keydown' && e.repeat)) return;
+    gap(); out.push((e.type === 'keydown' ? 'down:' : 'up:') + k); steps.value = out.join(' ');
+  };
+  const onMouse = e => {
+    if (!recording || !BTN[e.button]) return;
+    e.preventDefault(); gap(); out.push((e.type === 'mousedown' ? 'press:' : 'release:') + BTN[e.button]); steps.value = out.join(' ');
+  };
+  steps.addEventListener('keydown', onKey); steps.addEventListener('keyup', onKey);
+  steps.addEventListener('mousedown', onMouse); steps.addEventListener('mouseup', onMouse);
+  steps.addEventListener('contextmenu', e => { if (recording) e.preventDefault(); });
+  rec.onclick = () => {
+    recording = !recording;
+    rec.textContent = recording ? 'Stop recording' : 'Record';
+    if (recording) { out = []; last = 0; steps.value = ''; steps.focus(); toast('Recording: type and click in the box, then press Stop'); }
+    else steps.value = steps.value.replace(/(^| )down:(\S+) up:\2(?= |$)/g, '$1tap:$2'); // tidy plain key taps
+  };
+  box.append(list, el('div', { className: 'edgroup' }, el('h3', { textContent: 'New macro' }), name, steps,
+    el('div', { className: 'row' }, rec, save)),
+    el('p', { className: 'note', textContent: 'Steps: tap:<key or ctrl+c>, down:<key>, up:<key>, wait:<ms>, click:<left|right|middle|back|forward>, press:/release:<button>, wheel:up|down. Then pick it for a button in Buttons.' }));
+}
+
+async function macroCall(body, done) {
+  try {
+    macroData[dev.id] = await api('/api/macro', body);
+    renderWork();
+    toast(done);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function restoreAllButtons() {
+  try {
+    const r = await api('/api/buttons-restore', {});
+    btnData[dev.id] = r.buttons; dev.profile.buttons = {};
+    sel = null; renderWork();
+    toast('Every button is back to what the mouse stores');
+  } catch (err) { toast(err.message, true); }
+}
+
+async function assign(button, action, isUndo) {
+  const before = (btnData[dev.id] || []).find(x => x.name === button), layer = btnLayer;
+  const prev = before && { action: before[layer], remapped: before.remapped[layer] };
   try {
     const r = await api('/api/button', { button, layer: btnLayer, assign: action });
     btnData[dev.id] = r.buttons;
     const skey = btnLayer === 'normal' ? button : button + '/hypershift';
     dev.profile.buttons = dev.profile.buttons || {};
     if (action) dev.profile.buttons[skey] = action; else delete dev.profile.buttons[skey];
-    if (!action) { renderSheet(); focusCell('btn:' + button, dev.active); } else refreshCell('btn:' + button);
-    toast(action ? 'Saved to ' + dev.active : 'Back to the saved setting');
-  } catch (err) { toast(err.message, true); renderSheet(); }
+    if (!action) renderWork(); else refreshCell('btn:' + button);
+    const undo = !isUndo && prev ? () => { btnLayer = layer; assign(button, prev.remapped ? prev.action : '', true); } : null;
+    toast(isUndo ? 'Undone' : action ? 'Saved to ' + dev.active : 'Restored what the mouse stores', false, undo);
+  } catch (err) { toast(err.message, true); renderWork(); }
 }
 
 // ---------- Lighting, DPI, keys: send and record ----------
@@ -867,7 +1526,8 @@ function record(name, patch) {
 }
 const sendColor = {};
 function setColor(hex, name) {
-  record(name, { color: hex, off: false });
+  record(name, { color: hex, off: false, effect: undefined });
+  const fx = $('zoneFx'); if (fx) fx.value = 'static';
   const on = $('zoneOn'); if (on) on.checked = true;
   const br = $('zoneBright'), bv = $('zoneBrightVal');
   if (br && br.disabled) { br.disabled = false; bv.textContent = (zoneOf(dev.profile, name).brightness ?? 100) + '%'; }
@@ -931,8 +1591,8 @@ async function activate(name, quiet) {
   try {
     const r = await api('/api/profile', { action: 'use', name });
     adopt(r.device);
-    if (dev.kind === 'mouse') { btnData[dev.id] = undefined; if (!quiet) loadButtons(dev); }
-    if (!quiet) open = null;
+    if (dev.kind === 'mouse') btnData[dev.id] = undefined; // the new profile's remaps; read again when shown
+    if (!quiet) sel = null;
     render();
     toast(r.failures.length ? 'Some settings failed: ' + r.failures.join('; ') : (quiet ? 'Switched to ' + name + ' to edit it' : name + ' is active'), r.failures.length > 0);
     return true;
@@ -952,18 +1612,17 @@ async function deleteProfile(name) {
     if (other) await api('/api/profile', { action: 'use', name: other });
     const r = await api('/api/profile', { action: 'delete', name }); adopt(r.device);
     if (other && dev.kind === 'mouse') btnData[dev.id] = undefined;
-    open = null; render(); toast('Deleted ' + name);
+    sel = null; render(); toast('Deleted ' + name);
   } catch (err) { toast(err.message, true); }
 }
 async function saveApps(name, apps, msg) {
   try {
     const r = await api('/api/profile', { action: 'apps', name, apps });
     adopt(r.device);
-    // The response carries every profile, so other columns update too (a game moves between profiles).
-    renderSheet(); toast(msg);
+    // The response carries every profile, so a game that moved between profiles shows everywhere.
+    render(); toast(msg);
   } catch (err) { toast(err.message, true); }
 }
-$('mProfile').onchange = e => activate(e.target.value);
 
 // ---------- Overview ----------
 
@@ -974,7 +1633,7 @@ function renderOverview() {
   const grid = $('ovGrid');
   grid.innerHTML = '';
   devices.forEach(d => {
-    const top = el('div', { className: 'dtop' }, KINDS[d.kind] || 'Device');
+    const top = el('div', { className: 'dtop' }, el('h3', { textContent: devLabel(d) }));
     if (d.battery != null) {
       const b = el('span', { className: 'batt num' + (d.battery < 20 ? ' low' : ''), innerHTML: '<b></b>' });
       b.firstChild.style.setProperty('--lvl', d.battery / 100); b.append(d.battery + '%'); top.append(b);
@@ -983,11 +1642,11 @@ function renderOverview() {
     const p = d.profile || {}, keys = p.keys;
     const colors = keys && keys.length ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
     colors.forEach(z => { const i = el('i'); if (z.off || !z.color) i.className = 'off'; else i.style.color = '#' + z.color; dots.append(i); });
-    const meta = el('div', { className: 'dmeta num', textContent: [d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
-    grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, el('h3', { textContent: devLabel(d) }), dots, meta));
+    const meta = el('div', { className: 'dmeta num', textContent: [KINDS[d.kind] || 'Device', d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
+    grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, dots, meta));
   });
   unsupported.forEach(u => grid.append(el('div', { className: 'dcard muted' },
-    el('div', { className: 'dtop', textContent: u.pid }), el('h3', { textContent: u.name }), el('div', { className: 'dmeta', textContent: 'Connected · ' + u.reason }))));
+    el('div', { className: 'dtop' }, el('h3', { textContent: u.name })), el('div', { className: 'dmeta', textContent: u.pid + ' · Connected · ' + u.reason }))));
 }
 
 // ---------- Live updates, loading, global actions ----------
@@ -1025,7 +1684,7 @@ async function load(path = '/api/state', body) {
     const wanted = d => d.pid === want || d.id === want;
     dev = devices.find(d => dev && d.id === dev.id) || devices.find(wanted) || devices[0] || null;
     if (showAll === null) showAll = !devices.some(wanted) && (devices.length > 1 || unsupported.length > 0);
-    if (open && (!dev || open.profile !== dev.active)) open = null;
+    if (!dev) sel = null;
     render();
   } catch (e) { toast(e.message, true); }
 }
@@ -1039,26 +1698,40 @@ const sendSync = live(async color => {
   if (r.failed.length) throw new Error('Some zones failed: ' + r.failed.join('; '));
   return r;
 }, r => '#' + $('syncColor').value.slice(1).toUpperCase() + ' on ' + plural(r.zones, 'zone') + ' across ' + plural(r.devices, 'device'));
-// Theme: Windows decides until the button is used; the choice is remembered in this browser.
+// Theme: Auto follows Windows; a picked theme is remembered in this browser. Older builds
+// stored 'dark' or 'light' from a light/dark toggle: 'dark' now means the default (Auto).
 const themeKey = 'secbird-theme';
-try { const t = localStorage.getItem(themeKey); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
-$('theme').onclick = () => {
+const THEMES = ['bridge', 'roast', 'classic', 'light', 'workshop', 'neon'];
+function setTheme(t) {
   const root = document.documentElement;
-  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  root.dataset.theme = dark ? 'light' : 'dark';
-  try { localStorage.setItem(themeKey, root.dataset.theme); } catch (e) {}
+  if (THEMES.includes(t)) root.dataset.theme = t; else delete root.dataset.theme;
+  $('theme').value = root.dataset.theme || '';
+  requestAnimationFrame(() => { placeUnderline(); placeBand(); });
+}
+try { const t = localStorage.getItem(themeKey); setTheme(t === 'dark' ? '' : t); } catch (e) { }
+$('theme').onchange = e => {
+  setTheme(e.target.value);
+  try { if (e.target.value) localStorage.setItem(themeKey, e.target.value); else localStorage.removeItem(themeKey); } catch (err) { }
 };
-$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; open = null; render(); } };
+$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; sel = null; render(); } };
 $('syncColor').oninput = e => { syncPicked = true; sendSync(e.target.value.slice(1).toUpperCase()); };
 $('syncBtn').onclick = () => sendSync($('syncColor').value.slice(1).toUpperCase());
-// Many devices: the mouse wheel scrolls the tab row sideways.
-$('tabs').addEventListener('wheel', e => {
-  if (!e.deltaY || $('tabs').scrollWidth <= $('tabs').clientWidth) return;
-  $('tabs').scrollLeft += e.deltaY; e.preventDefault();
-}, { passive: false });
-$('rescan').onclick = () => { btnData = {}; load('/api/rescan', {}); };
+const updateTabsRow = scrollRow($('tabsRow')), updateProfilesRow = scrollRow($('profilesRow'));
+// Narrow windows lay the sections out as a row: the wheel scrolls it and a fade shows there is more.
+(() => {
+  const rail = $('rail');
+  const update = () => rail.classList.toggle('more-r', rail.scrollWidth - rail.clientWidth > 1 && rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1);
+  rail.addEventListener('scroll', update, { passive: true });
+  rail.addEventListener('wheel', e => {
+    if (getComputedStyle(rail).flexDirection !== 'row' || rail.scrollWidth <= rail.clientWidth) return;
+    rail.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; e.preventDefault();
+  }, { passive: false });
+  new ResizeObserver(update).observe(rail);
+  new MutationObserver(update).observe(rail, { childList: true });
+})();
+$('rescan').onclick = () => { btnData = {}; macroData = {}; load('/api/rescan', {}); };
 // Coming back to the window: refresh, but leave an open editor alone.
-window.addEventListener('focus', () => { if (!open) load(); });
+window.addEventListener('focus', () => { if (!sel) load(); });
 load();
 </script>
 </body>

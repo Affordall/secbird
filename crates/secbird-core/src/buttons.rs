@@ -30,6 +30,26 @@ pub const BUTTONS: &[(u8, &str, &str)] = &[
     (52, "tilt-left", "Wheel tilt left"),
     (53, "tilt-right", "Wheel tilt right"),
     (57, "hypershift", "HyperShift button"),
+    // Naga side plates (Synapse SPAD_NUM_1-12 and HPAD_NUM_1-7). Factory keys 1-9, 0, -, =.
+    (64, "grid-1", "Side grid 1"),
+    (65, "grid-2", "Side grid 2"),
+    (66, "grid-3", "Side grid 3"),
+    (67, "grid-4", "Side grid 4"),
+    (68, "grid-5", "Side grid 5"),
+    (69, "grid-6", "Side grid 6"),
+    (70, "grid-7", "Side grid 7"),
+    (71, "grid-8", "Side grid 8"),
+    (72, "grid-9", "Side grid 9"),
+    (73, "grid-10", "Side grid 10"),
+    (74, "grid-11", "Side grid 11"),
+    (75, "grid-12", "Side grid 12"),
+    (80, "hex-1", "6-button side 1"),
+    (81, "hex-2", "6-button side 2"),
+    (82, "hex-3", "6-button side 3"),
+    (83, "hex-4", "6-button side 4"),
+    (84, "hex-5", "6-button side 5"),
+    (85, "hex-6", "6-button side 6"),
+    (86, "hex-7", "6-button side 7"),
     (96, "dpi", "DPI button"),
     (97, "dpi-2", "Second DPI button"),
     (104, "scroll-left", "Scroll left"),
@@ -102,14 +122,30 @@ pub enum Action {
     Media(u16),
     /// Scroll wheel mode: 1 switches free-spin/notched.
     ScrollMode(u8),
+    /// Play an on-device macro (see [`crate::macros`]).
+    Macro { id: u16, play: MacroPlay },
     /// Anything else read from a device, kept so it can be written back unchanged.
     Raw { function: u8, data: [u8; 5] },
+}
+
+/// How a button plays its macro.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacroPlay {
+    /// This many times per press.
+    Times(u8),
+    /// Over and over while the button is held.
+    WhileHeld,
+    /// Press to start repeating, press again to stop.
+    Toggle,
 }
 
 // Function ids (Synapse's `Vh` enum).
 const FN_OFF: u8 = 0;
 const FN_BUTTON: u8 = 1;
 const FN_KEY: u8 = 2;
+const FN_MACRO_TIMES: u8 = 3;
+const FN_MACRO_HELD: u8 = 4;
+const FN_MACRO_TOGGLE: u8 = 5;
 const FN_DPI: u8 = 6;
 const FN_PROFILE: u8 = 7;
 const FN_MEDIA: u8 = 10;
@@ -182,6 +218,17 @@ impl Action {
                 (FN_MEDIA, 2)
             }
             Action::ScrollMode(mode) => one(&mut d, FN_SCROLL_MODE, mode),
+            Action::Macro { id, play } => {
+                d[..2].copy_from_slice(&id.to_be_bytes());
+                match play {
+                    MacroPlay::Times(n) => {
+                        d[2] = n;
+                        (FN_MACRO_TIMES, 3)
+                    }
+                    MacroPlay::WhileHeld => (FN_MACRO_HELD, 2),
+                    MacroPlay::Toggle => (FN_MACRO_TOGGLE, 2),
+                }
+            }
             Action::Raw { function, data } => {
                 d = data;
                 let size = data.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1) as u8;
@@ -214,6 +261,9 @@ impl Action {
             (FN_HYPERSHIFT, _) => Action::HyperShift,
             (FN_MEDIA, _) => Action::Media(u16::from_be_bytes([d[0], d[1]])),
             (FN_SCROLL_MODE, m) => Action::ScrollMode(m),
+            (FN_MACRO_TIMES, _) => Action::Macro { id: u16::from_be_bytes([d[0], d[1]]), play: MacroPlay::Times(d[2].max(1)) },
+            (FN_MACRO_HELD, _) => Action::Macro { id: u16::from_be_bytes([d[0], d[1]]), play: MacroPlay::WhileHeld },
+            (FN_MACRO_TOGGLE, _) => Action::Macro { id: u16::from_be_bytes([d[0], d[1]]), play: MacroPlay::Toggle },
             _ => Action::Raw { function, data: d },
         }
     }
@@ -247,7 +297,7 @@ const MEDIA_NAMES: &[(u16, &str)] = &[
 ];
 
 /// USB keyboard modifier bits.
-const MODIFIERS: &[(u8, &str)] = &[
+pub(crate) const MODIFIERS: &[(u8, &str)] = &[
     (0x01, "ctrl"),
     (0x02, "shift"),
     (0x04, "alt"),
@@ -259,7 +309,7 @@ const MODIFIERS: &[(u8, &str)] = &[
 ];
 
 /// USB HID keyboard usages by name.
-fn key_usage(name: &str) -> Option<u8> {
+pub(crate) fn key_usage(name: &str) -> Option<u8> {
     let b = name.as_bytes();
     match name {
         _ if b.len() == 1 && b[0].is_ascii_lowercase() => Some(0x04 + (b[0] - b'a')),
@@ -307,7 +357,7 @@ const KEY_NAMES: &[(u8, &str)] = &[
     (0x52, "up"),
 ];
 
-fn key_name(usage: u8) -> String {
+pub(crate) fn key_name(usage: u8) -> String {
     match usage {
         0x04..=0x1D => ((b'a' + usage - 0x04) as char).to_string(),
         0x1E..=0x26 => ((b'1' + usage - 0x1E) as char).to_string(),
@@ -320,7 +370,7 @@ fn key_name(usage: u8) -> String {
 
 /// `ctrl+shift+a` -> (modifier bits, usage). A modifier on its own (`ctrl`) is sent
 /// as that modifier with no key, as Synapse does.
-fn parse_combo(s: &str) -> Result<(u8, u8)> {
+pub(crate) fn parse_combo(s: &str) -> Result<(u8, u8)> {
     let bad = || Error::InvalidArg(format!("unknown key '{s}' (e.g. a, f5, ctrl+c, space, volume keys are media:...)"));
     let mut modifiers = 0;
     let mut usage = None;
@@ -380,6 +430,10 @@ impl fmt::Display for Action {
                 None => write!(f, "media:0x{u:04x}"),
             },
             Action::ScrollMode(m) => write!(f, "scroll-mode:{m}"),
+            Action::Macro { id, play: MacroPlay::Times(1) } => write!(f, "macro:{id}"),
+            Action::Macro { id, play: MacroPlay::Times(n) } => write!(f, "macro:{id}@{n}"),
+            Action::Macro { id, play: MacroPlay::WhileHeld } => write!(f, "macro:{id}@hold"),
+            Action::Macro { id, play: MacroPlay::Toggle } => write!(f, "macro:{id}@toggle"),
             Action::Raw { function, data } => {
                 write!(f, "raw:{function}:")?;
                 data.iter().try_for_each(|b| write!(f, "{b:02x}"))
@@ -449,6 +503,18 @@ impl FromStr for Action {
                         ),
                     },
                     "scroll-mode" => Action::ScrollMode(arg.parse().map_err(|_| bad())?),
+                    "macro" => {
+                        let (id, play) = arg.split_once('@').unwrap_or((arg, "1"));
+                        let play = match play {
+                            "hold" => MacroPlay::WhileHeld,
+                            "toggle" => MacroPlay::Toggle,
+                            n => match n.parse::<u8>() {
+                                Ok(n @ 1..=255) => MacroPlay::Times(n),
+                                _ => return Err(Error::InvalidArg("macro plays 1-255 times, @hold or @toggle".into())),
+                            },
+                        };
+                        Action::Macro { id: id.parse().map_err(|_| bad())?, play }
+                    }
                     "mouse" => Action::Mouse(
                         u8::from_str_radix(arg.strip_prefix("0x").unwrap_or(arg), 16).map_err(|_| bad())?,
                     ),
@@ -543,6 +609,10 @@ mod tests {
             "hypershift",
             "media:volume-up",
             "scroll-mode:1",
+            "macro:7",
+            "macro:12@3",
+            "macro:300@hold",
+            "macro:5@toggle",
         ] {
             let a: Action = text.parse().unwrap();
             assert_eq!(a.to_string(), text, "text round trip");

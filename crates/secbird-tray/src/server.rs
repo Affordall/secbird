@@ -268,6 +268,24 @@ struct Body {
     layer: String,
     #[serde(default)]
     assign: String,
+    /// DPI stages: the 1-based stage in use and `[x, y]` per stage.
+    #[serde(default)]
+    active: u8,
+    #[serde(default)]
+    stages: Vec<(u16, u16)>,
+    /// Sleep timer in minutes (0 = leave it), and the auto-sleep switch.
+    #[serde(default)]
+    minutes: u16,
+    #[serde(default)]
+    auto: Option<bool>,
+    /// Macro steps as text (`tap:ctrl+c wait:50`), and a macro id.
+    #[serde(default)]
+    script: String,
+    #[serde(default)]
+    macro_id: u16,
+    /// Lighting effect text (`spectrum`, `wave:left@3`).
+    #[serde(default)]
+    effect: String,
 }
 
 /// Every button of a mouse with what it does on each layer, and which ones the active
@@ -324,16 +342,76 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                 Ok(json!({ "dpi": [x, y] }))
             }
             "/api/polling" => actions::set_polling(dev, &mut store, b.hz).map(|_| json!({})),
+            "/api/stages" => {
+                let want = secbird_core::DpiStages { active: b.active, stages: b.stages.clone() };
+                let sent = actions::set_dpi_stages(dev, &mut store, &want)?;
+                let (x, y) = sent.stages[sent.active as usize - 1];
+                Ok(json!({ "stages": { "active": sent.active, "list": sent.stages }, "dpi": [x, y] }))
+            }
+            "/api/sleep" => {
+                if let Some(on) = b.auto {
+                    actions::set_auto_sleep(dev, &mut store, on)?;
+                }
+                if b.minutes > 0 {
+                    actions::set_sleep_minutes(dev, &mut store, b.minutes)?;
+                }
+                Ok(json!({ "sleep": sleep_json(dev) }))
+            }
             "/api/color" => {
                 actions::set_color(dev, &mut store, &b.zone, b.color.parse::<Rgb>()?).map(|_| json!({}))
             }
             "/api/brightness" => actions::set_brightness(dev, &mut store, &b.zone, b.value).map(|_| json!({})),
             "/api/off" => actions::lights_off(dev, &mut store, &b.zone).map(|_| json!({})),
+            "/api/effect" => actions::set_effect(dev, &mut store, &b.zone, b.effect.parse()?).map(|_| json!({})),
             "/api/keys" => {
                 let keys = b.keys.iter().map(|k| k.parse::<Rgb>()).collect::<Result<Vec<_>, _>>()?;
                 actions::set_keys(dev, &mut store, keys).map(|_| json!({}))
             }
             "/api/buttons" => Ok(buttons_json(dev, &mut store)),
+            "/api/buttons-restore" => {
+                actions::restore_all_buttons(dev, &mut store)?;
+                Ok(buttons_json(dev, &mut store))
+            }
+            "/api/macros" => macros_json(dev),
+            "/api/firmware" => {
+                use secbird_core::firmware::{check, Status};
+                let connected: Vec<u16> = engine.devices().iter().map(|d| d.pid).collect();
+                Ok(match check(dev, &connected)? {
+                    Status::UpToDate { current } => json!({ "current": current, "state": "current" }),
+                    Status::NoneListed { current } => json!({ "current": current, "state": "none" }),
+                    Status::Update { current, latest } => json!({
+                        "current": current, "state": "update", "version": latest.version,
+                        "url": latest.url, "guide": latest.guide,
+                    }),
+                })
+            }
+            "/api/macro" => {
+                match b.action.as_str() {
+                    "new" => {
+                        let script: secbird_core::macros::Script = b.script.parse()?;
+                        dev.create_macro(&b.name, &script.0)?;
+                    }
+                    "delete" => {
+                        // A button still playing this macro would silently do nothing.
+                        let used: Vec<String> = store
+                            .for_device(dev)
+                            .profiles
+                            .iter()
+                            .filter(|(_, p)| p.buttons.values().any(|a| macro_of(a) == Some(b.macro_id)))
+                            .map(|(name, _)| name.clone())
+                            .collect();
+                        if !used.is_empty() {
+                            return Err(Error::InvalidArg(format!(
+                                "a button in {} plays this macro; change that button first",
+                                used.join(", ")
+                            )));
+                        }
+                        dev.delete_macro(b.macro_id)?;
+                    }
+                    other => return Err(Error::InvalidArg(format!("unknown action '{other}'"))),
+                }
+                macros_json(dev)
+            }
             "/api/button" => {
                 let layer = match b.layer.as_str() {
                     "hypershift" => secbird_core::buttons::Layer::HyperShift,
@@ -408,6 +486,40 @@ fn state(engine: &Engine) -> Value {
     })
 }
 
+/// The macro id an action text plays (`macro:3@hold` -> 3).
+fn macro_of(action: &str) -> Option<u16> {
+    action.strip_prefix("macro:")?.split('@').next()?.parse().ok()
+}
+
+/// Every macro on the device with its steps as text, and the memory left.
+fn macros_json(dev: &Device) -> Result<Value, Error> {
+    use secbird_core::macros::Script;
+    let storage = dev.macro_storage()?;
+    let list: Vec<Value> = dev
+        .macros()?
+        .into_iter()
+        .map(|m| {
+            let steps = dev.macro_steps(m.id).map(|s| Script(s).to_string());
+            json!({
+                "id": m.id, "name": m.name, "size": m.size,
+                "steps": steps.as_ref().ok(),
+                "error": steps.err().map(|e| e.to_string()),
+            })
+        })
+        .collect();
+    Ok(json!({
+        "macros": list,
+        "free": storage.free_bytes, "max": storage.max_bytes, "recyclable": storage.recyclable_bytes,
+    }))
+}
+
+fn sleep_json(dev: &Device) -> Value {
+    match dev.sleep_timer() {
+        Ok(Some(t)) => json!({ "minutes": t.minutes, "max": t.max_minutes, "auto": t.auto_sleep }),
+        _ => Value::Null,
+    }
+}
+
 fn device_json(dev: &Device) -> Value {
     let spec = dev.spec.as_ref();
     let (profile_names, active) = Engine::profiles(dev);
@@ -436,8 +548,9 @@ fn device_json(dev: &Device) -> Value {
         "name": dev.name(),
         "kind": kind,
         "known": spec.is_some(),
-        "firmware": dev.firmware().ok().map(|(a, b)| format!("{a}.{b}")),
-        "serial": dev.serial().ok(),
+        "firmware": dev.firmware_version().ok(),
+        // Read once at discovery; asking the device again costs a USB round trip per page load.
+        "serial": (!dev.serial.is_empty()).then(|| dev.serial.clone()),
         "dpi": dev.dpi().ok().map(|(x, y)| json!({
             "x": x, "y": y,
             "min": dpi_range.map_or(100, |r| r.min),
@@ -452,6 +565,13 @@ fn device_json(dev: &Device) -> Value {
             .flatten()
             .map(|hz| json!({ "hz": hz, "options": polling_options })),
         "battery": dev.battery().ok().flatten(),
+        "stages": spec
+            .is_none_or(|s| s.dpi.is_some())
+            .then(|| dev.dpi_stages().ok())
+            .flatten()
+            .map(|s| json!({ "active": s.active, "list": s.stages, "max": secbird_core::commands::MAX_DPI_STAGES })),
+        "sleep": sleep_json(dev),
+        "macros": dev.macro_storage().is_ok(),
         "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols })),
         "leds": spec.map(|s| s.leds.iter().map(|l| json!({ "name": l.name, "id": l.id })).collect::<Vec<_>>()).unwrap_or_default(),
         "profiles": profile_names,

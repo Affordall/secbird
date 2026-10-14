@@ -30,6 +30,23 @@ impl std::str::FromStr for Rgb {
     }
 }
 
+/// The DPI values the mouse's DPI button cycles through.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DpiStages {
+    /// 1-based index of the stage in use.
+    pub active: u8,
+    /// `(x, y)` per stage, at most [`cmd::MAX_DPI_STAGES`].
+    pub stages: Vec<(u16, u16)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SleepTimer {
+    pub minutes: u16,
+    pub max_minutes: u16,
+    /// `Some` on devices that can turn sleeping off entirely.
+    pub auto_sleep: Option<bool>,
+}
+
 impl Device {
     pub fn firmware(&self) -> Result<(u8, u8)> {
         let r = self.get(cmd::FIRMWARE, cmd::FIRMWARE_SIZE, &[])?;
@@ -60,6 +77,87 @@ impl Device {
         let [yh, yl] = y.to_be_bytes();
         self.transact(cmd::DPI, cmd::DPI_SIZE, &[cmd::VARSTORE, xh, xl, yh, yl, 0, 0])?;
         Ok((x, y))
+    }
+
+    /// The DPI stages the DPI button cycles through.
+    pub fn dpi_stages(&self) -> Result<DpiStages> {
+        let r = self.get(cmd::DPI_STAGES, cmd::DPI_STAGES_SIZE, &[cmd::VARSTORE])?;
+        let a = r.args();
+        let count = (a[2] as usize).min(cmd::MAX_DPI_STAGES);
+        let stages = (0..count)
+            .map(|i| {
+                let s = &a[3 + 7 * i..];
+                (u16::from_be_bytes([s[1], s[2]]), u16::from_be_bytes([s[3], s[4]]))
+            })
+            .collect();
+        Ok(DpiStages { active: a[1], stages })
+    }
+
+    /// Replace the DPI stages and store them in the device's memory. Values are rounded
+    /// to the device's step; returns what was sent. The device also switches to the active
+    /// stage's DPI.
+    pub fn set_dpi_stages(&self, stages: &DpiStages) -> Result<DpiStages> {
+        let n = stages.stages.len();
+        if !(1..=cmd::MAX_DPI_STAGES).contains(&n) {
+            return Err(Error::InvalidArg(format!("{n} DPI stages; 1 to {} are allowed", cmd::MAX_DPI_STAGES)));
+        }
+        if !(1..=n as u8).contains(&stages.active) {
+            return Err(Error::InvalidArg(format!("active stage {} of {n}", stages.active)));
+        }
+        let range = self.spec.as_ref().and_then(|s| s.dpi.as_ref());
+        let fit = |v: u16| match range {
+            Some(r) => Ok(snap(v, r.min, r.max, r.step)),
+            None if (100..=30000).contains(&v) => Ok(v),
+            None => Err(Error::InvalidArg(format!("DPI {v} out of range"))),
+        };
+        let mut sent = DpiStages { active: stages.active, stages: Vec::with_capacity(n) };
+        let mut args = vec![cmd::VARSTORE, stages.active, n as u8];
+        for (i, &(x, y)) in stages.stages.iter().enumerate() {
+            let (x, y) = (fit(x)?, fit(y)?);
+            sent.stages.push((x, y));
+            let ([xh, xl], [yh, yl]) = (x.to_be_bytes(), y.to_be_bytes());
+            args.extend([i as u8, xh, xl, yh, yl, 0, 0]);
+        }
+        self.transact(cmd::DPI_STAGES, args.len() as u8, &args)?;
+        Ok(sent)
+    }
+
+    /// Minutes of inactivity before the device sleeps, with the longest allowed. `None` for
+    /// wired devices.
+    pub fn sleep_timer(&self) -> Result<Option<SleepTimer>> {
+        if !self.spec.as_ref().is_some_and(|s| s.wireless) {
+            return Ok(None);
+        }
+        let r = self.get(cmd::IDLE_TIME, cmd::IDLE_TIME_SIZE, &[])?;
+        let seconds = u16::from_be_bytes([r.args()[0], r.args()[1]]);
+        let auto_sleep = self.get(cmd::AUTO_SLEEP, cmd::AUTO_SLEEP_SIZE, &[]).ok().map(|r| r.args()[1] == 1);
+        Ok(Some(SleepTimer {
+            minutes: seconds.div_ceil(60).max(1),
+            max_minutes: if auto_sleep.is_some() { 60 } else { 15 },
+            auto_sleep,
+        }))
+    }
+
+    /// Set the sleep timer in minutes (1-15, or up to 60 on devices with an auto-sleep
+    /// switch), then read it back like Synapse does.
+    pub fn set_sleep_minutes(&self, minutes: u16) -> Result<()> {
+        let timer = self.sleep_timer()?.ok_or_else(|| Error::Unsupported("sleep timer on a wired device".into()))?;
+        if !(1..=timer.max_minutes).contains(&minutes) {
+            return Err(Error::InvalidArg(format!("sleep after {minutes} min; 1 to {} are allowed", timer.max_minutes)));
+        }
+        let seconds = minutes * 60;
+        self.transact(cmd::IDLE_TIME, cmd::IDLE_TIME_SIZE, &seconds.to_be_bytes())?;
+        let r = self.get(cmd::IDLE_TIME, cmd::IDLE_TIME_SIZE, &[])?;
+        if u16::from_be_bytes([r.args()[0], r.args()[1]]) != seconds {
+            return Err(Error::Unsupported(format!("the device didn't keep a {minutes} min sleep timer")));
+        }
+        Ok(())
+    }
+
+    /// Turn sleeping when idle on or off, on devices that have the switch.
+    pub fn set_auto_sleep(&self, enabled: bool) -> Result<()> {
+        self.transact(cmd::AUTO_SLEEP, cmd::AUTO_SLEEP_SIZE, &[0, enabled as u8])?;
+        Ok(())
     }
 
     fn polling_kind(&self) -> Polling {

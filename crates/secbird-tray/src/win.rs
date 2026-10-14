@@ -26,8 +26,10 @@ const WM_TRAY: u32 = WM_APP + 1;
 const WM_OPEN_EDITOR: u32 = WM_APP + 2;
 /// Sent by a listener thread: device events are waiting in `App::events`.
 const WM_DEVICE_EVENT: u32 = WM_APP + 3;
+/// Sent by the firmware check thread: results are waiting in `App::firmware`.
+const WM_FIRMWARE: u32 = WM_APP + 4;
 /// Sent by the report thread: `wparam` is 1 when the report is on the clipboard.
-const WM_REPORT_READY: u32 = WM_APP + 4;
+const WM_REPORT_READY: u32 = WM_APP + 5;
 const CLASS_NAME: &str = "SecretarybirdTray";
 const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
@@ -43,13 +45,20 @@ const SETTLE_MS: u32 = 1500;
 /// one profile instead of one per window passed.
 const TIMER_FOREGROUND: usize = 4;
 const FOREGROUND_MS: u32 = 300;
+/// Weekly firmware check (opt-in): looked at every few hours, runs when a week has passed.
+const TIMER_FIRMWARE: usize = 5;
+const FIRMWARE_TIMER_MS: u32 = 6 * 60 * 60 * 1000;
+const FIRMWARE_FIRST_MS: u32 = 2 * 60 * 1000;
+const FIRMWARE_EVERY_SECS: u64 = 7 * 24 * 60 * 60;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
 const ID_AUTOSTART: u32 = 3;
 const ID_EXIT: u32 = 4;
 const ID_EDITOR: u32 = 5;
-const ID_REPORT: u32 = 6;
+const ID_FIRMWARE: u32 = 6;
+const ID_REPORT: u32 = 7;
+const ID_RESTORE_BUTTONS: u32 = 8;
 const ID_PROFILE_BASE: u32 = 1000;
 
 const GUID_DEVINTERFACE_HID: GUID = GUID::from_u128(0x4d1e55b2_f16f_11cf_88cb_001111000030);
@@ -83,6 +92,53 @@ struct App {
     listening: Arc<Mutex<HashSet<CString>>>,
     events_tx: Sender<DeviceEvent>,
     events: Receiver<DeviceEvent>,
+    firmware_tx: Sender<Vec<FirmwareNews>>,
+    firmware: Receiver<Vec<FirmwareNews>>,
+}
+
+/// Tray settings in `tray.json`.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+struct TraySettings {
+    /// Check Razer's product pages for newer firmware once a week. Off until turned on.
+    #[serde(default)]
+    firmware_weekly: bool,
+    /// Unix time of the last weekly check.
+    #[serde(default)]
+    firmware_checked: u64,
+    /// Device key -> firmware version already announced, so each is announced once.
+    #[serde(default)]
+    firmware_notified: std::collections::BTreeMap<String, String>,
+}
+
+impl TraySettings {
+    fn path() -> std::path::PathBuf {
+        config_dir().join("tray.json")
+    }
+
+    fn load() -> Self {
+        std::fs::read_to_string(Self::path())
+            .ok()
+            .and_then(|t| serde_json::from_str(t.trim_start_matches('\u{feff}')).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self) {
+        if let Ok(text) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::create_dir_all(config_dir());
+            let _ = std::fs::write(Self::path(), text);
+        }
+    }
+}
+
+/// A device with newer firmware out, found by the weekly check.
+struct FirmwareNews {
+    key: String,
+    name: String,
+    version: String,
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
 /// Something a device did by itself, reported on its event collection.
@@ -186,6 +242,7 @@ pub fn run() {
         let icon = load_icon();
         add_icon(hwnd, icon);
         let (events_tx, events) = channel();
+        let (firmware_tx, firmware) = channel();
         APP.with(|cell| {
             *cell.borrow_mut() = Some(App {
                 hwnd,
@@ -201,12 +258,15 @@ pub fn run() {
                 listening: Arc::new(Mutex::new(HashSet::new())),
                 events_tx,
                 events,
+                firmware_tx,
+                firmware,
             })
         });
         log::append("tray started");
         with_app(|app| app.rescan());
         start_retries(hwnd);
         SetTimer(hwnd, TIMER_BATTERY, BATTERY_MS, None);
+        SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_FIRST_MS, None);
         if std::env::args().any(|a| a == "--editor") {
             with_app(|app| app.open_editor());
         }
@@ -236,6 +296,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_DEVICE_EVENT => {
             with_app(|app| app.device_events());
+            0
+        }
+        WM_FIRMWARE => {
+            with_app(|app| app.firmware_news());
             0
         }
         WM_REPORT_READY => {
@@ -283,6 +347,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             if let Some(Some(ms)) = next {
                 SetTimer(hwnd, TIMER_RETRY, ms, None);
             }
+            0
+        }
+        WM_TIMER if wparam == TIMER_FIRMWARE => {
+            SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_TIMER_MS, None);
+            with_app(|app| app.check_firmware(false));
             0
         }
         WM_TIMER if wparam == TIMER_BATTERY => {
@@ -529,6 +598,45 @@ impl App {
         }
     }
 
+    /// The weekly firmware check, if it's on and due (or `now`). Reads each device's version
+    /// here, then asks Razer's servers on a background thread so the tray never waits.
+    fn check_firmware(&mut self, now: bool) {
+        let mut settings = TraySettings::load();
+        if !settings.firmware_weekly || (!now && now_secs().saturating_sub(settings.firmware_checked) < FIRMWARE_EVERY_SECS) {
+            return;
+        }
+        let devices: Vec<(String, String, u16, String)> = {
+            let engine = self.engine();
+            engine
+                .devices()
+                .iter()
+                .filter_map(|d| d.firmware_version().ok().map(|v| (d.key(), engine.label(d), d.pid, v)))
+                .collect()
+        };
+        if devices.is_empty() {
+            return;
+        }
+        settings.firmware_checked = now_secs();
+        settings.save();
+        let connected: Vec<u16> = devices.iter().map(|d| d.2).collect();
+        let tx = self.firmware_tx.clone();
+        let hwnd = self.hwnd as usize;
+        std::thread::spawn(move || {
+            use secbird_core::firmware::{latest_for, status, Status};
+            let news: Vec<FirmwareNews> = devices
+                .into_iter()
+                .filter_map(|(key, name, pid, current)| match status(current, latest_for(pid).ok().flatten(), &connected) {
+                    Status::Update { latest, .. } => Some(FirmwareNews { key, name, version: latest.version }),
+                    _ => None,
+                })
+                .collect();
+            log::append(&format!("weekly firmware check: {} update(s)", news.len()));
+            if !news.is_empty() && tx.send(news).is_ok() {
+                unsafe { PostMessageW(hwnd as HWND, WM_FIRMWARE, 0, 0) };
+            }
+        });
+    }
+
     /// Build `secbird report` (a few seconds of read-only USB requests) on a background
     /// thread, put it on the clipboard and open the GitHub device report form.
     fn make_report(&mut self) {
@@ -545,6 +653,24 @@ impl App {
             }
             unsafe { PostMessageW(hwnd as HWND, WM_REPORT_READY, copied as usize, 0) };
         });
+    }
+
+    /// Announce each newer firmware once.
+    fn firmware_news(&mut self) {
+        let mut settings = TraySettings::load();
+        let mut lines = Vec::new();
+        while let Ok(news) = self.firmware.try_recv() {
+            for n in news {
+                if settings.firmware_notified.get(&n.key) != Some(&n.version) {
+                    lines.push(format!("{}: {}", n.name, n.version));
+                    settings.firmware_notified.insert(n.key, n.version);
+                }
+            }
+        }
+        if !lines.is_empty() {
+            settings.save();
+            self.balloon("Firmware update available", &format!("{}\nOpen the editor for Razer's download link.", lines.join("\n")));
+        }
     }
 
     /// Build the popup menu and remember which item maps to which profile.
@@ -572,9 +698,12 @@ impl App {
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         append(menu, MF_STRING, ID_REAPPLY as usize, "Re-apply profiles");
         append(menu, MF_STRING, ID_FOLDER as usize, "Open settings folder");
+        append(menu, MF_STRING, ID_RESTORE_BUTTONS as usize, "Restore all mouse buttons");
         append(menu, MF_STRING, ID_REPORT as usize, "Make a device report…");
         let auto = if autostart_enabled() { MF_CHECKED } else { MF_UNCHECKED };
         append(menu, MF_STRING | auto, ID_AUTOSTART as usize, "Start with Windows");
+        let fw = if TraySettings::load().firmware_weekly { MF_CHECKED } else { MF_UNCHECKED };
+        append(menu, MF_STRING | fw, ID_FIRMWARE as usize, "Check for firmware updates weekly");
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         append(menu, MF_STRING, ID_EXIT as usize, "Exit");
         menu
@@ -589,7 +718,32 @@ impl App {
             ID_EDITOR => self.open_editor(),
             ID_FOLDER => open_config_folder(),
             ID_REPORT => self.make_report(),
+            ID_RESTORE_BUTTONS => {
+                let results = self.engine().restore_buttons();
+                let lines: Vec<String> = results
+                    .iter()
+                    .map(|(name, r)| match r {
+                        Ok(0) => format!("{name}: nothing was remapped"),
+                        Ok(n) => format!("{name}: {n} button(s) restored"),
+                        Err(e) => format!("{name}: {e}"),
+                    })
+                    .collect();
+                let body = if lines.is_empty() { "No mouse with remappable buttons is connected.".to_string() } else { lines.join("\n") };
+                self.balloon("Mouse buttons restored", &body);
+            }
             ID_AUTOSTART => set_autostart(!autostart_enabled()),
+            ID_FIRMWARE => {
+                let mut s = TraySettings::load();
+                s.firmware_weekly = !s.firmware_weekly;
+                s.save();
+                if s.firmware_weekly {
+                    self.balloon(
+                        "Weekly firmware check on",
+                        "Once a week Secretarybird asks apps.razer.com whether newer firmware is out for your devices. It never installs anything.",
+                    );
+                    self.check_firmware(true);
+                }
+            }
             ID_EXIT => unsafe {
                 DestroyWindow(self.hwnd);
             },

@@ -247,6 +247,19 @@ impl Engine {
     }
 
     /// Make `name` the active profile for a device and apply it.
+    /// Every mouse's remapped buttons back to what the mouse stores. Returns (device, count).
+    pub fn restore_buttons(&self) -> Vec<(String, Result<usize>)> {
+        let mut store = match Self::store() {
+            Ok(s) => s,
+            Err(e) => return vec![("profiles".into(), Err(e))],
+        };
+        self.devices
+            .iter()
+            .filter(|d| d.spec.as_ref().is_some_and(|s| s.kind == secbird_core::Kind::Mouse))
+            .map(|d| (self.label(d), secbird_core::actions::restore_all_buttons(d, &mut store)))
+            .collect()
+    }
+
     pub fn switch_profile(&self, key: &str, name: &str) -> Result<Vec<ApplyReport>> {
         let dev = self
             .devices

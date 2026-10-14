@@ -59,14 +59,19 @@ pub struct Report {
 /// Read-only GETs: (name, command, size, args).
 const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("firmware", cmd::FIRMWARE.get(), cmd::FIRMWARE_SIZE, &[]),
+    ("firmware (full)", cmd::FIRMWARE_EXT.get(), cmd::FIRMWARE_EXT_SIZE, &[]),
     ("device mode", cmd::DEVICE_MODE.get(), cmd::DEVICE_MODE_SIZE, &[]),
     ("polling rate", cmd::POLLING.get(), cmd::POLLING_SIZE, &[]),
     ("polling rate (high speed)", cmd::POLLING_HS.get(), cmd::POLLING_HS_SIZE, &[]),
     ("dpi", cmd::DPI.get(), cmd::DPI_SIZE, &[cmd::NOSTORE]),
-    ("dpi stages", Command::new(0x04, 0x86), 0x26, &[cmd::VARSTORE]),
+    ("dpi stages", cmd::DPI_STAGES.get(), cmd::DPI_STAGES_SIZE, &[cmd::VARSTORE]),
     ("battery", cmd::BATTERY.get(), cmd::POWER_SIZE, &[]),
     ("charging", cmd::CHARGING.get(), cmd::POWER_SIZE, &[]),
-    ("idle time", Command::new(0x07, 0x83), 0x02, &[]),
+    ("idle time", cmd::IDLE_TIME.get(), cmd::IDLE_TIME_SIZE, &[]),
+    ("auto sleep", cmd::AUTO_SLEEP.get(), cmd::AUTO_SLEEP_SIZE, &[]),
+    ("paired mice", cmd::WIRELESS_DEVICES.get(), cmd::WIRELESS_DEVICES_SIZE, &[]),
+    ("macro storage", cmd::MACRO_STORAGE.get(), cmd::MACRO_STORAGE_SIZE, &[]),
+    ("macro count", cmd::MACRO_COUNT.get(), cmd::MACRO_COUNT_SIZE, &[]),
 ];
 
 /// Laptop fan and power reads (Synapse's thermal module, class 0D, and power class 07), for

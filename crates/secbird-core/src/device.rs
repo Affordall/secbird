@@ -1,7 +1,7 @@
 //! Discovery and request/reply transport over HID feature reports.
 
 use crate::commands as cmd;
-use crate::db::{Db, DeviceSpec, RAZER_VID};
+use crate::db::{Db, DeviceSpec, Kind, RAZER_VID};
 use crate::error::{Error, Result};
 use crate::proto::{Command, Report, Status, REPORT_LEN};
 use crate::transport::Transport;
@@ -11,6 +11,10 @@ use std::thread::sleep;
 
 /// Synapse retries reads up to 30 times (5 ms apart, see [`Transport::read_delay`]).
 const READ_RETRIES: u32 = 30;
+
+/// Writes to the device's flash (macros) take longer: Synapse waits at least 10 ms between
+/// reads and retries 40 times. Allow up to about two seconds.
+const FLASH_RETRIES: u32 = 200;
 
 /// Transaction ids seen across Razer devices, tried in order when the database has none.
 pub const TXID_CANDIDATES: [u8; 4] = [0x1F, 0x3F, 0xFF, 0x9F];
@@ -34,10 +38,35 @@ impl Device {
         }
     }
 
+    /// A Mouse Dock Pro is the docked mouse's receiver: every command reaches the mouse.
+    /// Ask which mouse is paired and take its name, DPI range and lighting zones. Polling
+    /// stays on the dock's `00:C0` command. If the answer is missing or isn't a mouse that
+    /// pairs with the dock, keep the generic database entry.
+    pub(crate) fn identify_docked_mouse(&mut self, db: &Db) {
+        if self.pid != MOUSE_DOCK_PRO {
+            return;
+        }
+        let Ok(reply) = self.get(cmd::WIRELESS_DEVICES, cmd::WIRELESS_DEVICES_SIZE, &[]) else { return };
+        let Some(pid) = connected_mouse_pid(reply.args()).filter(|p| DOCK_PRO_MICE.contains(p)) else { return };
+        let Some(mouse) = db.get(pid).filter(|s| s.kind == Kind::Mouse) else { return };
+        if let Some(spec) = &mut self.spec {
+            spec.name = format!("{} on Mouse Dock Pro", mouse.name.trim_end_matches(" (Wireless)"));
+            spec.dpi = mouse.dpi.clone();
+            spec.lighting = mouse.lighting;
+            spec.leds = mouse.leds.clone();
+            spec.onboard_profiles = mouse.onboard_profiles;
+        }
+    }
+
     /// Send one command and wait for its reply. `size` is the argument length the
     /// device expects for this command.
     pub fn transact(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
-        transact(self.transport.as_ref(), self.txid, command, size, args)
+        transact(self.transport.as_ref(), self.txid, command, size, args, READ_RETRIES)
+    }
+
+    /// [`Device::transact`] for commands that write flash and answer slowly.
+    pub(crate) fn transact_slow(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
+        transact(self.transport.as_ref(), self.txid, command, size, args, FLASH_RETRIES)
     }
 
     pub fn get(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
@@ -67,13 +96,31 @@ fn parse_serial(args: &[u8]) -> String {
     if usable { s } else { String::new() }
 }
 
-fn transact(hid: &dyn Transport, txid: u8, command: Command, size: u8, args: &[u8]) -> Result<Report> {
+const MOUSE_DOCK_PRO: u16 = 0x00A4;
+
+/// Mice that pair with the Mouse Dock Pro (Synapse's `DualDongleCompatibleDevices.json`).
+const DOCK_PRO_MICE: [u16; 11] =
+    [0x00A8, 0x00AB, 0x00B0, 0x00CD, 0x00D7, 0x00DB, 0x00DF, 0x00E3, 0x00E8, 0x00EA, 0xB00B];
+
+/// The one connected mouse in a paired-mice reply. `None` if there is none, or more than one.
+fn connected_mouse_pid(args: &[u8]) -> Option<u16> {
+    let count = *args.first()? as usize;
+    let entries = args.get(1..1 + count * 3)?;
+    let mut connected = entries.as_chunks::<3>().0.iter().filter_map(|e| {
+        let pid = u16::from_be_bytes([e[1], e[2]]);
+        (e[0] == 1 && pid != 0 && pid != 0xFFFF).then_some(pid)
+    });
+    let pid = connected.next()?;
+    connected.next().is_none().then_some(pid)
+}
+
+fn transact(hid: &dyn Transport, txid: u8, command: Command, size: u8, args: &[u8], retries: u32) -> Result<Report> {
     let req = Report::request(txid, command, size, args);
     let mut buf = [0u8; REPORT_LEN + 1]; // byte 0 is the HID report id (0)
     buf[1..].copy_from_slice(&req.0);
     hid.send_feature_report(&buf)?;
 
-    for _ in 0..READ_RETRIES {
+    for _ in 0..retries {
         sleep(hid.read_delay());
         let mut reply = [0u8; REPORT_LEN + 1];
         let n = hid.get_feature_report(&mut reply)?;
@@ -124,6 +171,9 @@ pub fn candidates(api: &HidApi) -> Vec<Candidate> {
 /// Simulated devices named in `SECBIRD_SIM` (e.g. `mouse,keyboard`) are added at the end.
 pub fn discover(api: &HidApi, db: &Db) -> Vec<Device> {
     let mut found = discover_hid(api, db);
+    for dev in &mut found {
+        dev.identify_docked_mouse(db);
+    }
     found.extend(crate::sim::from_env());
     found
 }
@@ -179,7 +229,7 @@ impl Device {
         spec: Option<DeviceSpec>,
     ) -> Option<Device> {
         let (txid, reply) = txids.iter().copied().find_map(|t| {
-            transact(transport.as_ref(), t, cmd::SERIAL.get(), cmd::SERIAL_SIZE, &[]).ok().map(|r| (t, r))
+            transact(transport.as_ref(), t, cmd::SERIAL.get(), cmd::SERIAL_SIZE, &[], READ_RETRIES).ok().map(|r| (t, r))
         })?;
         let serial = parse_serial(reply.args());
         Some(Device { transport, pid, serial, interface, path, txid, spec })
@@ -196,7 +246,19 @@ pub fn unanswered(api: &HidApi, found: &[Device]) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_serial;
+    use super::{connected_mouse_pid, parse_serial};
+
+    #[test]
+    fn paired_mice_reply_needs_exactly_one_connected_mouse() {
+        assert_eq!(connected_mouse_pid(&[2, 1, 0, 0xAB, 0, 0xFF, 0xFF]), Some(0x00AB));
+        for args in [
+            &[][..], &[0], &[2, 1, 0, 0xAB], &[255, 1, 0, 0xAB],
+            &[1, 0, 0, 0xAB], &[1, 1, 0xFF, 0xFF], &[1, 1, 0, 0],
+            &[2, 1, 0, 0xAB, 1, 0, 0xA8],
+        ] {
+            assert_eq!(connected_mouse_pid(args), None, "{args:?}");
+        }
+    }
 
     #[test]
     fn serials_are_cleaned() {

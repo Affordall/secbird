@@ -3,7 +3,7 @@
 
 use crate::device::Device;
 use crate::error::Result;
-use crate::features::Rgb;
+use crate::features::{DpiStages, Rgb};
 use crate::profile::{Store, Zone};
 
 fn zone<'a>(store: &'a mut Store, dev: &Device, name: &str) -> &'a mut Zone {
@@ -18,6 +18,29 @@ pub fn set_dpi(dev: &Device, store: &mut Store, x: u16, y: u16) -> Result<(u16, 
     Ok(applied)
 }
 
+/// Replace the DPI stages. The mouse moves to the active stage, so the profile's DPI
+/// follows it. Returns the stages as sent, after rounding.
+pub fn set_dpi_stages(dev: &Device, store: &mut Store, stages: &DpiStages) -> Result<DpiStages> {
+    let sent = dev.set_dpi_stages(stages)?;
+    let profile = store.for_device(dev).active_mut();
+    profile.dpi = Some(sent.stages[sent.active as usize - 1]);
+    profile.dpi_stages = Some(sent.clone());
+    store.save()?;
+    Ok(sent)
+}
+
+pub fn set_sleep_minutes(dev: &Device, store: &mut Store, minutes: u16) -> Result<()> {
+    dev.set_sleep_minutes(minutes)?;
+    store.for_device(dev).active_mut().sleep_minutes = Some(minutes);
+    store.save()
+}
+
+pub fn set_auto_sleep(dev: &Device, store: &mut Store, enabled: bool) -> Result<()> {
+    dev.set_auto_sleep(enabled)?;
+    store.for_device(dev).active_mut().auto_sleep = Some(enabled);
+    store.save()
+}
+
 pub fn set_polling(dev: &Device, store: &mut Store, hz: u32) -> Result<()> {
     dev.set_polling_rate(hz)?;
     store.for_device(dev).active_mut().polling = Some(hz);
@@ -29,6 +52,17 @@ pub fn set_color(dev: &Device, store: &mut Store, zone_name: &str, color: Rgb) -
     store.for_device(dev).active_mut().keys.clear();
     let z = zone(store, dev, zone_name);
     z.color = Some(color);
+    z.effect = None;
+    z.off = false;
+    store.save()
+}
+
+/// A built-in effect on one zone. Like a color, it replaces per-key colors.
+pub fn set_effect(dev: &Device, store: &mut Store, zone_name: &str, effect: crate::effects::Effect) -> Result<()> {
+    dev.set_effect(dev.led_id(zone_name)?, &effect)?;
+    store.for_device(dev).active_mut().keys.clear();
+    let z = zone(store, dev, zone_name);
+    z.effect = Some(effect);
     z.off = false;
     store.save()
 }
@@ -55,6 +89,7 @@ pub fn set_keys(dev: &Device, store: &mut Store, keys: Vec<Rgb>) -> Result<()> {
     let profile = store.for_device(dev).active_mut();
     for z in profile.lighting.values_mut() {
         z.color = None;
+        z.effect = None;
         z.off = false;
     }
     profile.keys = keys;
@@ -72,6 +107,9 @@ pub fn set_button(
 ) -> Result<()> {
     let key = crate::buttons::setting_key(button, layer);
     let (id, _) = crate::buttons::parse_setting_key(&key)?;
+    if let Some(action) = action {
+        keeps_a_left_click(dev, id, layer, action)?;
+    }
     let buttons = &mut store.for_device(dev).active_mut().buttons;
     match action {
         Some(action) => {
@@ -84,6 +122,47 @@ pub fn set_button(
         }
     }
     store.save()
+}
+
+/// Refuse a change that would leave the mouse with no left click on its normal layer: the
+/// user could no longer click anything, including the button to undo it.
+fn keeps_a_left_click(dev: &Device, id: u8, layer: crate::buttons::Layer, action: crate::buttons::Action) -> Result<()> {
+    use crate::buttons::{Action, Layer};
+    const LEFT: Action = Action::Mouse(1);
+    if layer != Layer::Normal || action == LEFT || dev.button(id, Layer::Normal).ok() != Some(LEFT) {
+        return Ok(());
+    }
+    if dev.buttons().iter().any(|&(other, a)| other != id && a == LEFT) {
+        return Ok(());
+    }
+    Err(crate::error::Error::InvalidArg(
+        "this is the only left click; give another button left click first, or you couldn't click anything".into(),
+    ))
+}
+
+/// Put every remapped button of the active profile back to what the mouse stores (Synapse's
+/// or the factory setting), on both layers, and forget the remaps so they aren't applied
+/// again. Returns how many buttons were restored.
+pub fn restore_all_buttons(dev: &Device, store: &mut Store) -> Result<usize> {
+    let keys: Vec<String> = store.for_device(dev).active().buttons.keys().cloned().collect();
+    let mut restored = 0;
+    let mut first_error = None;
+    for key in keys {
+        match crate::buttons::parse_setting_key(&key).and_then(|(id, layer)| dev.reset_button(id, layer)) {
+            Ok(_) => {
+                store.for_device(dev).active_mut().buttons.remove(&key);
+                restored += 1;
+            }
+            Err(e) => {
+                first_error.get_or_insert(e);
+            }
+        }
+    }
+    store.save()?;
+    match first_error {
+        Some(e) if restored == 0 => Err(e),
+        _ => Ok(restored),
+    }
 }
 
 /// One zone's outcome from [`sync_color`].

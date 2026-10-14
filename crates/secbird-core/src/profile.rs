@@ -5,7 +5,7 @@
 
 use crate::device::Device;
 use crate::error::{Error, Result};
-use crate::features::Rgb;
+use crate::features::{DpiStages, Rgb};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -20,6 +20,9 @@ pub struct Zone {
     pub off: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brightness: Option<u8>,
+    /// A built-in effect instead of the static color.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<crate::effects::Effect>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -28,6 +31,15 @@ pub struct Profile {
     pub dpi: Option<(u16, u16)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub polling: Option<u32>,
+    /// What the DPI button cycles through.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpi_stages: Option<DpiStages>,
+    /// Minutes idle before a wireless device sleeps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sleep_minutes: Option<u16>,
+    /// Sleeping when idle on or off, for devices with that switch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_sleep: Option<bool>,
     /// Lighting zone name (or numeric id) -> state.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub lighting: BTreeMap<String, Zone>,
@@ -262,8 +274,18 @@ impl Profile {
         if let Some(hz) = self.polling {
             push(format!("polling {hz} Hz"), dev.set_polling_rate(hz));
         }
+        // Stages first: setting them also moves the mouse to the active stage's DPI.
+        if let Some(stages) = &self.dpi_stages {
+            push(format!("dpi stages ({})", stages.stages.len()), dev.set_dpi_stages(stages).map(|_| ()));
+        }
         if let Some((x, y)) = self.dpi {
             push(format!("dpi {x}x{y}"), dev.set_dpi(x, y).map(|_| ()));
+        }
+        if let Some(on) = self.auto_sleep {
+            push(format!("auto sleep {}", if on { "on" } else { "off" }), dev.set_auto_sleep(on));
+        }
+        if let Some(minutes) = self.sleep_minutes {
+            push(format!("sleep after {minutes} min"), dev.set_sleep_minutes(minutes));
         }
         for (name, zone) in &self.lighting {
             let led = match dev.led_id(name) {
@@ -278,6 +300,8 @@ impl Profile {
             }
             if zone.off {
                 push(format!("{name} off"), dev.lights_off(led));
+            } else if let Some(effect) = &zone.effect {
+                push(format!("{name} {effect}"), dev.set_effect(led, effect));
             } else if let Some(color) = zone.color {
                 push(format!("{name} color {color}"), dev.set_static_color(led, color));
             }
@@ -370,7 +394,7 @@ mod tests {
         dev.active_mut().polling = Some(500);
         dev.active_mut().lighting.insert(
             "logo".into(),
-            Zone { color: Some(Rgb(255, 0, 0)), off: false, brightness: Some(40) },
+            Zone { color: Some(Rgb(255, 0, 0)), off: false, brightness: Some(40), effect: None },
         );
         store.save().unwrap();
 

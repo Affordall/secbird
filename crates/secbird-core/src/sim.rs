@@ -1,7 +1,7 @@
 //! Simulated Razer devices that answer Protocol 2.5 the way real hardware does.
 //!
 //! Tests use them to exercise discovery, retries, lighting and profiles without a
-//! device on the desk. Setting `SECBIRD_SIM=mouse,wireless,keyboard,old-keyboard` also makes the
+//! device on the desk. Setting `SECBIRD_SIM=all` (or a list of [`PRESETS`]) also makes the
 //! CLI and tray show them, which is handy for working on the editor.
 //!
 //! The simulated product ids (`FFF1`-`FFF3`) are outside Razer's range, so they
@@ -22,6 +22,7 @@ pub const MOUSE_PID: u16 = 0xFFF1;
 pub const WIRELESS_MOUSE_PID: u16 = 0xFFF2;
 pub const KEYBOARD_PID: u16 = 0xFFF3;
 pub const OLD_KEYBOARD_PID: u16 = 0xFFF4;
+pub const NAGA_PID: u16 = 0xFFF5;
 
 const MOUSE_SPEC: &str = r#"{"pid":"FFF1","name":"Simulated Mouse","kind":"mouse","interface":0,
   "dpi":{"min":100,"max":26000,"step":50},"polling":"standard",
@@ -29,6 +30,10 @@ const MOUSE_SPEC: &str = r#"{"pid":"FFF1","name":"Simulated Mouse","kind":"mouse
   "source":"simulator"}"#;
 
 const WIRELESS_MOUSE_SPEC: &str = r#"{"pid":"FFF2","name":"Simulated Wireless Mouse","kind":"mouse",
+  "interface":0,"dpi":{"min":100,"max":30000,"step":50},"polling":"standard",
+  "leds":[{"name":"logo","id":4}],"wireless":true,"source":"simulator"}"#;
+
+const NAGA_SPEC: &str = r#"{"pid":"FFF5","name":"Simulated Naga","kind":"mouse",
   "interface":0,"dpi":{"min":100,"max":30000,"step":50},"polling":"standard",
   "leds":[{"name":"logo","id":4}],"wireless":true,"source":"simulator"}"#;
 
@@ -41,6 +46,9 @@ const KEYBOARD_SPEC: &str = r#"{"pid":"FFF3","name":"Simulated Keyboard","kind":
   "interface":0,"polling":"standard","leds":[{"name":"backlight","id":5}],
   "matrix":{"rows":6,"cols":22},"source":"simulator"}"#;
 
+/// A stored macro: its 250-byte header and its steps.
+pub type SimMacro = (Vec<u8>, Vec<u8>);
+
 /// Everything the simulated device remembers. Tests read and tweak it via [`Sim::state`].
 #[derive(Debug, Clone)]
 pub struct SimState {
@@ -51,6 +59,19 @@ pub struct SimState {
     /// `None` = the device has no DPI sensor (keyboards).
     pub dpi: Option<(u16, u16)>,
     pub polling_code: u8,
+    /// High-speed polling code (`00:C0`), or `None` when the device doesn't have it.
+    pub polling_hs: Option<u8>,
+    /// DPI stages as the device reports them: `(active, [(x, y)])`.
+    pub dpi_stages: Option<(u8, Vec<(u16, u16)>)>,
+    /// Sleep timer in seconds (`07:83`), and the auto-sleep switch where there is one.
+    pub idle_seconds: Option<u16>,
+    pub auto_sleep: Option<bool>,
+    /// On-device macro memory (`None` = no macros): id -> (header, steps). Sized like a Basilisk V3.
+    pub macros: Option<BTreeMap<u16, SimMacro>>,
+    /// Bytes freed by deleted macros, not reusable until the memory is compacted.
+    pub macro_recyclable: u32,
+    /// What a receiver reports as paired (`00:BF`): `(connected, pid)`.
+    pub paired: Vec<(bool, u16)>,
     pub battery: Option<u8>,
     pub charging: bool,
     /// LED ids that exist on the device.
@@ -83,6 +104,13 @@ impl SimState {
             firmware: (1, 2),
             dpi: None,
             polling_code: 0x01,
+            polling_hs: None,
+            dpi_stages: None,
+            macros: None,
+            macro_recyclable: 0,
+            idle_seconds: None,
+            auto_sleep: None,
+            paired: Vec::new(),
             battery: None,
             charging: false,
             leds: Vec::new(),
@@ -97,6 +125,86 @@ impl SimState {
             busy_reads: 0,
             log: Vec::new(),
             reply: None,
+        }
+    }
+
+    /// Macro memory commands, like the Basilisk V3: ids 1-100, 90 KB.
+    fn handle_macro(&mut self, c: Command, a: &[u8], size: u8) -> (Status, Vec<u8>) {
+        use Status::{Failed, NotSupported, Success};
+        const MAX_BYTES: u32 = 92160;
+        let recyclable = self.macro_recyclable;
+        let Some(macros) = self.macros.as_mut() else { return (NotSupported, vec![]) };
+        let used: u32 = macros.values().map(|(_, d)| crate::macros::footprint(d.len() as u32)).sum();
+        let id = u16::from_be_bytes([a[0], a[1]]);
+        let be32 = |b: &[u8]| u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as usize;
+        match c {
+            c if c == cmd::MACRO_STORAGE.get() => {
+                let mut v = vec![0, 100];
+                for n in [MAX_BYTES, MAX_BYTES - used - recyclable, recyclable] {
+                    v.extend(n.to_be_bytes());
+                }
+                (Success, v)
+            }
+            c if c == cmd::MACRO_COUNT.get() => (Success, (macros.len() as u16).to_be_bytes().to_vec()),
+            c if c == cmd::MACRO_IDS.get() => {
+                let offset = id as usize; // the first two bytes are the offset here
+                let n = (size as usize - 4) / 2;
+                let mut v = vec![a[0], a[1], 0, n as u8];
+                v.extend(macros.keys().skip(offset).take(n).flat_map(|k| k.to_be_bytes()));
+                (Success, v)
+            }
+            cmd::MACRO_ALLOCATE => {
+                if id == 0 || id > 100 || macros.contains_key(&id) {
+                    return (Failed, vec![]);
+                }
+                macros.insert(id, (vec![0; cmd::MACRO_HEADER_LEN], vec![0; be32(&a[2..])]));
+                (Success, a[..6].to_vec())
+            }
+            c if c == cmd::MACRO_ALLOCATE.get() => match macros.get(&id) {
+                Some((_, d)) => {
+                    let mut v = id.to_be_bytes().to_vec();
+                    v.extend((d.len() as u32).to_be_bytes());
+                    (Success, v)
+                }
+                None => (Failed, vec![]),
+            },
+            cmd::MACRO_NAME | cmd::MACRO_DATA => {
+                let (start, at, len) = if c == cmd::MACRO_NAME {
+                    (6, u16::from_be_bytes([a[2], a[3]]) as usize, size as usize - 6)
+                } else {
+                    (7, be32(&a[2..]), a[6] as usize)
+                };
+                let Some(entry) = macros.get_mut(&id) else { return (Failed, vec![]) };
+                let buf = if c == cmd::MACRO_NAME { &mut entry.0 } else { &mut entry.1 };
+                if at + len > buf.len() {
+                    return (Failed, vec![]);
+                }
+                buf[at..at + len].copy_from_slice(&a[start..start + len]);
+                (Success, a[..size as usize].to_vec())
+            }
+            c if c == cmd::MACRO_NAME.get() || c == cmd::MACRO_DATA.get() => {
+                let Some(entry) = macros.get(&id) else { return (Failed, vec![]) };
+                let (head, at, len, buf) = if c == cmd::MACRO_NAME.get() {
+                    (6, u16::from_be_bytes([a[2], a[3]]) as usize, size as usize - 6, &entry.0)
+                } else {
+                    (7, be32(&a[2..]), a[6] as usize, &entry.1)
+                };
+                let end = (at + len).min(buf.len());
+                let mut v = a[..head].to_vec();
+                if c == cmd::MACRO_DATA.get() {
+                    v[6] = end.saturating_sub(at) as u8;
+                }
+                v.extend_from_slice(buf.get(at..end).unwrap_or(&[]));
+                (Success, v)
+            }
+            cmd::MACRO_DELETE => match macros.remove(&id) {
+                Some((_, d)) => {
+                    self.macro_recyclable += crate::macros::footprint(d.len() as u32);
+                    (Success, a[..2].to_vec())
+                }
+                None => (Failed, vec![]),
+            },
+            _ => (NotSupported, vec![]),
         }
     }
 
@@ -165,6 +273,90 @@ impl SimState {
                 self.polling_code = a[0];
                 ok(vec![a[0]])
             }
+            c if c == cmd::DPI_STAGES.get() => match &self.dpi_stages {
+                Some((active, stages)) => {
+                    let mut v = vec![a[0], *active, stages.len() as u8];
+                    for (i, &(x, y)) in stages.iter().enumerate() {
+                        let ([xh, xl], [yh, yl]) = (x.to_be_bytes(), y.to_be_bytes());
+                        v.extend([i as u8 + 1, xh, xl, yh, yl, 0, 0]);
+                    }
+                    ok(v)
+                }
+                None => (NotSupported, vec![]),
+            },
+            cmd::DPI_STAGES => {
+                let (active, n) = (a[1], a[2] as usize);
+                let well_formed = (1..=cmd::MAX_DPI_STAGES).contains(&n)
+                    && (1..=n as u8).contains(&active)
+                    && size as usize == 7 * n + 3
+                    && (0..n).all(|i| a[3 + 7 * i] == i as u8);
+                match (&self.dpi_stages, well_formed) {
+                    (None, _) => (NotSupported, vec![]),
+                    (Some(_), false) => (Failed, vec![]),
+                    (Some(_), true) => {
+                        let stages: Vec<(u16, u16)> = (0..n)
+                            .map(|i| {
+                                let s = &a[3 + 7 * i..];
+                                (u16::from_be_bytes([s[1], s[2]]), u16::from_be_bytes([s[3], s[4]]))
+                            })
+                            .collect();
+                        self.dpi = Some(stages[active as usize - 1]);
+                        self.dpi_stages = Some((active, stages));
+                        ok(a[..size as usize].to_vec())
+                    }
+                }
+            }
+            c if c == cmd::IDLE_TIME.get() => match self.idle_seconds {
+                Some(secs) => ok(secs.to_be_bytes().to_vec()),
+                None => (NotSupported, vec![]),
+            },
+            cmd::IDLE_TIME => match self.idle_seconds {
+                Some(_) => {
+                    // Like most mice: 1 to 15 minutes, or up to 60 with an auto-sleep switch.
+                    let secs = u16::from_be_bytes([a[0], a[1]]);
+                    let max = if self.auto_sleep.is_some() { 3600 } else { 900 };
+                    if (60..=max).contains(&secs) {
+                        self.idle_seconds = Some(secs);
+                    }
+                    ok(a[..2].to_vec())
+                }
+                None => (NotSupported, vec![]),
+            },
+            c if c == cmd::AUTO_SLEEP.get() => match self.auto_sleep {
+                Some(on) => ok(vec![0, on as u8]),
+                None => (NotSupported, vec![]),
+            },
+            cmd::AUTO_SLEEP => match self.auto_sleep {
+                Some(_) => {
+                    self.auto_sleep = Some(a[1] == 1);
+                    ok(a[..2].to_vec())
+                }
+                None => (NotSupported, vec![]),
+            },
+            c if c.class == 0x06 => self.handle_macro(c, a, size),
+            c if c == cmd::POLLING_HS.get() => match self.polling_hs {
+                Some(code) => ok(vec![0, code]),
+                None => (NotSupported, vec![]),
+            },
+            cmd::POLLING_HS => match (self.polling_hs, cmd::polling_hs_hz(a[1])) {
+                (Some(_), Some(_)) => {
+                    self.polling_hs = Some(a[1]);
+                    ok(vec![0, a[1]])
+                }
+                (None, _) => (NotSupported, vec![]),
+                (Some(_), None) => (Failed, vec![]),
+            },
+            c if c == cmd::WIRELESS_DEVICES.get() => match self.paired.is_empty() {
+                true => (NotSupported, vec![]),
+                false => {
+                    let mut v = vec![self.paired.len() as u8];
+                    for &(connected, pid) in &self.paired {
+                        v.push(connected as u8);
+                        v.extend(pid.to_be_bytes());
+                    }
+                    ok(v)
+                }
+            },
             c if c == cmd::BATTERY.get() => match self.battery {
                 Some(level) => ok(vec![0, level]),
                 None => (NotSupported, vec![]),
@@ -274,6 +466,8 @@ impl Sim {
     pub fn mouse() -> Self {
         let mut s = SimState::new("SIMMOUSE0001");
         s.dpi = Some((800, 800));
+        s.dpi_stages = Some((2, vec![(400, 400), (800, 800), (1000, 1000), (1300, 1300), (6400, 6400)]));
+        s.macros = Some(BTreeMap::new());
         s.leds = vec![1, 4, 10];
         // The Basilisk V3's factory buttons, as read from the real mouse, in the live
         // slot and the active saved slot, both layers.
@@ -303,8 +497,41 @@ impl Sim {
         s.txid = 0x3F;
         s.dpi = Some((1600, 1600));
         s.battery = Some(191); // 75 %
+        s.idle_seconds = Some(300);
         s.charging = true;
         s.leds = vec![4];
+        Sim::new(s)
+    }
+
+    /// Wireless Naga with the 12-button side grid (factory keys 1-9, 0, -, =).
+    pub fn naga() -> Self {
+        let mut s = SimState::new("SIMNAGA00001");
+        s.dpi = Some((1600, 1600));
+        s.dpi_stages = Some((3, vec![(400, 400), (800, 800), (1600, 1600), (3200, 3200), (6400, 6400)]));
+        s.battery = Some(0xE9);
+        s.idle_seconds = Some(180);
+        s.auto_sleep = Some(true);
+        s.macros = Some(BTreeMap::new());
+        s.leds = vec![4];
+        let mut factory: Vec<(u8, u8, [u8; 5])> = vec![
+            (1, 1, [1, 0, 0, 0, 0]),
+            (2, 1, [2, 0, 0, 0, 0]),
+            (3, 1, [3, 0, 0, 0, 0]),
+            (4, 1, [4, 0, 0, 0, 0]),
+            (5, 1, [5, 0, 0, 0, 0]),
+            (52, 14, [0x68, 0, 0x14, 0, 0]),
+            (53, 14, [0x69, 0, 0x14, 0, 0]),
+            (96, 6, [6, 0, 0, 0, 0]),
+        ];
+        let grid_keys = [0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2D, 0x2E];
+        factory.extend(grid_keys.iter().enumerate().map(|(i, &usage)| (64 + i as u8, 2, [0, usage, 0, 0, 0])));
+        for slot in [0, 1] {
+            for layer in [0, 1] {
+                for &(id, function, data) in &factory {
+                    s.buttons.insert((slot, id, layer), (function, data));
+                }
+            }
+        }
         Sim::new(s)
     }
 
@@ -338,6 +565,7 @@ impl Sim {
             WIRELESS_MOUSE_PID => WIRELESS_MOUSE_SPEC,
             KEYBOARD_PID => KEYBOARD_SPEC,
             OLD_KEYBOARD_PID => OLD_KEYBOARD_SPEC,
+            NAGA_PID => NAGA_SPEC,
             _ => return None,
         };
         Some(serde_json::from_str(json).expect("built-in simulator spec"))
@@ -404,21 +632,120 @@ impl Transport for Sim {
     }
 }
 
-/// Simulated devices listed in `SECBIRD_SIM` (comma-separated: mouse, wireless, keyboard, old-keyboard).
+/// Simulated devices listed in `SECBIRD_SIM`: `all`, or comma-separated [`PRESETS`] names.
 pub fn from_env() -> Vec<Device> {
     let Ok(list) = std::env::var("SECBIRD_SIM") else { return Vec::new() };
-    list.split(',')
+    let names: Vec<&str> = match list.trim() {
+        "all" => PRESETS.to_vec(),
+        list => list.split(',').map(str::trim).collect(),
+    };
+    let db = crate::db::Db::builtin().unwrap_or_default();
+    names
+        .into_iter()
         .filter_map(|name| {
-            let (sim, pid) = match name.trim() {
-                "mouse" => (Sim::mouse(), MOUSE_PID),
-                "wireless" => (Sim::wireless_mouse(), WIRELESS_MOUSE_PID),
-                "keyboard" => (Sim::keyboard(), KEYBOARD_PID),
-                "old-keyboard" => (Sim::old_keyboard(), OLD_KEYBOARD_PID),
-                _ => return None,
-            };
-            sim.open(pid, Sim::spec_for(pid))
+            let (sim, pid) = preset(name)?;
+            // Fake product ids carry their own spec; real ones use the device list, as for hardware.
+            let spec = Sim::spec_for(pid).or_else(|| db.get(pid).cloned());
+            let mut dev = sim.open(pid, spec)?;
+            dev.identify_docked_mouse(&db);
+            Some(dev)
         })
         .collect()
+}
+
+/// Every preset `SECBIRD_SIM=all` loads.
+pub const PRESETS: [&str; 12] =
+    ["mouse", "wireless", "keyboard", "old-keyboard", "naga", "cobra", "dock", "blackwidow", "goliathus", "firefly", "blade", "base-station"];
+
+/// A simulated device by name. The later ones copy devices users reported, under their real
+/// product ids, so the editor treats them exactly as it treats the hardware.
+pub fn preset(name: &str) -> Option<(Sim, u16)> {
+    Some(match name {
+        "mouse" => (Sim::mouse(), MOUSE_PID),
+        "wireless" => (Sim::wireless_mouse(), WIRELESS_MOUSE_PID),
+        "keyboard" => (Sim::keyboard(), KEYBOARD_PID),
+        "old-keyboard" => (Sim::old_keyboard(), OLD_KEYBOARD_PID),
+        "naga" => (Sim::naga(), NAGA_PID),
+        // Cobra (wired), issue #1.
+        "cobra" => {
+            let mut s = SimState::new("SIMCOBRA0001");
+            s.dpi = Some((800, 800));
+            s.dpi_stages = Some((2, vec![(400, 400), (800, 800), (1600, 1600), (3200, 3200)]));
+            s.leds = vec![4];
+            s.macros = Some(BTreeMap::new());
+            with_buttons(&mut s, &[(1, 1, [1, 0, 0, 0, 0]), (2, 1, [2, 0, 0, 0, 0]), (3, 1, [3, 0, 0, 0, 0]),
+                (4, 1, [4, 0, 0, 0, 0]), (5, 1, [5, 0, 0, 0, 0]), (96, 6, [6, 0, 0, 0, 0])]);
+            (Sim::new(s), 0x00A3)
+        }
+        // Mouse Dock Pro with a Basilisk V3 Pro on it, issues #3 and #6.
+        "dock" => {
+            let mut s = SimState::new("SIMDOCK00001");
+            s.dpi = Some((1600, 1600));
+            s.dpi_stages = Some((3, vec![(400, 400), (800, 800), (1600, 1600), (3200, 3200), (6400, 6400)]));
+            s.polling_hs = Some(0x08);
+            s.battery = Some(0xD0);
+            s.charging = true;
+            s.idle_seconds = Some(300);
+            s.leds = vec![1, 4, 10];
+            s.paired = vec![(true, 0x00AB)];
+            s.macros = Some(BTreeMap::new());
+            with_buttons(&mut s, &[(1, 1, [1, 0, 0, 0, 0]), (2, 1, [2, 0, 0, 0, 0]), (3, 1, [3, 0, 0, 0, 0]),
+                (4, 1, [4, 0, 0, 0, 0]), (5, 1, [5, 0, 0, 0, 0]), (14, 7, [4, 0, 0, 0, 0]),
+                (15, 6, [5, 0x01, 0x90, 0x01, 0x90]), (52, 14, [0x68, 0, 0x14, 0, 0]), (53, 14, [0x69, 0, 0x14, 0, 0]), (96, 6, [6, 0, 0, 0, 0])]);
+            (Sim::new(s), 0x00A4)
+        }
+        // BlackWidow V4 75%, issue #6: per-key grid, high-speed polling, no DPI.
+        "blackwidow" => {
+            let mut s = SimState::new("SIMBW75KEYS1");
+            s.polling_hs = Some(0x08);
+            s.leds = vec![5];
+            s.matrix = Some((6, 16, vec![[0; 3]; 6 * 16]));
+            (Sim::new(s), 0x02A5)
+        }
+        // Goliathus mousepad (reported on Reddit): one zone, no polling rate.
+        "goliathus" => {
+            let mut s = SimState::new("SIMGOLIATH01");
+            s.txid = 0x3F;
+            s.leds = vec![0];
+            s.matrix = Some((1, 1, vec![[0; 3]]));
+            (Sim::new(s), 0x0C01)
+        }
+        // Firefly V2 Pro mousepad: a strip of 17 LEDs.
+        "firefly" => {
+            let mut s = SimState::new("SIMFIREFLY01");
+            s.txid = 0x3F;
+            s.leds = vec![0];
+            s.matrix = Some((1, 17, vec![[0; 3]; 17]));
+            (Sim::new(s), 0x0C08)
+        }
+        // Blade 15 Advanced (Early 2021), issue #7: older lighting commands, keyboard and lid logo.
+        "blade" => {
+            let mut s = SimState::new("SIMBLADE0001");
+            s.standard = true;
+            s.leds = vec![5, 4];
+            s.matrix = Some((6, 16, vec![[0; 3]; 6 * 16]));
+            (Sim::new(s), 0x026D)
+        }
+        // Base Station V2 Chroma, issue #6.
+        "base-station" => {
+            let mut s = SimState::new("SIMBASEST001");
+            s.leds = vec![0];
+            s.matrix = Some((1, 8, vec![[0; 3]; 8]));
+            (Sim::new(s), 0x0F20)
+        }
+        _ => return None,
+    })
+}
+
+/// Factory button assignments in the live slot and the saved slot, on both layers.
+fn with_buttons(s: &mut SimState, factory: &[(u8, u8, [u8; 5])]) {
+    for slot in [0, 1] {
+        for layer in [0, 1] {
+            for &(id, function, data) in factory {
+                s.buttons.insert((slot, id, layer), (function, data));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -525,6 +852,264 @@ mod tests {
     }
 
     #[test]
+    fn dpi_stages_round_trip_and_move_the_mouse() {
+        use crate::features::DpiStages;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let read = dev.dpi_stages().unwrap();
+        assert_eq!(read, DpiStages { active: 2, stages: vec![(400, 400), (800, 800), (1000, 1000), (1300, 1300), (6400, 6400)] });
+
+        let want = DpiStages { active: 3, stages: vec![(450, 450), (1234, 1234), (30000, 26050)] };
+        let sent = dev.set_dpi_stages(&want).unwrap();
+        assert_eq!(sent.stages, [(450, 450), (1250, 1250), (26000, 26000)], "snapped to the 26000 max");
+        assert_eq!(dev.dpi_stages().unwrap(), sent);
+        assert_eq!(dev.dpi().unwrap(), (26000, 26000), "mouse moved to the active stage");
+
+        for bad in [
+            DpiStages { active: 1, stages: vec![] },
+            DpiStages { active: 1, stages: vec![(800, 800); 6] },
+            DpiStages { active: 0, stages: vec![(800, 800)] },
+            DpiStages { active: 2, stages: vec![(800, 800)] },
+        ] {
+            assert!(matches!(dev.set_dpi_stages(&bad), Err(Error::InvalidArg(_))), "{bad:?}");
+        }
+        assert_eq!(dev.dpi_stages().unwrap(), sent, "rejected stages never reach the mouse");
+    }
+
+    #[test]
+    fn dpi_stages_follow_profiles() {
+        use crate::features::DpiStages;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let mut store = crate::Store::default();
+        let stages = DpiStages { active: 1, stages: vec![(500, 500), (1500, 1500)] };
+        // A store with no path can't save; record by hand what actions::set_dpi_stages would.
+        let p = store.for_device(&dev).active_mut();
+        p.dpi_stages = Some(stages.clone());
+        let failures: Vec<_> = p.apply(&dev).into_iter().filter(|a| a.result.is_err()).collect();
+        assert!(failures.is_empty(), "{failures:?}");
+        assert_eq!(dev.dpi_stages().unwrap(), stages);
+        assert_eq!(dev.dpi().unwrap(), (500, 500));
+    }
+
+    #[test]
+    fn sleep_timer_limits_and_switch() {
+        // Wired mouse: no sleep timer.
+        let wired = open(&Sim::mouse(), MOUSE_PID);
+        assert_eq!(wired.sleep_timer().unwrap(), None);
+        assert!(wired.set_sleep_minutes(5).is_err());
+
+        // Wireless mouse without the switch: 1-15 minutes.
+        let sim = Sim::wireless_mouse();
+        let dev = open(&sim, WIRELESS_MOUSE_PID);
+        let t = dev.sleep_timer().unwrap().unwrap();
+        assert_eq!((t.minutes, t.max_minutes, t.auto_sleep), (5, 15, None));
+        dev.set_sleep_minutes(15).unwrap();
+        assert_eq!(sim.state().idle_seconds, Some(900));
+        assert!(matches!(dev.set_sleep_minutes(16), Err(Error::InvalidArg(_))));
+        assert!(matches!(dev.set_sleep_minutes(0), Err(Error::InvalidArg(_))));
+        assert!(dev.set_auto_sleep(false).is_err(), "no switch on this mouse");
+
+        // Naga with the switch: up to 60 minutes, and sleeping can be turned off.
+        let sim = Sim::naga();
+        let dev = open(&sim, NAGA_PID);
+        let t = dev.sleep_timer().unwrap().unwrap();
+        assert_eq!((t.minutes, t.max_minutes, t.auto_sleep), (3, 60, Some(true)));
+        dev.set_sleep_minutes(45).unwrap();
+        dev.set_auto_sleep(false).unwrap();
+        assert_eq!(dev.sleep_timer().unwrap().unwrap().auto_sleep, Some(false));
+        assert_eq!(sim.state().idle_seconds, Some(2700));
+    }
+
+    #[test]
+    fn effects_are_sent_and_follow_profiles() {
+        use crate::effects::Effect;
+        use crate::profile::DeviceProfiles;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        dev.set_effect(4, &"wave:left@5".parse().unwrap()).unwrap();
+        assert_eq!(sim.state().effects[&4], [4, 2, 15, 0]);
+        dev.set_effect(1, &"breathing:FF0000,0000FF".parse().unwrap()).unwrap();
+        assert_eq!(sim.state().effects[&1], [2, 2, 0, 2, 0xFF, 0, 0, 0, 0, 0xFF]);
+        assert!(dev.set_effect(7, &Effect::Spectrum).is_err(), "unknown zone");
+
+        let mut p = DeviceProfiles::default();
+        p.create("Party").unwrap();
+        let zone = p.profiles.get_mut("Party").unwrap().lighting.entry("logo".into()).or_default();
+        zone.color = Some(Rgb(0, 0xFF, 0));
+        zone.effect = Some(Effect::Spectrum);
+        assert!(p.apply("Party", &dev).iter().all(|a| a.result.is_ok()));
+        assert_eq!(sim.state().effects[&4], [3, 0, 0, 0], "the effect wins over the static color");
+
+        let old = open(&Sim::old_keyboard(), OLD_KEYBOARD_PID);
+        assert!(matches!(old.set_effect(5, &Effect::Spectrum), Err(Error::Unsupported(_))));
+    }
+
+    #[test]
+    fn macros_are_stored_listed_read_and_deleted() {
+        use crate::buttons::{Action, Layer, MacroPlay};
+        use crate::macros::Script;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        assert!(dev.macros().unwrap().is_empty());
+        let free = dev.macro_storage().unwrap().free_bytes;
+
+        // Long enough to need several 72-byte data reports.
+        let text = (0..30).map(|i| format!("tap:{} wait:{}", (b'a' + i % 26) as char, 20 + i)).collect::<Vec<_>>().join(" ");
+        let script: Script = text.parse().unwrap();
+        let first = dev.create_macro("Long one", &script.0).unwrap();
+        let second = dev.create_macro("Copy ✓", &"tap:ctrl+c".parse::<Script>().unwrap().0).unwrap();
+        assert_eq!((first, second), (1, 2), "lowest free ids");
+
+        let list = dev.macros().unwrap();
+        assert_eq!(list.iter().map(|m| m.name.as_str()).collect::<Vec<_>>(), ["Long one", "Copy ✓"]);
+        assert_eq!(dev.macro_steps(first).unwrap(), script.0);
+        assert_eq!(Script(dev.macro_steps(second).unwrap()).to_string(), "down:ctrl tap:c up:ctrl");
+        assert!(dev.macro_storage().unwrap().free_bytes < free);
+
+        // A button plays it.
+        let play = Action::Macro { id: second, play: MacroPlay::WhileHeld };
+        assert!(dev.set_button(5, Layer::Normal, play).unwrap());
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), play);
+
+        dev.delete_macro(first).unwrap();
+        assert_eq!(dev.macro_ids().unwrap(), [second]);
+        assert!(dev.macro_storage().unwrap().recyclable_bytes > 0);
+        assert_eq!(dev.create_macro("Reuses id 1", &script.0).unwrap(), 1);
+        assert!(dev.create_macro("  ", &script.0).is_err(), "needs a name");
+    }
+
+    #[test]
+    fn macro_too_big_for_memory_is_refused_before_writing() {
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let huge = vec![crate::macros::Step::Delay(10); 50_000];
+        assert!(matches!(dev.create_macro("Huge", &huge), Err(Error::InvalidArg(_))));
+        assert!(sim.state().macros.as_ref().unwrap().is_empty());
+        let kb = open(&Sim::keyboard(), KEYBOARD_PID);
+        assert!(kb.macro_storage().is_err(), "devices without macro memory say so");
+    }
+
+    #[test]
+    fn last_left_click_is_kept_and_everything_can_be_restored() {
+        use crate::buttons::{Action, Layer};
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let dir = std::env::temp_dir().join(format!("secbird-restore-{}", std::process::id()));
+        let mut store = crate::Store::load(&dir.join("profiles.json")).unwrap();
+        let middle: Action = "middle".parse().unwrap();
+        let err = crate::actions::set_button(&dev, &mut store, "left", Layer::Normal, Some(middle)).unwrap_err();
+        assert!(err.to_string().contains("only left click"), "{err}");
+        assert_eq!(dev.button(1, Layer::Normal).unwrap(), Action::Mouse(1));
+
+        // With another left click it's allowed; HyperShift is never blocked.
+        let left: Action = "left".parse().unwrap();
+        crate::actions::set_button(&dev, &mut store, "side-back", Layer::Normal, Some(left)).unwrap();
+        crate::actions::set_button(&dev, &mut store, "left", Layer::Normal, Some(middle)).unwrap();
+        crate::actions::set_button(&dev, &mut store, "left", Layer::HyperShift, Some(middle)).unwrap();
+        assert_eq!(store.for_device(&dev).active().buttons.len(), 3);
+
+        assert_eq!(crate::actions::restore_all_buttons(&dev, &mut store).unwrap(), 3);
+        assert_eq!(dev.button(1, Layer::Normal).unwrap(), Action::Mouse(1));
+        assert_eq!(dev.button(4, Layer::Normal).unwrap(), Action::Mouse(4));
+        assert!(store.for_device(&dev).active().buttons.is_empty(), "remaps forgotten, not re-applied later");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn every_preset_opens_with_its_real_spec() {
+        let db = crate::db::Db::builtin().unwrap();
+        for name in PRESETS {
+            let (sim, pid) = preset(name).unwrap();
+            let spec = Sim::spec_for(pid).or_else(|| db.get(pid).cloned());
+            assert!(spec.is_some(), "{name}: no spec");
+            let mut dev = sim.open(pid, spec).unwrap_or_else(|| panic!("{name} doesn't answer"));
+            dev.identify_docked_mouse(&db);
+            for led in dev.spec.clone().unwrap().leds {
+                dev.set_static_color(led.id, Rgb(1, 2, 3)).unwrap_or_else(|e| panic!("{name} {}: {e}", led.name));
+            }
+            if let Some(m) = dev.matrix() {
+                let frame = vec![Rgb(9, 9, 9); m.rows as usize * m.cols as usize];
+                dev.show_frame(&frame).unwrap_or_else(|e| panic!("{name} keys: {e}"));
+            }
+        }
+        let (sim, pid) = preset("dock").unwrap();
+        let mut dock = sim.open(pid, db.get(pid).cloned()).unwrap();
+        dock.identify_docked_mouse(&db);
+        assert_eq!(dock.name(), "Basilisk V3 Pro on Mouse Dock Pro");
+        assert_eq!(dock.polling_rate().unwrap(), 1000);
+    }
+
+    #[test]
+    fn naga_side_grid_is_listed_and_remappable() {
+        use crate::buttons::{button_id, Action, Layer};
+        let sim = Sim::mouse();
+        // Factory grid keys 1-9, 0, -, = (Synapse's SPAD_NUM_1-12 defaults).
+        let usages = [0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2D, 0x2E];
+        for (i, usage) in usages.into_iter().enumerate() {
+            for slot in [0, 1] {
+                for layer in [0, 1] {
+                    sim.state().buttons.insert((slot, 64 + i as u8, layer), (2, [0, usage, 0, 0, 0]));
+                }
+            }
+        }
+        let dev = open(&sim, MOUSE_PID);
+        let ids: Vec<u8> = dev.buttons().iter().map(|b| b.0).collect();
+        assert_eq!(ids, [1, 2, 3, 4, 5, 14, 15, 52, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 96]);
+        let labels: Vec<String> = dev.buttons().iter().filter(|b| b.0 >= 64 && b.0 <= 75).map(|b| b.1.to_string()).collect();
+        assert_eq!(labels, ["key:1", "key:2", "key:3", "key:4", "key:5", "key:6", "key:7", "key:8", "key:9", "key:0", "key:minus", "key:equal"]);
+
+        let grid12 = button_id("grid-12").unwrap();
+        assert_eq!(grid12, 75);
+        let f5: Action = "key:f5".parse().unwrap();
+        assert!(dev.set_button(grid12, Layer::HyperShift, f5).unwrap());
+        assert_eq!(dev.button(grid12, Layer::HyperShift).unwrap(), f5);
+        dev.reset_button(grid12, Layer::HyperShift).unwrap();
+        assert_eq!(dev.button(grid12, Layer::HyperShift).unwrap().to_string(), "key:equal");
+    }
+
+    /// A Mouse Dock Pro answering for a docked Basilisk V3 Pro, shaped like issue #6's report.
+    fn docked_basilisk() -> (Sim, Device, crate::db::Db) {
+        let mut s = SimState::new("PM2400000076");
+        s.dpi = Some((950, 950));
+        s.battery = Some(0xF3);
+        s.polling_hs = Some(0x08);
+        s.leds = vec![1, 4, 10];
+        s.paired = vec![(true, 0x00AB)];
+        let sim = Sim::new(s);
+        let db = crate::db::Db::builtin().unwrap();
+        let dev = sim.open(0x00A4, db.get(0x00A4).cloned()).unwrap();
+        (sim, dev, db)
+    }
+
+    #[test]
+    fn mouse_dock_pro_controls_the_docked_mouse() {
+        let (_sim, mut dev, db) = docked_basilisk();
+        dev.identify_docked_mouse(&db);
+        assert_eq!(dev.name(), "Basilisk V3 Pro on Mouse Dock Pro");
+        assert_eq!(dev.key(), "00A4:PM2400000076", "profiles stay with the dock");
+        assert_eq!(dev.battery().unwrap(), Some(95));
+        assert_eq!(dev.polling_rate().unwrap(), 1000);
+        dev.set_polling_rate(500).unwrap();
+        assert_eq!(dev.polling_rate().unwrap(), 500);
+        assert_eq!(dev.set_dpi(31000, 31000).unwrap(), (30000, 30000));
+        let leds: Vec<u8> = dev.spec.as_ref().unwrap().leds.iter().map(|l| l.id).collect();
+        assert_eq!(leds, [4, 1]);
+    }
+
+    #[test]
+    fn mouse_dock_pro_keeps_generic_entry_when_mouse_is_unknown() {
+        for paired in [vec![], vec![(false, 0x00AB)], vec![(true, 0x00FF)], vec![(true, 0x0099)]] {
+            let (sim, mut dev, db) = docked_basilisk();
+            sim.state().paired = paired.clone();
+            dev.identify_docked_mouse(&db);
+            assert_eq!(dev.name(), "Mouse on Mouse Dock Pro", "{paired:?}");
+            assert_eq!(dev.battery().unwrap(), Some(95));
+            assert_eq!(dev.polling_rate().unwrap(), 1000);
+        }
+    }
+
+    #[test]
     fn wireless_reports_battery() {
         let dev = open(&Sim::wireless_mouse(), WIRELESS_MOUSE_PID);
         assert_eq!(dev.battery().unwrap(), Some(75));
@@ -590,8 +1175,8 @@ mod tests {
         let sim = Sim::mouse();
         let dev = open(&sim, MOUSE_PID);
         let mut p = Profile { dpi: Some((3200, 3200)), polling: Some(125), ..Default::default() };
-        p.lighting.insert("logo".into(), Zone { color: Some(Rgb(255, 0, 0)), off: false, brightness: Some(100) });
-        p.lighting.insert("underglow".into(), Zone { color: None, off: true, brightness: None });
+        p.lighting.insert("logo".into(), Zone { color: Some(Rgb(255, 0, 0)), off: false, brightness: Some(100), effect: None });
+        p.lighting.insert("underglow".into(), Zone { color: None, off: true, brightness: None, effect: None });
         let results = p.apply(&dev);
         assert!(results.iter().all(|r| r.result.is_ok()), "{:?}", results.iter().map(|r| &r.result).collect::<Vec<_>>());
         let s = sim.state();

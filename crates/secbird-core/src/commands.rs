@@ -16,9 +16,46 @@ pub const BACKLIGHT_LED: u8 = 0x05;
 pub const FIRMWARE: Command = Command::new(0x00, 0x01);
 pub const FIRMWARE_SIZE: u8 = 0x02;
 
+/// Full firmware version: `[major, minor, internal, reserved]`, the form Razer's firmware
+/// manifests use (2.50.3.0). GET only.
+pub const FIRMWARE_EXT: Command = Command::new(0x00, 0x07);
+pub const FIRMWARE_EXT_SIZE: u8 = 0x04;
+
 /// Serial number: 22 ASCII bytes. Verified (Basilisk V3).
 pub const SERIAL: Command = Command::new(0x00, 0x02);
 pub const SERIAL_SIZE: u8 = 0x16;
+
+/// Mice paired to a receiver or dock: `[count, (connected, pid_hi, pid_lo) * count]`.
+/// Layout from PR #2 (verified on a HyperPolling dongle); not yet seen on a Mouse Dock Pro.
+pub const WIRELESS_DEVICES: Command = Command::new(0x00, 0x3F);
+pub const WIRELESS_DEVICES_SIZE: u8 = 0x50;
+
+/// On-device macros (class 06, from Synapse's obmEngine). Ids, offsets and sizes are big-endian.
+/// Storage: GET only, `[max_id u16, max_memory u32, available u32, recyclable u32]`.
+pub const MACRO_STORAGE: Command = Command::new(0x06, 0x0E);
+pub const MACRO_STORAGE_SIZE: u8 = 0x0E;
+/// Number of macros on the device: GET only, `[count u16]`.
+pub const MACRO_COUNT: Command = Command::new(0x06, 0x00);
+pub const MACRO_COUNT_SIZE: u8 = 0x02;
+/// Macro ids: GET `[offset u16, count u16, ids u16...]`, asked with `2 * n + 4` bytes.
+pub const MACRO_IDS: Command = Command::new(0x06, 0x0B);
+pub const MACRO_IDS_SIZE: u8 = 0x50;
+/// Reserve room for a macro, which also creates it: SET `[id u16, size u32]`.
+pub const MACRO_ALLOCATE: Command = Command::new(0x06, 0x08);
+pub const MACRO_ALLOCATE_SIZE: u8 = 0x06;
+/// Macro events: `[id u16, offset u32, len, data...]`, at most 72 bytes per report.
+pub const MACRO_DATA: Command = Command::new(0x06, 0x09);
+pub const MACRO_DATA_SIZE: u8 = 0x50;
+pub const MACRO_DATA_CHUNK: usize = 72;
+/// 250-byte macro header (guid, item count, name): `[id u16, offset u16, 250 u16, data...]`,
+/// at most 64 bytes per report.
+pub const MACRO_NAME: Command = Command::new(0x06, 0x0C);
+pub const MACRO_NAME_SIZE: u8 = 0x50;
+pub const MACRO_NAME_CHUNK: usize = 64;
+pub const MACRO_HEADER_LEN: usize = 250;
+/// Delete a macro: SET `[id u16]`.
+pub const MACRO_DELETE: Command = Command::new(0x06, 0x03);
+pub const MACRO_DELETE_SIZE: u8 = 0x02;
 
 /// Device mode: `[mode, param]`; 0x00 = normal, 0x03 = driver mode.
 pub const DEVICE_MODE: Command = Command::new(0x00, 0x04);
@@ -35,6 +72,22 @@ pub const POLLING_HS_SIZE: u8 = 0x02;
 /// Active DPI: `[store, x_hi, x_lo, y_hi, y_lo, 0, 0]`. GET verified (Basilisk V3).
 pub const DPI: Command = Command::new(0x04, 0x05);
 pub const DPI_SIZE: u8 = 0x07;
+
+/// DPI stages: `[store, active (1-based), count, count x (id, x_hi, x_lo, y_hi, y_lo, 0, 0)]`.
+/// SET sends `7 * count + 3` bytes with ids 0-based; GET answers them 1-based (Synapse
+/// checks `sent + 1 == read`). GET verified (Basilisk V3 and user reports).
+pub const DPI_STAGES: Command = Command::new(0x04, 0x06);
+pub const DPI_STAGES_SIZE: u8 = 0x26;
+pub const MAX_DPI_STAGES: usize = 5;
+
+/// Seconds idle before a wireless device sleeps: `[hi, lo]`. GET seen in user reports.
+pub const IDLE_TIME: Command = Command::new(0x07, 0x03);
+pub const IDLE_TIME_SIZE: u8 = 0x02;
+
+/// Auto-sleep switch: `[0, enabled]`. Only some devices have it; on those Synapse allows
+/// idle times up to 60 minutes.
+pub const AUTO_SLEEP: Command = Command::new(0x07, 0x08);
+pub const AUTO_SLEEP_SIZE: u8 = 0x02;
 
 /// Battery level: reply `[_, level 0..=255]`.
 pub const BATTERY: Command = Command::new(0x07, 0x00);

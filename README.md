@@ -12,8 +12,8 @@ Synapse's background services, account, ads, pop-ups or restart prompts.
   applies your settings when you sign in, plug a device in or wake the PC.
 - **Built for many devices:** one screen for all of them, and one click to sync a color everywhere.
 
-> **Beta.** Only the Basilisk V3 has been tested on real hardware so far. Other devices are
-> supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
+> **Beta.** Only the Basilisk V3 is tested by us on real hardware; a few more are confirmed by
+> users (see below). Other devices are supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
 
 ### [⬇ Download for Windows](https://github.com/infinityInfinite/secbird/releases/latest)
 
@@ -53,18 +53,34 @@ and run `secbird-tray.exe`.
 - **Tray icon:** switch profiles per device, re-apply settings, Start with Windows. Hover it to see
   each device's profile and battery.
 - **Editor:** opens in your browser but runs only on your PC (`127.0.0.1`), protected by a
-  one-time key. Each device is one sheet: settings are rows, your profiles are columns, and the
-  active profile is lit. Click any cell to change it: colors and brightness per zone, DPI, polling
-  rate, buttons, and paint-by-key on keyboards with per-key lighting.
+  one-time key. Made to be quick mid-game: it opens on the live profile, with your profiles in a
+  switcher on top; pick a section (Lighting, Sensitivity, Buttons, Macros, Power, Profile,
+  Device), click a tile, change it in the side panel. Nothing scrolls on a desktop window, even
+  a Naga with all its side buttons. Compare shows every profile side by side. Six themes
+  (Bridge, Roast, Classic, Light, Workshop, Neon), or Auto to follow Windows.
+- **Lighting:** colors and brightness per zone, per-key painting on per-key keyboards, and the
+  effects the device runs itself (spectrum, wave, breathing, reactive, starlight; each device
+  only has some of them). Verified on the Basilisk V3 (spectrum, wave).
+- **Sensitivity:** DPI, the DPI stages the DPI button cycles through, and polling rate. DPI stages
+  verified on the Basilisk V3.
 - **Button remapping** (mice with on-board button memory): keys and shortcuts, turbo, sniper/DPI
   clutch, DPI and profile buttons, media keys, double click, disable, and a **HyperShift** layer for
   a second function while a HyperShift button is held. Changes go to the mouse's live memory, so
-  what Synapse or the factory saved stays put, and Reset brings it back. Verified on the Basilisk V3.
+  what Synapse or the factory saved stays put. Every change has Undo, **Restore all** puts every
+  button back (also in the tray menu, which works from the keyboard), and the app won't let you
+  remap away your last left click. Verified on the Basilisk V3. Naga side buttons (12-button grid
+  and 6-button plate) included.
+- **Macros** stored on the device: keys, shortcuts, mouse buttons, wheel and delays, typed as steps
+  or recorded in the editor. Play one from any button once, several times, while held, or as a
+  toggle; it runs without Secretarybird open. Macros made in Synapse show up too. Verified on
+  the Basilisk V3.
+- **Firmware check:** asks Razer's public product page whether newer firmware is out and links to
+  Razer's updater (on request, or weekly if you turn it on in the tray). Nothing is installed.
 - **Popups:** a small popup above the clock when you change DPI with the mouse's button, switch
   its on-board profile, or when a per-app profile kicks in. The editor follows DPI changes too.
 - **Profiles** are saved per physical device, so two identical mice keep their own settings.
   Back them up with `secbird export backup.json`.
-- **Per-app profiles:** tie a profile to games or apps (in its column header in the editor, or
+- **Per-app profiles:** tie a profile to games or apps (the Profile section in the editor, or
   `secbird profile apps Gaming cs2.exe`). It switches while that program is in front and goes
   back when you leave it, button remaps included. Windows tells the tray when the window in front
   changes, so nothing polls.
@@ -87,8 +103,17 @@ secbird list                    connected devices
 secbird info                    firmware, serial, DPI, polling rate, battery
 secbird dpi 1600                set DPI
 secbird poll 1000               set polling rate
+secbird stages 400 800 1600 --use 2
+                                DPI stages the DPI button cycles through
+secbird sleep 10                wireless: sleep after 10 minutes idle
+secbird macro new Copy "tap:ctrl+c"
+                                store a macro on the device
+secbird button side-back macro:1
+                                play it from a button
 secbird color logo FF8800       static color for a zone
+secbird effect logo spectrum    built-in effect: spectrum, wave, breathing, reactive, starlight
 secbird keys 00FFAA             every key one color (per-key keyboards)
+secbird firmware                is newer firmware out? (links to Razer's updater)
 secbird sync 00FFAA             same color on every device
 secbird profile new gaming      profiles per device
 secbird profile apps gaming cs2.exe   switch to a profile while a program is in front
@@ -114,14 +139,15 @@ Drivers are never touched.
 
 ## Help us support your device
 
-Run `secbird report` and [open a device report](https://github.com/infinityInfinite/secbird/issues/new?template=device-report.yml),
+Right-click the tray icon → **Make a device report…** (it copies the report and opens the form), or
+run `secbird report` and [open a device report](https://github.com/infinityInfinite/secbird/issues/new?template=device-report.yml),
 saying what works and what doesn't. The report only reads from your devices and shortens serial
 numbers. Reports are how devices move from "listed" to "verified".
 
 | Status | Devices |
 |---|---|
-| Verified on real hardware | Basilisk V3 (ours), Cobra wired ([report](https://github.com/infinityInfinite/secbird/issues/1)) |
-| Reported working by users | Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
+| Verified on real hardware | Basilisk V3 (ours), Cobra wired ([report](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([report](https://github.com/infinityInfinite/secbird/issues/4)) |
+| Reported working by users | Naga V2 HyperSpeed (main buttons; [report](https://github.com/infinityInfinite/secbird/issues/8)), Basilisk X HyperSpeed (2.4 GHz dongle), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
 | Listed, waiting for reports | 268 more mice, keyboards, keypads, mousepads, laptops and accessories |
 | Not supported yet | Kraken headsets, laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
 
@@ -147,7 +173,7 @@ portable zip and checksums on GitHub into a draft release.
 To try the editor without hardware, start the tray with simulated devices:
 
 ```
-$env:SECBIRD_SIM="mouse,wireless,keyboard,old-keyboard"
+$env:SECBIRD_SIM="all"   # or a list, e.g. "naga,blackwidow,blade,firefly,dock"
 .\target\release\secbird-tray.exe
 ```
 
