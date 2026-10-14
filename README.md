@@ -43,9 +43,9 @@ and run `secbird-tray.exe`.
 
 ## Using it
 
-![A mouse with three profiles side by side](docs/mouse.png)
+![A Naga with six profiles side by side in Compare](docs/mouse.png)
 
-| Remapping a button | Keyboard, per-key |
+| Naga side grid, a button playing a macro | Keyboard, per-key |
 |---|---|
 | ![Button editor](docs/buttons.png) | ![Keyboard page](docs/keyboard.png) |
 
