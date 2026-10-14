@@ -69,6 +69,28 @@ const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("idle time", Command::new(0x07, 0x83), 0x02, &[]),
 ];
 
+/// Laptop fan and power reads (Synapse's thermal module, class 0D, and power class 07), for
+/// Blades and devices not in the database. Read-only like the rest: fan ids are 1 (CPU) and
+/// 2 (GPU), the first argument is Synapse's "class id", always 0.
+const LAPTOP_PROBES: &[(&str, Command, u8, &[u8])] = &[
+    ("fan ids", Command::new(0x0D, 0x80), 0x50, &[]),
+    ("fan 1 mode", Command::new(0x0D, 0x82), 0x04, &[0, 1]),
+    ("fan 2 mode", Command::new(0x0D, 0x82), 0x04, &[0, 2]),
+    ("fan 1 speed setting", Command::new(0x0D, 0x81), 0x03, &[0, 1]),
+    ("fan 2 speed setting", Command::new(0x0D, 0x81), 0x03, &[0, 2]),
+    ("fan 1 current speed", Command::new(0x0D, 0x88), 0x03, &[0, 1]),
+    ("fan 2 current speed", Command::new(0x0D, 0x88), 0x03, &[0, 2]),
+    ("advanced fan mode", Command::new(0x0D, 0x87), 0x03, &[0, 1]),
+    ("cooling mode", Command::new(0x0D, 0x90), 0x03, &[0]),
+    ("fan duty cycle", Command::new(0x0D, 0x8B), 0x02, &[]),
+    ("gpu mode", Command::new(0x0D, 0x89), 0x02, &[]),
+    ("sku", Command::new(0x0D, 0x8F), 0x01, &[]),
+    ("cpu boost / power mode", Command::new(0x07, 0x8F), 0x01, &[]),
+    ("charge limiter", Command::new(0x07, 0x92), 0x01, &[]),
+    ("adapter wattage", Command::new(0x07, 0x8C), 0x02, &[]),
+    ("smart illumination", Command::new(0x07, 0x93), 0x03, &[]),
+];
+
 /// LED ids tried with a brightness GET. Razer uses 0x00-0x14 across its products.
 const LED_IDS: std::ops::RangeInclusive<u8> = 0x00..=0x14;
 
@@ -112,8 +134,10 @@ pub fn build(api: &HidApi, db: &Db) -> Report {
 
 /// Send every read-only probe to one device.
 pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
+    let laptop = dev.spec.as_ref().is_none_or(|s| s.kind == crate::Kind::Laptop);
     let probes = PROBES
         .iter()
+        .chain(LAPTOP_PROBES.iter().filter(|_| laptop))
         .map(|&(name, command, size, args)| {
             let (status, reply) = match dev.transact(command, size, args) {
                 Ok(r) => ("ok".to_string(), hex(&r.args()[..size as usize])),
@@ -226,6 +250,16 @@ mod tests {
         let k = report_for(&Sim::keyboard(), KEYBOARD_PID);
         assert_eq!(k.leds, [5]);
         assert_eq!(status(&k, "dpi"), "NotSupported");
+    }
+
+    #[test]
+    fn laptop_probes_only_for_laptops_and_unknown_devices() {
+        let has_fans = |r: &DeviceReport| r.probes.iter().any(|p| p.name == "fan 1 mode");
+        assert!(!has_fans(&report_for(&Sim::mouse(), MOUSE_PID)));
+        let sim = Sim::mouse();
+        let unknown = probe(&sim.open(MOUSE_PID, None).unwrap(), true);
+        assert!(has_fans(&unknown), "a new Blade isn't in the database yet");
+        assert!(sim.state().log.iter().all(|c| c.id & 0x80 != 0), "still only GET commands");
     }
 
     #[test]

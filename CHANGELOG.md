@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3] - 2026-10-14
+
+### Changed
+- Device reports without a terminal: tray menu → "Make a device report…" copies the report and
+  opens the GitHub form; paste it in.
+- `secbird report` on Razer Blade laptops (and devices not in the list) also reads fan,
+  performance, GPU and battery-limit settings, so owners' reports show what fan and power
+  controls need. Still read-only: a report changes nothing on the device.
+
 ## [0.3.2] - 2026-10-14
 
 ### Fixed

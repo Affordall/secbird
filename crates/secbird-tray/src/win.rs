@@ -26,6 +26,8 @@ const WM_TRAY: u32 = WM_APP + 1;
 const WM_OPEN_EDITOR: u32 = WM_APP + 2;
 /// Sent by a listener thread: device events are waiting in `App::events`.
 const WM_DEVICE_EVENT: u32 = WM_APP + 3;
+/// Sent by the report thread: `wparam` is 1 when the report is on the clipboard.
+const WM_REPORT_READY: u32 = WM_APP + 4;
 const CLASS_NAME: &str = "SecretarybirdTray";
 const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
@@ -47,6 +49,7 @@ const ID_FOLDER: u32 = 2;
 const ID_AUTOSTART: u32 = 3;
 const ID_EXIT: u32 = 4;
 const ID_EDITOR: u32 = 5;
+const ID_REPORT: u32 = 6;
 const ID_PROFILE_BASE: u32 = 1000;
 
 const GUID_DEVINTERFACE_HID: GUID = GUID::from_u128(0x4d1e55b2_f16f_11cf_88cb_001111000030);
@@ -233,6 +236,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_DEVICE_EVENT => {
             with_app(|app| app.device_events());
+            0
+        }
+        WM_REPORT_READY => {
+            with_app(|app| {
+                if wparam == 1 {
+                    app.balloon(
+                        "Device report copied",
+                        "Paste it (Ctrl+V) into \"Output of secbird report\" on the page that just opened. It only holds read results; serial numbers are shortened.",
+                    )
+                } else {
+                    app.balloon("Could not copy the device report", "Run `secbird report` in a terminal instead.")
+                }
+            });
             0
         }
         WM_DEVICECHANGE => {
@@ -513,6 +529,24 @@ impl App {
         }
     }
 
+    /// Build `secbird report` (a few seconds of read-only USB requests) on a background
+    /// thread, put it on the clipboard and open the GitHub device report form.
+    fn make_report(&mut self) {
+        let engine = self.engine.clone();
+        let hwnd = self.hwnd as usize;
+        std::thread::spawn(move || {
+            let text = engine.lock().unwrap_or_else(|p| p.into_inner()).report_text();
+            let copied = set_clipboard(&text);
+            if copied {
+                let url = concat!(env!("CARGO_PKG_REPOSITORY"), "/issues/new?template=device-report.yml");
+                unsafe {
+                    ShellExecuteW(null_mut(), wide("open").as_ptr(), wide(url).as_ptr(), null(), null(), SW_SHOWNORMAL);
+                }
+            }
+            unsafe { PostMessageW(hwnd as HWND, WM_REPORT_READY, copied as usize, 0) };
+        });
+    }
+
     /// Build the popup menu and remember which item maps to which profile.
     unsafe fn build_menu(&mut self) -> HMENU {
         let menu = CreatePopupMenu();
@@ -538,6 +572,7 @@ impl App {
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
         append(menu, MF_STRING, ID_REAPPLY as usize, "Re-apply profiles");
         append(menu, MF_STRING, ID_FOLDER as usize, "Open settings folder");
+        append(menu, MF_STRING, ID_REPORT as usize, "Make a device report…");
         let auto = if autostart_enabled() { MF_CHECKED } else { MF_UNCHECKED };
         append(menu, MF_STRING | auto, ID_AUTOSTART as usize, "Start with Windows");
         AppendMenuW(menu, MF_SEPARATOR, 0, null());
@@ -553,6 +588,7 @@ impl App {
             }
             ID_EDITOR => self.open_editor(),
             ID_FOLDER => open_config_folder(),
+            ID_REPORT => self.make_report(),
             ID_AUTOSTART => set_autostart(!autostart_enabled()),
             ID_EXIT => unsafe {
                 DestroyWindow(self.hwnd);
@@ -673,6 +709,42 @@ fn set_autostart(enable: bool) {
             RegDeleteValueW(key, wide(APP_NAME).as_ptr());
         }
         RegCloseKey(key);
+    }
+}
+
+/// Put text on the clipboard. False if another program holds it.
+fn set_clipboard(text: &str) -> bool {
+    use windows_sys::Win32::System::DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData};
+    use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    const CF_UNICODETEXT: u32 = 13;
+    let data = wide(&text.replace("\r\n", "\n").replace('\n', "\r\n"));
+    unsafe {
+        let mem = GlobalAlloc(GMEM_MOVEABLE, data.len() * 2);
+        if mem.is_null() {
+            return false;
+        }
+        let dst = GlobalLock(mem) as *mut u16;
+        if dst.is_null() {
+            GlobalFree(mem);
+            return false;
+        }
+        std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+        GlobalUnlock(mem);
+        // Retry briefly: clipboard managers open it for a moment after every change.
+        for _ in 0..10 {
+            if OpenClipboard(null_mut()) != 0 {
+                EmptyClipboard();
+                let ok = !SetClipboardData(CF_UNICODETEXT, mem).is_null();
+                CloseClipboard();
+                if !ok {
+                    GlobalFree(mem);
+                }
+                return ok;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        GlobalFree(mem);
+        false
     }
 }
 

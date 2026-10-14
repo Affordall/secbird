@@ -43,6 +43,13 @@ pub struct ApplyReport {
 }
 
 impl Engine {
+    /// The text of `secbird report`, for the tray's "Make a device report" item. Only reads.
+    pub fn report_text(&mut self) -> String {
+        let _ = self.api.refresh_devices();
+        let db = Db::load(Some(&config_dir().join("devices.json"))).unwrap_or_default();
+        secbird_core::report::build(&self.api, &db).to_string()
+    }
+
     pub fn new() -> Result<Self> {
         Ok(Self {
             api: HidApi::new()?,
