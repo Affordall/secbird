@@ -58,6 +58,29 @@ impl Device {
         }
     }
 
+    /// A HyperPolling dongle is its paired mouse's receiver: ask which mouse it reports and
+    /// label the device with that mouse, so the editor shows the mouse rather than the
+    /// dongle. The dongle keeps its own transport, capabilities and profile key — the
+    /// database entry for `00B3` describes the pair, and polling stays on the dongle's
+    /// `00:C0` command. If the answer is missing or isn't a mouse, keep the generic entry.
+    pub(crate) fn identify_hyperpolling_mouse(&mut self, db: &Db) {
+        if self.pid != HYPERPOLLING_DONGLE {
+            return;
+        }
+        let Ok(reply) = self.get(cmd::WIRELESS_DEVICES, cmd::WIRELESS_DEVICES_SIZE, &[]) else { return };
+        let Some(pid) = connected_mouse_pid(reply.args()) else { return };
+        let Some(mouse) = db.get(pid).filter(|s| s.kind == Kind::Mouse) else { return };
+        if let Some(spec) = &mut self.spec {
+            spec.name = format!("{} (via HyperPolling)", mouse.name.trim_end_matches(" (Wireless)"));
+        }
+    }
+
+    /// Receivers answer for the device they pair with, so label the one they report.
+    pub(crate) fn identify_receiver(&mut self, db: &Db) {
+        self.identify_docked_mouse(db);
+        self.identify_hyperpolling_mouse(db);
+    }
+
     /// Send one command and wait for its reply. `size` is the argument length the
     /// device expects for this command.
     pub fn transact(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
@@ -97,6 +120,9 @@ fn parse_serial(args: &[u8]) -> String {
 }
 
 const MOUSE_DOCK_PRO: u16 = 0x00A4;
+
+/// The HyperPolling wireless dongle. It answers for the mouse paired to it.
+pub(crate) const HYPERPOLLING_DONGLE: u16 = 0x00B3;
 
 /// Mice that pair with the Mouse Dock Pro (Synapse's `DualDongleCompatibleDevices.json`).
 const DOCK_PRO_MICE: [u16; 11] =
@@ -172,7 +198,7 @@ pub fn candidates(api: &HidApi) -> Vec<Candidate> {
 pub fn discover(api: &HidApi, db: &Db) -> Vec<Device> {
     let mut found = discover_hid(api, db);
     for dev in &mut found {
-        dev.identify_docked_mouse(db);
+        dev.identify_receiver(db);
     }
     found.extend(crate::sim::from_env());
     found

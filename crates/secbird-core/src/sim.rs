@@ -661,8 +661,8 @@ pub fn from_env() -> Vec<Device> {
 }
 
 /// Every preset `SECBIRD_SIM=all` loads.
-pub const PRESETS: [&str; 12] =
-    ["mouse", "wireless", "keyboard", "old-keyboard", "naga", "cobra", "dock", "blackwidow", "goliathus", "firefly", "blade", "base-station"];
+pub const PRESETS: [&str; 13] =
+    ["mouse", "wireless", "keyboard", "old-keyboard", "naga", "cobra", "dock", "hyperpolling", "blackwidow", "goliathus", "firefly", "blade", "base-station"];
 
 /// A simulated device by name. The later ones copy devices users reported, under their real
 /// product ids, so the editor treats them exactly as it treats the hardware.
@@ -700,6 +700,16 @@ pub fn preset(name: &str) -> Option<(Sim, u16)> {
                 (4, 1, [4, 0, 0, 0, 0]), (5, 1, [5, 0, 0, 0, 0]), (14, 7, [4, 0, 0, 0, 0]),
                 (15, 6, [5, 0x01, 0x90, 0x01, 0x90]), (52, 14, [0x68, 0, 0x14, 0, 0]), (53, 14, [0x69, 0, 0x14, 0, 0]), (96, 6, [6, 0, 0, 0, 0])]);
             (Sim::new(s), 0x00A4)
+        }
+        // HyperPolling dongle (00B3) with a DeathAdder V3 Pro paired to it.
+        "hyperpolling" => {
+            let mut s = SimState::new("PM2327H26600383");
+            s.dpi = Some((1600, 1600));
+            s.polling_hs = Some(0x04);
+            s.battery = Some(0xF3);
+            s.charging = false;
+            s.paired = vec![(true, 0x00B7)];
+            (Sim::new(s), 0x00B3)
         }
         // BlackWidow V4 75%, issue #6: per-key grid, high-speed polling, no DPI.
         "blackwidow" => {
@@ -1103,6 +1113,38 @@ mod tests {
         assert_eq!(dev.set_dpi(31000, 31000).unwrap(), (30000, 30000));
         let leds: Vec<u8> = dev.spec.as_ref().unwrap().leds.iter().map(|l| l.id).collect();
         assert_eq!(leds, [4, 1]);
+    }
+
+    #[test]
+    fn hyperpolling_dongle_names_its_mouse_and_writes_both_polling_selectors() {
+        let (sim, pid) = preset("hyperpolling").unwrap();
+        let db = crate::db::Db::builtin().unwrap();
+        let mut dev = sim.open(pid, db.get(pid).cloned()).unwrap();
+        dev.identify_receiver(&db);
+        assert_eq!(dev.name(), "DeathAdder V3 Pro (via HyperPolling)");
+        assert_eq!(dev.key(), "00B3:PM2327H26600383", "profiles stay with the dongle");
+        assert_eq!(dev.battery().unwrap(), Some(95));
+        assert_eq!(dev.polling_rate().unwrap(), 2000);
+
+        // Both the live (0x00) and the stored (0x01) selector, or the device comes back
+        // up at its old rate.
+        sim.state().log.clear();
+        dev.set_polling_rate(8000).unwrap();
+        assert_eq!(sim.state().log.iter().filter(|c| **c == cmd::POLLING_HS).count(), 2);
+        assert_eq!(dev.polling_rate().unwrap(), 8000);
+    }
+
+    #[test]
+    fn hyperpolling_dongle_keeps_its_entry_when_no_mouse_is_paired() {
+        let (sim, pid) = preset("hyperpolling").unwrap();
+        let db = crate::db::Db::builtin().unwrap();
+        let mut dev = sim.open(pid, db.get(pid).cloned()).unwrap();
+        for paired in [vec![], vec![(false, 0x00B7)], vec![(true, 0x00FF)], vec![(true, 0x02A7)]] {
+            sim.state().paired = paired.clone();
+            dev.identify_receiver(&db);
+            assert_eq!(dev.key(), "00B3:PM2327H26600383", "the key never changes");
+            assert_eq!(dev.name(), "HyperPolling Wireless Dongle", "{paired:?}");
+        }
     }
 
     #[test]

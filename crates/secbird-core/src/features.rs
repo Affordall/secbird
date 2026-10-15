@@ -188,6 +188,12 @@ impl Device {
             Polling::High => {
                 let code = cmd::polling_hs_code(hz).ok_or_else(unsupported)?;
                 self.transact(cmd::POLLING_HS, cmd::POLLING_HS_SIZE, &[0x00, code])?;
+                // The HyperPolling dongle keeps a live and a stored selector. Writing only
+                // the live one (0x00) leaves the rate the device comes up with unchanged, so
+                // both get the new code, as Synapse and OpenRazer do.
+                if self.pid == crate::device::HYPERPOLLING_DONGLE {
+                    self.transact(cmd::POLLING_HS, cmd::POLLING_HS_SIZE, &[0x01, code])?;
+                }
             }
         }
         Ok(())
