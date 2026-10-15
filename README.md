@@ -7,11 +7,11 @@ A small, lightweight replacement for Razer Synapse on Windows. Set your Razer mo
 keyboard and other peripherals: lighting, DPI, polling rate, button remapping and profiles, without
 Synapse's background services, account, ads, pop-ups or restart prompts.
 
-- **Light:** a 780 KB tray app using about 11 MB of RAM, next to the hundreds of MB Synapse keeps running.
+- **Light:** a 1 MB tray app using about 11 MB of RAM, next to the hundreds of MB Synapse keeps running.
 - **Quiet:** no services, no account, no telemetry. It sits in the tray and
   applies your settings when you sign in, plug a device in or wake the PC. The only time it goes
   online is a daily check for a new Secretarybird version, which you can turn off.
-- **Built for many devices:** one screen for all of them, and one click to sync a color everywhere.
+- **Built for many devices:** one screen for all of them, and one click to put a color or effect on every device, in step.
 
 > **Beta.** Only the Basilisk V3 is tested by us on real hardware; a few more are confirmed by
 > users (see below). Other devices are supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
@@ -151,10 +151,11 @@ numbers. Reports are how devices move from "listed" to "verified".
 
 | Status | Devices |
 |---|---|
-| Verified on real hardware | Basilisk V3 (ours), Cobra wired ([report](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([report](https://github.com/infinityInfinite/secbird/issues/4)) |
-| Reported working by users | Naga V2 HyperSpeed (main buttons; [report](https://github.com/infinityInfinite/secbird/issues/8)), Basilisk X HyperSpeed (2.4 GHz dongle), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
-| Listed, waiting for reports | 268 more mice, keyboards, keypads, mousepads, laptops and accessories |
-| Not supported yet | Kraken headsets, laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
+| Verified on real hardware | **Mice:** Basilisk V3 (ours), Cobra wired ([#1](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([#4](https://github.com/infinityInfinite/secbird/issues/4), [#13](https://github.com/infinityInfinite/secbird/issues/13)), Naga V2 HyperSpeed with side grid, battery and HyperShift ([#8](https://github.com/infinityInfinite/secbird/issues/8), [#11](https://github.com/infinityInfinite/secbird/issues/11)), Viper Ultimate wired and wireless ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Keyboards and keypads:** BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12)), Cynosa V2, Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Accessories:** Mouse Dock ([#14](https://github.com/infinityInfinite/secbird/issues/14)) |
+| Reported working by users | Basilisk X HyperSpeed (2.4 GHz dongle; [#10](https://github.com/infinityInfinite/secbird/issues/10)), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
+| Partly working | Basilisk V4 Pro on the Mouse Dock Pro: DPI, polling, sleep and most buttons work; its name and button list are fixed in the next version ([#16](https://github.com/infinityInfinite/secbird/issues/16)) |
+| Listed, waiting for reports | About 260 more mice, keyboards, keypads, mousepads, laptops and accessories, including the Basilisk V4 Pro, Basilisk V4 HyperSpeed and Naga V3 Pro |
+| Not supported yet | Headsets (Kraken, BlackShark V3; [#15](https://github.com/infinityInfinite/secbird/issues/15)), Bluetooth connections ([#10](https://github.com/infinityInfinite/secbird/issues/10)), laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
 
 "Reported working" means a user said so; a `secbird report` from them moves a device to verified.
 

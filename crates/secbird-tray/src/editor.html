@@ -8,36 +8,15 @@
 <style>
   /* Themes. Each sets every token; the accent means live, selected, changed or focused, and
      the value colour carries numbers. Auto follows Windows: Bridge when dark, Light when light. */
-  :root, :root[data-theme="bridge"] { --bg: #050505; --bar: #0d0d0e; --panel: #131314; --raise: #1b1b1d; --line: #242426; --line-strong: #4a4440; --text: #f4efe9; --muted: #b8aea3; --faint: #9c9287; --value: #ffb85d; --accent: #ff5412; --accent-text: #ff7a45; --lit: #ff541224; --lit-edge: #ff5412; --toast: #1b1b1d; --zone-off: #242426; --body-fill: #131314; --body-stroke: #3a3632; --button-fill: #1b1b1d; --key-fill: #1b1b1d; --key-stroke: #34312e; --key-text: #f4efe999; --warn-line: #ffb85d55; --warn-bg: #ffb85d14; --warn-text: #ffb85d; --err: #ff4a5a; --err-text: #ffb4bb; --shadow: 0 12px 32px -14px #000000e6; color-scheme: dark; }
-  :root[data-theme="roast"] { --bg: #150d05; --bar: #1e1007; --panel: #201002; --raise: #2b1909; --line: #3a2916; --line-strong: #64492b; --text: #f5e0d3; --muted: #b58754; --faint: #ad8150; --value: #e2aa6b; --accent: #c35724; --accent-text: #f57032; --lit: #c3572426; --lit-edge: #c35724; --toast: #2b1909; --zone-off: #3a2916; --body-fill: #201002; --body-stroke: #4a2b09; --button-fill: #2b1909; --key-fill: #2b1909; --key-stroke: #4a2b09; --key-text: #f5e0d399; --warn-line: #f8ac6055; --warn-bg: #f8ac6014; --warn-text: #f8ac60; --err: #ff5a4e; --err-text: #ffb4a8; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
-  @media (prefers-color-scheme: light) { :root:not([data-theme]) { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #c35724; --accent-text: #9a3f14; --lit: #c357241a; --lit-edge: #c35724; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; } }
-  :root[data-theme="classic"] { --bg: #0d0d10; --bar: #111115; --panel: #15151a; --raise: #1b1b21; --line: #25252d; --line-strong: #3a3a44; --text: #ececf1; --muted: #9a9aa6; --faint: #858591; --value: #ececf1; --accent: #e8782a; --accent-text: #f2a066; --lit: #e8782a1f; --lit-edge: #e8782a; --toast: #222229; --zone-off: #2a2a31; --body-fill: #141418; --body-stroke: #2b2b33; --button-fill: #1d1d23; --key-fill: #1b1b21; --key-stroke: #2e2e37; --key-text: #ffffff99; --warn-line: #ffd60a55; --warn-bg: #ffd60a12; --warn-text: #ffe58a; --err: #ff453a; --err-text: #ffb4ae; --shadow: 0 10px 30px -12px #000000cc; color-scheme: dark; }
-  :root[data-theme="light"] { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #c35724; --accent-text: #9a3f14; --lit: #c357241a; --lit-edge: #c35724; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; }
-  :root[data-theme="workshop"] { --bg: #ede7dc; --bar: #e0d7c7; --panel: #f7f3ec; --raise: #e8e0d2; --line: #d6ccb9; --line-strong: #b3a68d; --text: #3d362a; --muted: #5c5141; --faint: #62564a; --value: #8a3f1b; --accent: #d0643e; --accent-text: #913c1a; --lit: #e7a26542; --lit-edge: #d0643e; --toast: #f7f3ec; --zone-off: #d6ccb9; --body-fill: #e8e0d2; --body-stroke: #b3a68d; --button-fill: #e0d7c7; --key-fill: #e8e0d2; --key-stroke: #cbbfa8; --key-text: #3d362a99; --warn-line: #a6672255; --warn-bg: #e7a2652a; --warn-text: #5a3412; --err: #c2181a; --err-text: #a3171a; --shadow: 0 12px 32px -16px #3d362a40; color-scheme: light; }
-  :root[data-theme="neon"] { --bg: #160520; --bar: #1e0829; --panel: #250a33; --raise: #2f0d40; --line: #45185a; --line-strong: #6b2a85; --text: #f1e3d0; --muted: #c99ec6; --faint: #ad80ab; --value: #fbb550; --accent: #dd3290; --accent-text: #f26cb4; --lit: #dd32902e; --lit-edge: #dd3290; --toast: #2f0d40; --zone-off: #45185a; --body-fill: #250a33; --body-stroke: #5a1f73; --button-fill: #2f0d40; --key-fill: #2f0d40; --key-stroke: #5a1f73; --key-text: #f1e3d099; --warn-line: #fbb55055; --warn-bg: #fbb55014; --warn-text: #fbb550; --err: #ff5a6e; --err-text: #ffb4c0; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
-  /* Bridge goes bold: the live profile, current section and selected tile are solid red-orange with black text. */
-  :root[data-theme="bridge"] .tile[aria-pressed=true] { background: #ff5412; border-color: #ff5412; }
-  :root[data-theme="bridge"] .tile[aria-pressed=true] .tl, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv small, :root[data-theme="bridge"] .tile[aria-pressed=true] .tv .unset,
-  :root[data-theme="bridge"] .tile[aria-pressed=true] .big, :root[data-theme="bridge"] .tile.changed[aria-pressed=true] .tl::after { color: #0a0a0b; }
-  :root[data-theme="bridge"] .pbtn[aria-current=true], :root[data-theme="bridge"] .pbtn[aria-current=true]:hover { background: #ff5412; color: #0a0a0b; }
-  :root[data-theme="bridge"] .pbtn[aria-current=true] .g { color: #0a0a0b; }
-  :root[data-theme="bridge"] .uline { display: none; }
-  :root[data-theme="bridge"] .sec[aria-current=true] { background: #ff5412; border-color: #ff5412; }
-  :root[data-theme="bridge"] .sec[aria-current=true] b, :root[data-theme="bridge"] .sec[aria-current=true] span { color: #0a0a0b; }
-  :root[data-theme="bridge"] .seg button[aria-pressed=true] { background: #ff5412; color: #0a0a0b; box-shadow: none; }
-  :root[data-theme="bridge"] .tab[aria-selected=true] { border-color: #ff5412; }
-  @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .tile[aria-pressed=true] { background: #ff5412; border-color: #ff5412; }
-  :root:not([data-theme]) .tile[aria-pressed=true] .tl, :root:not([data-theme]) .tile[aria-pressed=true] .tv, :root:not([data-theme]) .tile[aria-pressed=true] .tv small, :root:not([data-theme]) .tile[aria-pressed=true] .tv .unset,
-  :root:not([data-theme]) .tile[aria-pressed=true] .big, :root:not([data-theme]) .tile.changed[aria-pressed=true] .tl::after { color: #0a0a0b; }
-  :root:not([data-theme]) .pbtn[aria-current=true], :root:not([data-theme]) .pbtn[aria-current=true]:hover { background: #ff5412; color: #0a0a0b; }
-  :root:not([data-theme]) .pbtn[aria-current=true] .g { color: #0a0a0b; }
-  :root:not([data-theme]) .uline { display: none; }
-  :root:not([data-theme]) .sec[aria-current=true] { background: #ff5412; border-color: #ff5412; }
-  :root:not([data-theme]) .sec[aria-current=true] b, :root:not([data-theme]) .sec[aria-current=true] span { color: #0a0a0b; }
-  :root:not([data-theme]) .seg button[aria-pressed=true] { background: #ff5412; color: #0a0a0b; box-shadow: none; }
-  :root:not([data-theme]) .tab[aria-selected=true] { border-color: #ff5412; }
-  }
+  :root { --fill: var(--accent); }
+  :root, :root[data-theme="bridge"] { --bg: #050505; --bar: #0d0d0e; --panel: #131314; --raise: #1b1b1d; --line: #242426; --line-strong: #4a4440; --text: #f4efe9; --muted: #b8aea3; --faint: #9c9287; --value: #ffb85d; --accent: #ff5412; --accent-text: #ff7a45; --on-accent: #000; --lit: #ff541224; --lit-edge: #ff5412; --toast: #1b1b1d; --zone-off: #242426; --body-fill: #131314; --body-stroke: #3a3632; --button-fill: #1b1b1d; --key-fill: #1b1b1d; --key-stroke: #34312e; --key-text: #f4efe999; --warn-line: #ffb85d55; --warn-bg: #ffb85d14; --warn-text: #ffb85d; --err: #ff4a5a; --err-text: #ffb4bb; --shadow: 0 12px 32px -14px #000000e6; color-scheme: dark; }
+  :root[data-theme="roast"] { --bg: #150d05; --bar: #1e1007; --panel: #201002; --raise: #2b1909; --line: #3a2916; --line-strong: #64492b; --text: #f5e0d3; --muted: #b58754; --faint: #ad8150; --value: #e2aa6b; --accent: #e6c08f; --accent-text: #efcf9f; --on-accent: #1e1007; --lit: #e6c08f26; --lit-edge: #e6c08f; --toast: #2b1909; --zone-off: #3a2916; --body-fill: #201002; --body-stroke: #4a2b09; --button-fill: #2b1909; --key-fill: #2b1909; --key-stroke: #4a2b09; --key-text: #f5e0d399; --warn-line: #f8ac6055; --warn-bg: #f8ac6014; --warn-text: #f8ac60; --err: #ff5a4e; --err-text: #ffb4a8; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme]) { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #4f86ec; --accent-text: #1d4ed8; --on-accent: #0f2a66; --fill: #cfe0ff; --lit: #4f86ec1a; --lit-edge: #4f86ec; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; } }
+  :root[data-theme="classic"] { --bg: #0d0d10; --bar: #111115; --panel: #15151a; --raise: #1b1b21; --line: #25252d; --line-strong: #3a3a44; --text: #ececf1; --muted: #9a9aa6; --faint: #858591; --value: #ececf1; --accent: #5b9cff; --accent-text: #8bb8ff; --on-accent: #000; --lit: #5b9cff1f; --lit-edge: #5b9cff; --toast: #222229; --zone-off: #2a2a31; --body-fill: #141418; --body-stroke: #2b2b33; --button-fill: #1d1d23; --key-fill: #1b1b21; --key-stroke: #2e2e37; --key-text: #ffffff99; --warn-line: #ffd60a55; --warn-bg: #ffd60a12; --warn-text: #ffe58a; --err: #ff453a; --err-text: #ffb4ae; --shadow: 0 10px 30px -12px #000000cc; color-scheme: dark; }
+  :root[data-theme="light"] { --bg: #f4f4f7; --bar: #ffffff; --panel: #ffffff; --raise: #f0f0f4; --line: #e1e1e8; --line-strong: #c3c3cc; --text: #18181d; --muted: #5f5f6b; --faint: #6c6c78; --value: #18181d; --accent: #4f86ec; --accent-text: #1d4ed8; --on-accent: #0f2a66; --fill: #cfe0ff; --lit: #4f86ec1a; --lit-edge: #4f86ec; --toast: #ffffff; --zone-off: #d9d9df; --body-fill: #f1f1f4; --body-stroke: #c4c4cc; --button-fill: #e4e4ea; --key-fill: #ececf0; --key-stroke: #cfcfd7; --key-text: #00000099; --warn-line: #c9a20055; --warn-bg: #fff7d6; --warn-text: #6b5200; --err: #d70015; --err-text: #b3261e; --shadow: 0 10px 30px -14px #1b1b3040; color-scheme: light; }
+  :root[data-theme="workshop"] { --bg: #ede7dc; --bar: #e0d7c7; --panel: #f7f3ec; --raise: #e8e0d2; --line: #d6ccb9; --line-strong: #b3a68d; --text: #3d362a; --muted: #5c5141; --faint: #62564a; --value: #8a3f1b; --accent: #3f6e45; --accent-text: #2f5a35; --on-accent: #fff; --lit: #3f6e4533; --lit-edge: #3f6e45; --toast: #f7f3ec; --zone-off: #d6ccb9; --body-fill: #e8e0d2; --body-stroke: #b3a68d; --button-fill: #e0d7c7; --key-fill: #e8e0d2; --key-stroke: #cbbfa8; --key-text: #3d362a99; --warn-line: #a6672255; --warn-bg: #e7a2652a; --warn-text: #5a3412; --err: #c2181a; --err-text: #a3171a; --shadow: 0 12px 32px -16px #3d362a40; color-scheme: light; }
+  :root[data-theme="neon"] { --bg: #160520; --bar: #1e0829; --panel: #250a33; --raise: #2f0d40; --line: #45185a; --line-strong: #6b2a85; --text: #f1e3d0; --muted: #c99ec6; --faint: #ad80ab; --value: #fbb550; --accent: #dd3290; --accent-text: #f26cb4; --on-accent: #000; --lit: #dd32902e; --lit-edge: #dd3290; --toast: #2f0d40; --zone-off: #45185a; --body-fill: #250a33; --body-stroke: #5a1f73; --button-fill: #2f0d40; --key-fill: #2f0d40; --key-stroke: #5a1f73; --key-text: #f1e3d099; --warn-line: #fbb55055; --warn-bg: #fbb55014; --warn-text: #fbb550; --err: #ff5a6e; --err-text: #ffb4c0; --shadow: 0 12px 32px -14px #000000d9; color-scheme: dark; }
+  :root[data-theme="acid"] { --bg: #050605; --bar: #0b0d0b; --panel: #111411; --raise: #181c18; --line: #222822; --line-strong: #3a4838; --text: #eaf2e8; --muted: #a6b4a3; --faint: #8e9c8b; --value: #b9f0a8; --accent: #44d62c; --accent-text: #5fe048; --on-accent: #000; --lit: #44d62c24; --lit-edge: #44d62c; --toast: #181c18; --zone-off: #222822; --body-fill: #111411; --body-stroke: #2f3a2e; --button-fill: #181c18; --key-fill: #181c18; --key-stroke: #2c352b; --key-text: #eaf2e899; --warn-line: #ffd25e55; --warn-bg: #ffd25e14; --warn-text: #ffd25e; --err: #ff4d5e; --err-text: #ffb4bb; --shadow: 0 12px 32px -14px #000000e6; color-scheme: dark; }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -198,14 +177,34 @@
   input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
   .hex { width: 96px; text-transform: uppercase; font-family: ui-monospace, Consolas, monospace; }
   .hex::placeholder { text-transform: none; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  input[type=range] { width: 100%; max-width: 300px; }
+  input[type=range] { width: 100%; max-width: 300px; appearance: none; height: 22px; background: none; cursor: pointer; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--line-strong); }
+  input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line-strong); }
+  input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
+  input[type=range]:focus-visible { outline: none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--accent), 0 0 0 5px var(--lit); }
   .val { min-width: 44px; color: var(--muted); }
   .switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line-strong); position: relative; cursor: pointer; flex: none; margin: 0; }
   .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: var(--accent); }
   .switch:checked::after { left: 19px; }
-  .dpi { font-size: 30px; font-weight: 650; width: 130px; background: none !important; border: 0 !important; padding: 0 !important; color: var(--value); }
-  .dpi::-webkit-inner-spin-button { display: none; }
+  .dpi { font-size: 30px; font-weight: 650; width: 130px; background: none !important; border: 0 !important; padding: 0 !important; color: var(--value); appearance: textfield; }
+  .dpi::-webkit-inner-spin-button, .dpi::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  .readout { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+  .readout:focus-within { border-color: var(--accent); }
+  .readout .dpi { width: 100%; text-align: center; font-size: 32px; line-height: 1.1; }
+  .readout .dpi:focus-visible { outline: none; }
+  .readout .unit { display: block; text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; margin-top: 2px; }
+  .step { width: 40px; height: 40px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .step:hover { border-color: var(--line-strong); }
+  .step .ico { width: 14px; height: 14px; }
+  .scale { display: flex; flex-direction: column; gap: 4px; }
+  .scale input[type=range] { max-width: none; }
+  .ends { display: flex; justify-content: space-between; color: var(--faint); font-size: 12px; }
+  .chips5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 6px; }
+  .chips5 .pill { border-radius: 8px; padding: 7px 0; text-align: center; }
+  .chips5 .pill[aria-pressed=true] { background: var(--fill); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
   #stageRows .dpi { font-size: 17px; width: 84px; }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .pill { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; cursor: pointer; color: var(--muted); }
@@ -298,7 +297,7 @@
     body { overflow: auto; display: block; }
     header.top { padding: 8px 12px; gap: 8px 10px; height: auto; flex-wrap: wrap; }
     #tabsRow { order: 3; flex-basis: 100%; }
-    .actions { margin-left: auto; }
+    .actions { margin-left: auto; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; row-gap: 8px; min-width: 0; }
     .synclabel { display: none; }
     .devbar { flex-wrap: wrap; padding: 10px 12px; gap: 10px; }
     .who { max-width: none; flex: 1; }
@@ -319,11 +318,53 @@
     .work.wide .edbox { flex-direction: column; }
     .compare, .overview { padding: 14px 12px; }
   }
+
+  .macro .row { flex-wrap: wrap; }
+  .macro .row b { flex: 1 1 100%; }
+  @media (max-width: 820px) { .themepick select { max-width: 96px; } }
+  /* Settings: the app's own options, in groups of rows (label and help on the left, control on the right). */
+  .sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .gear { width: 34px; height: 34px; padding: 0; justify-content: center; }
+  .gear .ico { width: 16px; height: 16px; }
+  .gear[aria-pressed=true] { color: var(--text); border-color: var(--accent); }
+  .settings { flex: 1; min-height: 0; overflow: auto; padding: 28px 20px 90px; }
+  .set-wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 22px; }
+  .set-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
+  .set-head p { margin: 4px 0 0; color: var(--muted); }
+  .set-group h2 { margin: 0 0 8px 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .set-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .set-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 24px; padding: 14px 18px; }
+  .set-row + .set-row { border-top: 1px solid var(--line); }
+  .set-row b { display: block; font-size: 15px; font-weight: 600; }
+  .set-row small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; max-width: 60ch; line-height: 1.45; }
+  .set-ctl { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .set-ctl .out { color: var(--value); font-weight: 600; font-size: 13px; }
+  .set-row .wide { grid-column: 1 / -1; }
+  :root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  @media (max-width: 820px) {
+    .settings { padding: 16px 12px 90px; }
+    .set-row { grid-template-columns: 1fr; }
+    .set-ctl { justify-content: flex-start; }
+  }
   .addgame, .del { background: none; border: 0; padding: 3px 2px; font-size: 12.5px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
   .addgame:hover, .addgame:focus-visible { color: var(--text); }
   .del { color: var(--faint); margin-top: 6px; display: flex; }
   .del:hover { color: var(--err-text); }
   .gamein { width: 150px; padding: 4px 9px !important; font-size: 12.5px; }
+  /* Every theme goes bold in its own colour: the live profile, current section, selected tile
+     and pressed segment are solid --fill (the accent, or a lighter tint in Light) with the
+     theme's on-accent text (4.5:1 or more), edged in the accent, and
+     the device tab in use is outlined in it. */
+  .tile[aria-pressed=true] { background: var(--fill); border-color: var(--accent); }
+  .tile[aria-pressed=true] .tl, .tile[aria-pressed=true] .tv, .tile[aria-pressed=true] .tv small, .tile[aria-pressed=true] .tv .unset,
+  .tile[aria-pressed=true] .big, .tile.changed[aria-pressed=true] .tl::after { color: var(--on-accent); }
+  .pbtn[aria-current=true], .pbtn[aria-current=true]:hover { background: var(--fill); color: var(--on-accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .pbtn[aria-current=true] .g { color: var(--on-accent); }
+  .uline { display: none; }
+  .sec[aria-current=true] { background: var(--fill); border-color: var(--accent); }
+  .sec[aria-current=true] b, .sec[aria-current=true] span { color: var(--on-accent); }
+  .seg button[aria-pressed=true] { background: var(--fill); color: var(--on-accent); box-shadow: none; }
+  .tab[aria-selected=true] { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -339,8 +380,9 @@
     <label class="themepick" title="Theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
       <select id="theme" aria-label="Theme">
         <option value="">Auto</option><option value="bridge">Bridge</option><option value="roast">Roast</option><option value="classic">Classic</option>
-        <option value="light">Light</option><option value="workshop">Workshop</option><option value="neon">Neon</option>
+        <option value="light">Light</option><option value="workshop">Workshop</option><option value="neon">Neon</option><option value="acid">Acid</option>
       </select></label>
+    <button class="ghost gear" id="gear" title="Settings" aria-label="Settings" aria-pressed="false"></button>
   </div>
 </header>
 <p class="banner" id="synBanner" hidden>Razer Synapse is running and can overwrite these settings. Close it, or run <code>secbird debloat</code> to stop it starting with Windows.</p>
@@ -379,6 +421,8 @@
     <aside class="panel" id="panel" aria-label="Edit"></aside>
   </div>
 
+  <section class="settings" id="settings" hidden aria-label="Settings"></section>
+
   <section class="compare" id="compare" hidden>
     <div class="sheet-wrap" id="sheetWrap">
       <div class="band" id="band"></div>
@@ -391,7 +435,7 @@
 <script>
 const T = new URLSearchParams(location.search).get('t');
 const $ = id => document.getElementById(id);
-const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids.filter(k => k != null && k !== false)); return e; };
+const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); Object.assign(e.dataset, dataset); e.append(...kids.filter(k => k != null && k !== false)); return e; };
 // Colors for LEDs, not screens: an LED shows even small green/blue parts (FF2D55 looks pink),
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
 const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
@@ -401,7 +445,7 @@ const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
 let sel = null, section = null, view = 'work'; // selected tile, rail section, 'work' or 'compare'
-let btnData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
+let btnFailed = {}, btnData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
 
 // Full-size ANSI keyboard on Razer's 6 x 22 per-key grid.
 // Each key: [label, matrix column, width, gap before, height], in key units.
@@ -467,8 +511,9 @@ function live(send, done) {
   };
 }
 
-const ICONS = { plus: '<path d="M8 3v10M3 8h10"/>', x: '<path d="M4 4l8 8M12 4l-8 8"/>',
-  left: '<path d="M10 3L5 8l5 5"/>', right: '<path d="M6 3l5 5-5 5"/>' };
+const ICONS = { plus: '<path d="M8 3v10M3 8h10"/>', minus: '<path d="M3 8h10"/>', x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+  left: '<path d="M10 3L5 8l5 5"/>', right: '<path d="M6 3l5 5-5 5"/>',
+  gear: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/><circle cx="8" cy="8" r="4.6"/>' };
 
 // Rows that can hold more than fits get arrows at the cut-off side; the wheel scrolls them too.
 function scrollRow(row) {
@@ -519,6 +564,14 @@ function adopt(d) {
 }
 const prof = name => (name === dev.active ? dev.profile : (dev.profilesData && dev.profilesData[name])) || {};
 const zoneOf = (p, name) => (p.lighting && p.lighting[name]) || {};
+// What a zone's dot shows: its effect's colour, a colour wheel for spectrum, wave and random
+// colours, else its static colour; '' when it is off.
+const RAINBOW = 'conic-gradient(#ff0000, #ff9600, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)';
+function zonePaint(z) {
+  if (z.off) return '';
+  if (z.effect) { const c = /([0-9a-f]{6})/i.exec(z.effect); return c ? '#' + c[1] : RAINBOW; }
+  return z.color ? '#' + z.color : '';
+}
 const keyCount = () => dev.matrix.rows * dev.matrix.cols;
 
 // ---------- Rendering ----------
@@ -526,9 +579,11 @@ const keyCount = () => dev.matrix.rows * dev.matrix.cols;
 function render() {
   const has = devices.length > 0;
   if (!has) showAll = unsupported.length > 0;
-  $('empty').hidden = has || unsupported.length > 0;
-  $('overview').hidden = !showAll;
-  const onDevice = has && !showAll;
+  $('empty').hidden = has || unsupported.length > 0 || showSettings;
+  $('overview').hidden = !showAll || showSettings;
+  $('settings').hidden = !showSettings;
+  $('gear').ariaPressed = showSettings;
+  const onDevice = has && !showAll && !showSettings;
   $('devbar').hidden = !onDevice;
   $('work').hidden = !onDevice || view === 'compare';
   $('compare').hidden = !onDevice || view !== 'compare';
@@ -541,10 +596,11 @@ function render() {
   $('tabs').innerHTML = '';
   const tab = (text, selected, onclick) => $('tabs').append(el('button', { className: 'tab', textContent: text, onclick, ariaSelected: selected }));
   if (devices.length || unsupported.length) {
-    tab('All devices', !!showAll, () => { showAll = true; sel = null; render(); });
-    devices.forEach(d => tab(devLabel(d), !showAll && d.id === dev.id, () => openDevice(d)));
+    tab('All devices', !!showAll && !showSettings, () => { showAll = true; showSettings = false; sel = null; render(); });
+    devices.forEach(d => tab(devLabel(d), !showAll && !showSettings && d.id === dev.id, () => openDevice(d)));
   }
   requestAnimationFrame(() => { bringIntoView($('tabs'), $('tabs').querySelector('[aria-selected=true]')); updateTabsRow(); });
+  if (showSettings) return renderSettings();
   if (showAll) return renderOverview();
   if (!has) return;
   renderDevbar();
@@ -552,7 +608,7 @@ function render() {
 }
 
 function openDevice(d) {
-  dev = d; sel = null; showAll = false;
+  dev = d; sel = null; showAll = false; showSettings = false;
   section = null; // resolved (last used, else first) when the workbench draws
   render();
 }
@@ -648,8 +704,8 @@ function railSummary(s) {
   if (s.id === 'light') {
     if (p.keys && p.keys.length && dev.matrix) return 'Per-key colors';
     const box = el('span');
-    dev.leds.forEach(l => { const z = zoneOf(p, l.name); const d = el('i', { className: 'dot' + (z.off || !z.color ? ' off' : '') });
-      if (z.color && !z.off) d.style.background = '#' + z.color; box.append(d); });
+    dev.leds.forEach(l => { const paint = zonePaint(zoneOf(p, l.name)); const d = el('i', { className: 'dot' + (paint ? '' : ' off') });
+      if (paint) d.style.background = paint; box.append(d); });
     const fx = dev.leds.map(l => zoneOf(p, l.name).effect).find(Boolean);
     const lit = dev.leds.map(l => zoneOf(p, l.name)).filter(z => z.color && !z.off);
     box.append(fx ? effectLabel(fx) : lit.length === 1 ? '#' + lit[0].color : lit.length ? plural(lit.length, 'zone') + ' lit' : 'Off');
@@ -725,8 +781,8 @@ function renderTiles(cur) {
       onclick: () => { btnLayer = v; sel = null; renderWork(); } })));
     tools.append(seg);
   } else if (cur.tools === 'allzones') {
-    tools.append(el('button', { className: 'link', textContent: 'Same color on all zones',
-      onclick: () => { const z = dev.leds.map(l => zoneOf(dev.profile, l.name)).find(z => z.color); if (z) dev.leds.forEach(l => setColor(z.color, l.name)); else toast('Pick a color for one zone first', true); } }));
+    tools.append(el('button', { className: 'link', textContent: 'Same on all zones', title: 'The colour or effect of the zone you changed last, on every zone',
+      onclick: () => { const src = sourceZone(); if (src) copyToZones(src); else toast('Pick a color or effect for one zone first', true); } }));
   }
   head.append(tools);
   t.append(head);
@@ -820,6 +876,7 @@ function liveSummary() {
 // Esc closes the panel (and returns to its tile), or leaves Compare.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || e.target.classList.contains('combo')) return;
+  if (showSettings) { showSettings = false; render(); return; }
   if (view === 'compare') { view = 'work'; render(); return; }
   if (sel) closePanel();
 });
@@ -1085,7 +1142,19 @@ function zoneEditor(box, name) {
   box.append(effectGroup(name),
     el('div', { className: 'edgroup' }, el('h3', { textContent: label(name) + ' color' }), presets, custom),
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Brightness' }), el('div', { className: 'row' }, bright, val),
-      el('div', { className: 'row' }, on, el('label', { htmlFor: 'zoneOn', textContent: 'Lit' }))));
+      el('div', { className: 'row' }, on, el('label', { htmlFor: 'zoneOn', textContent: 'Lit' }))),
+    copyGroup(name));
+}
+// Use this zone's colour or effect elsewhere: this device's other zones, or every device.
+function copyGroup(name) {
+  const others = devices.some(d => d !== dev && d.leds.length);
+  if (dev.leds.length < 2 && !others) return '';
+  const pick = fn => () => { const what = zoneLighting(name); if (what) fn(what); else toast('Pick a color or effect first', true); };
+  return el('div', { className: 'edgroup' }, el('h3', { textContent: 'Use this lighting on' }),
+    el('div', { className: 'row' },
+      dev.leds.length > 1 ? el('button', { className: 'ghost', textContent: 'All zones', title: 'Every zone of this ' + (KINDS[dev.kind] || 'device').toLowerCase(), onclick: pick(() => copyToZones(name)) }) : '',
+      others ? el('button', { className: 'ghost', textContent: 'Every device', title: 'Every zone of every device, started together', onclick: pick(what => sendSync(what)) }) : ''),
+    el('p', { className: 'note', textContent: 'Effects start together on every device. A device that can’t run the effect is left as it is.' }));
 }
 
 // Built-in effects the device runs by itself. Colors come from the zone's color above.
@@ -1153,17 +1222,25 @@ function keysEditor(box) {
 }
 
 function dpiEditor(box) {
-  const d = dev.dpi;
+  const d = dev.dpi, step = Math.max(d.step || 50, 50);
   const num = el('input', { type: 'number', className: 'dpi num', min: d.min, max: d.max, step: d.step, value: d.x, ariaLabel: 'DPI', id: 'dpiNum' });
   const slider = el('input', { type: 'range', min: d.min, max: d.max, step: d.step, value: d.x, ariaLabel: 'DPI slider', id: 'dpiSlider' });
-  const pills = el('div', { className: 'pills', id: 'dpiPills' });
+  const pills = el('div', { className: 'chips5', id: 'dpiPills', role: 'group', ariaLabel: 'DPI presets' });
   [400, 800, 1600, 3200, 6400].filter(v => v >= d.min && v <= d.max).forEach(v =>
     pills.append(el('button', { className: 'pill num', textContent: v, ariaPressed: v === d.x, onclick: () => setDpi(v) })));
   num.oninput = () => { num.dataset.dirty = '1'; };
   num.onchange = e => { delete num.dataset.dirty; setDpi(e.target.value); };
+  num.onkeydown = e => { if (e.key === 'Enter') num.blur(); };
   slider.oninput = e => setDpi(e.target.value);
-  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'DPI' }), el('div', { className: 'row' }, num, el('span', { className: 'val', textContent: d.min + '–' + d.max })), slider),
-    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Presets' }), pills),
+  // - / + move to the next multiple of the step, within the range.
+  const nudge = dir => setDpi(Math.min(d.max, Math.max(d.min, (Math.round((+num.value || dev.dpi.x) / step) + dir) * step)));
+  const stepBtn = (dir, ic, label) => el('button', { className: 'step', innerHTML: icon(ic), ariaLabel: label, title: label + ' (' + step + ')', onclick: () => nudge(dir) });
+  const fmt = n => n.toLocaleString('en-US');
+  box.append(
+    el('div', { className: 'readout' }, stepBtn(-1, 'minus', 'Lower DPI'),
+      el('label', {}, num, el('span', { className: 'unit', textContent: 'DPI' })), stepBtn(1, 'plus', 'Higher DPI')),
+    el('div', { className: 'scale' }, slider, el('div', { className: 'ends num', ariaHidden: 'true' }, el('span', { textContent: fmt(d.min) }), el('span', { textContent: fmt(d.max) }))),
+    pills.childElementCount ? el('div', { className: 'edgroup' }, el('h3', { textContent: 'Presets' }), pills) : '',
     el('p', { className: 'note', textContent: 'The DPI button on the mouse changes this too; this follows it.' }));
 }
 function showDpi() { // the mouse changed DPI by itself
@@ -1350,6 +1427,7 @@ function actionLabel(a) {
     return 'Macro ' + (mac ? `“${mac.name}”` : '#' + m[1]) + how;
   }
   if (CHOICE_LABEL[a]) return CHOICE_LABEL[a];
+  if ((m = /^raw:(\d+):/.exec(a))) return `Set by Synapse (function ${m[1]})`;
   return a.replace(/[-:]/g, ' ').replace(/^./, c => c.toUpperCase());
 }
 
@@ -1357,7 +1435,7 @@ async function loadButtons(d, force) {
   if (d.kind !== 'mouse' || (!force && btnData[d.id] !== undefined)) return;
   btnData[d.id] = null; // loading
   if (dev && dev.id === d.id && !showAll) renderSheet();
-  try { btnData[d.id] = (await api('/api/buttons', { id: d.id })).buttons; } catch { btnData[d.id] = []; }
+  try { btnData[d.id] = (await api('/api/buttons', { id: d.id })).buttons; delete btnFailed[d.id]; } catch { btnData[d.id] = []; btnFailed[d.id] = true; }
   if (dev && dev.id === d.id && !showAll) renderSheet();
 }
 
@@ -1520,7 +1598,10 @@ async function assign(button, action, isUndo) {
 
 // ---------- Lighting, DPI, keys: send and record ----------
 
+// The zone changed last on each device: what "Same on all zones" copies.
+const lastZone = {};
 function record(name, patch) {
+  lastZone[dev.id] = name;
   dev.profile.lighting = dev.profile.lighting || {};
   dev.profile.lighting[name] = { ...zoneOf(dev.profile, name), ...patch };
   if (dev.matrix && (patch.color || patch.off)) dev.profile.keys = [];
@@ -1534,6 +1615,30 @@ function setColor(hex, name) {
   const br = $('zoneBright'), bv = $('zoneBrightVal');
   if (br && br.disabled) { br.disabled = false; bv.textContent = (zoneOf(dev.profile, name).brightness ?? 100) + '%'; }
   (sendColor[name] ||= live(c => api('/api/color', { zone: name, color: c })))(hex);
+}
+// What a zone shows, as something to copy: { color } or { effect }; null when off or unset.
+function zoneLighting(name) {
+  const z = zoneOf(dev.profile, name);
+  return z.off ? null : z.effect ? { effect: z.effect } : z.color ? { color: z.color } : null;
+}
+// The zone open in the panel, else the one changed last, else the first lit one.
+function sourceZone() {
+  const open = sel && sel.startsWith('zone:') ? sel.slice(5) : null;
+  return [open, lastZone[dev.id], ...dev.leds.map(l => l.name)].find(n => n && dev.leds.some(l => l.name === n) && zoneLighting(n));
+}
+// One zone's colour or effect on the device's other zones.
+async function copyToZones(src) {
+  const what = zoneLighting(src), skipped = [];
+  for (const l of dev.leds) {
+    if (l.name === src) continue;
+    if (what.color) { setColor(what.color, l.name); continue; }
+    try { await api('/api/effect', { zone: l.name, effect: what.effect }); record(l.name, { effect: what.effect, off: false }); }
+    catch (e) { skipped.push(label(l.name)); }
+  }
+  lastZone[dev.id] = src;
+  const name = what.color ? '#' + what.color : effectLabel(what.effect);
+  const all = skipped.length === dev.leds.length - 1;
+  toast(name + (all ? ' stays on ' + label(src) + ': the other zones can’t run it' : ' on all zones' + (skipped.length ? '. ' + skipped.join(', ') + ' can’t run it' : '')), all);
 }
 const sendBright = live(([name, value]) => api('/api/brightness', { zone: name, value }));
 const sendDpi = live(v => api('/api/dpi', { x: v, y: v }).then(r => { dev.dpi.x = dev.dpi.y = r.dpi[0]; dev.profile.dpi = r.dpi; refreshCell('dpi'); }));
@@ -1626,6 +1731,132 @@ async function saveApps(name, apps, msg) {
   } catch (err) { toast(err.message, true); }
 }
 
+// ---------- Settings ----------
+// The app's own options. What the tray reads (start with Windows, popups, checks) is kept in
+// tray.json by the tray; what only the editor uses (theme, motion) in this browser.
+let showSettings = false, appSettings = null;
+
+function renderSettings() {
+  const box = $('settings');
+  if (!appSettings) {
+    box.replaceChildren(el('p', { className: 'empty', textContent: 'Reading the settings…' }));
+    api('/api/settings').then(r => { appSettings = r; if (showSettings) renderSettings(); }).catch(e => toast(e.message, true));
+    return;
+  }
+  const top = box.scrollTop, a = appSettings;
+  const row = (label, help, ...ctl) => el('div', { className: 'set-row' },
+    el('div', {}, el('b', { textContent: label }), help ? el('small', { textContent: help }) : null),
+    el('div', { className: 'set-ctl' }, ...ctl));
+  const group = (title, ...rows) => el('section', { className: 'set-group' }, el('h2', { textContent: title }), el('div', { className: 'set-card' }, ...rows));
+  let n = 0;
+  const toggle = (label, on, change) => {
+    const id = 'set' + (++n);
+    const input = el('input', { type: 'checkbox', className: 'switch', id, checked: on, onchange: e => change(e.target.checked, e.target) });
+    return [input, el('label', { htmlFor: id, className: 'sr', textContent: label })];
+  };
+  // A switch the tray keeps: sent, then the page shows what the tray says.
+  const traySwitch = (key, label) => toggle(label, !!a[key], async (on, input) => {
+    input.disabled = true;
+    try { appSettings = await api('/api/settings', { key, on }); toast(label + (on ? ' on' : ' off')); }
+    catch (e) { toast(e.message, true); input.checked = !on; }
+    input.disabled = false;
+  });
+  const seg = (label, options, current, pick) => {
+    const g = el('span', { className: 'seg', role: 'group', ariaLabel: label });
+    options.forEach(([v, t]) => g.append(el('button', { textContent: t, ariaPressed: v === current, onclick: () => pick(v) })));
+    return g;
+  };
+
+  // Editor
+  const themeSel = $('theme').cloneNode(true);
+  themeSel.id = ''; themeSel.value = $('theme').value; themeSel.ariaLabel = 'Theme';
+  themeSel.onchange = e => { $('theme').value = e.target.value; $('theme').dispatchEvent(new Event('change')); };
+  const editor = group('Editor',
+    row('Theme', 'Auto follows Windows: Bridge when dark, Light when light.', themeSel),
+    row('Motion', 'Less motion stops slides and fades in the editor, whatever Windows is set to.',
+      seg('Motion', [['', 'Like Windows'], ['reduce', 'Less motion']], remembered('motion') === 'reduce' ? 'reduce' : '', v => {
+        remember('motion', v); if (v) document.documentElement.dataset.motion = v; else delete document.documentElement.dataset.motion; renderSettings();
+      })));
+
+  // Startup and games
+  const startup = group('Startup and games',
+    row('Start with Windows', 'Your settings go back on as soon as you sign in. Off means they only apply while Secretarybird is running.', ...traySwitch('autostart', 'Start with Windows')),
+    row('Switch profiles with games', 'A profile tied to a program comes up while that program is in front, and goes back after.', ...traySwitch('auto_switch', 'Switch profiles with games')));
+
+  // Notifications and checks
+  const checkOut = el('span', { className: 'out' });
+  const checkBtn = el('button', { className: 'ghost', textContent: 'Check now', onclick: async () => {
+    checkBtn.disabled = true; checkOut.textContent = 'Checking…';
+    try {
+      const r = await api('/api/update-check', {});
+      checkOut.replaceChildren(r.latest ? el('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', textContent: 'Secretarybird ' + r.latest + ' is out' }) : 'You’re up to date');
+    } catch (e) { checkOut.textContent = ''; toast(e.message, true); }
+    checkBtn.disabled = false;
+  } });
+  const notes = group('Notifications and checks',
+    row('DPI and profile popups', 'A small popup above the clock when DPI, the on-board profile or a game profile changes.', ...traySwitch('popups', 'DPI and profile popups')),
+    row('Low battery warning', 'A notification when a wireless device drops to 15%.', ...traySwitch('battery_warning', 'Low battery warning')),
+    row('New version notices', 'Once a day, asks GitHub whether a newer Secretarybird is out. Nothing else is sent.', checkOut, checkBtn, ...traySwitch('updates', 'New version notices')),
+    row('Weekly firmware check', 'Once a week, asks Razer’s website whether newer firmware is out for your devices. It never installs anything.', ...traySwitch('firmware_weekly', 'Weekly firmware check')));
+
+  // Profiles and backup
+  const file = el('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const r = await api('/api/import', { data: JSON.parse(await f.text()) });
+      devices = r.state.devices; devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
+      dev = devices.find(d => dev && d.id === dev.id) || devices[0] || null;
+      toast(r.added ? 'Added ' + plural(r.added, 'profile') + '; yours were kept' : 'Nothing new in that file');
+    } catch (err) { toast(err instanceof SyntaxError ? 'That file isn’t a Secretarybird backup' : err.message, true); }
+    e.target.value = '';
+  } });
+  const backup = group('Profiles and backup',
+    row('Back up profiles', 'Every profile of every device in one file.', el('button', { className: 'ghost', textContent: 'Save a backup', onclick: async () => {
+      try {
+        const data = await api('/api/export');
+        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+        el('a', { href: url, download: 'secretarybird-profiles.json' }).click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch (e) { toast(e.message, true); }
+    } })),
+    row('Restore from a backup', 'Adds the profiles in a backup file. Yours are kept; a clashing name gets “(imported)”.', file,
+      el('button', { className: 'ghost', textContent: 'Choose a file…', onclick: () => file.click() })),
+    row('Settings folder', a.folder, el('button', { className: 'ghost', textContent: 'Open', onclick: () => api('/api/open-folder', {}).catch(e => toast(e.message, true)) })));
+
+  // Help
+  const reportBtn = el('button', { className: 'ghost', textContent: 'Copy report and open GitHub', onclick: async () => {
+    reportBtn.disabled = true; reportBtn.textContent = 'Reading the devices…';
+    try {
+      const r = await api('/api/report', {});
+      await navigator.clipboard.writeText(r.text);
+      window.open(a.repository + '/issues/new?template=device-report.yml', '_blank', 'noopener');
+      toast('Report copied: paste it into “Output of secbird report”');
+    } catch (e) { toast(e.message, true); }
+    reportBtn.disabled = false; reportBtn.textContent = 'Copy report and open GitHub';
+  } });
+  const mice = devices.filter(d => d.kind === 'mouse');
+  const help = group('Help',
+    row('Device report', 'A read-only description of your devices for a GitHub issue, when one is missing or misbehaves. Serial numbers are shortened.', reportBtn),
+    mice.length ? row('Restore all mouse buttons', 'Every remapped button on every mouse back to what the mouse stores (factory or Synapse), and the remaps forgotten.',
+      el('button', { className: 'ghost', textContent: 'Restore all', onclick: async () => {
+        if (!confirm('Put every mouse button back to what the mouse stores?')) return;
+        try {
+          const r = await api('/api/restore-all-buttons', {});
+          btnData = {};
+          toast(r.results.map(x => x.error ? x.device + ': ' + x.error : x.device + ': ' + plural(x.restored, 'button') + ' restored').join(' · ') || 'No mouse with remappable buttons', r.results.some(x => x.error));
+          load();
+        } catch (e) { toast(e.message, true); }
+      } })) : null,
+    row('Razer Synapse', a.synapse.length ? 'Running (' + a.synapse.join(', ') + '). It can overwrite these settings. `secbird debloat` stops it starting with Windows.' : 'Not running. Good: nothing will overwrite your settings.'),
+    row('About', 'Secretarybird ' + a.version + '. Not affiliated with Razer. It goes online only for the daily version check and, if on, the weekly firmware check.',
+      el('a', { href: a.repository, target: '_blank', rel: 'noopener noreferrer', textContent: 'GitHub' })));
+
+  box.replaceChildren(el('div', { className: 'set-wrap' },
+    el('div', { className: 'set-head' }, el('h1', { textContent: 'Settings' }), el('p', { textContent: 'Changes apply right away. Esc goes back.' })),
+    editor, startup, notes, backup, help));
+  box.scrollTop = top;
+}
+
 // ---------- Overview ----------
 
 function renderOverview() {
@@ -1643,7 +1874,7 @@ function renderOverview() {
     const dots = el('div', { className: 'dots' });
     const p = d.profile || {}, keys = p.keys;
     const colors = keys && keys.length ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
-    colors.forEach(z => { const i = el('i'); if (z.off || !z.color) i.className = 'off'; else i.style.color = '#' + z.color; dots.append(i); });
+    colors.forEach(z => { const i = el('i'), paint = zonePaint(z); if (paint) i.style.background = paint; else i.className = 'off'; dots.append(i); });
     const meta = el('div', { className: 'dmeta num', textContent: [KINDS[d.kind] || 'Device', d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
     grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, dots, meta));
   });
@@ -1690,20 +1921,30 @@ async function load(path = '/api/state', body) {
     render();
   } catch (e) { toast(e.message, true); }
 }
-// Sync: one color on every zone of every device. Dragging the swatch syncs live.
-const sendSync = live(async color => {
-  const r = await api('/api/sync', { color });
+// Sync: one color (the top bar), or a zone's color or effect (its panel), on every zone of
+// every device; effects start together. Dragging the swatch syncs live.
+let syncing = null;
+const sendSync = live(async what => {
+  syncing = what;
+  const r = await api('/api/sync', { color: what.color || '', effect: what.effect || '' });
   devices = r.state.devices; unsupported = r.state.unsupported || []; synapse = r.state.synapse || [];
   devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
   dev = devices.find(d => d.id === dev.id) || devices[0];
   render();
+  const skipped = r.skipped || [];
+  const cant = skipped.length ? ` ${skipped.join(', ')} can’t show it.` : '';
+  if (!r.zones) throw new Error(r.failed.length ? 'Nothing synced: ' + r.failed.join('; ') : 'Nothing synced.' + cant);
   if (r.failed.length) throw new Error('Some zones failed: ' + r.failed.join('; '));
   return r;
-}, r => '#' + $('syncColor').value.slice(1).toUpperCase() + ' on ' + plural(r.zones, 'zone') + ' across ' + plural(r.devices, 'device'));
+}, r => {
+  const skipped = r.skipped || [];
+  return (syncing.effect ? effectLabel(syncing.effect) : '#' + syncing.color) + ' on ' + plural(r.zones, 'zone') + ' across ' + plural(r.devices, 'device') +
+    (skipped.length ? `. ${skipped.join(', ')} can’t show it.` : '');
+});
 // Theme: Auto follows Windows; a picked theme is remembered in this browser. Older builds
 // stored 'dark' or 'light' from a light/dark toggle: 'dark' now means the default (Auto).
 const themeKey = 'secbird-theme';
-const THEMES = ['bridge', 'roast', 'classic', 'light', 'workshop', 'neon'];
+const THEMES = ['bridge', 'roast', 'classic', 'light', 'workshop', 'neon', 'acid'];
 function setTheme(t) {
   const root = document.documentElement;
   if (THEMES.includes(t)) root.dataset.theme = t; else delete root.dataset.theme;
@@ -1711,13 +1952,17 @@ function setTheme(t) {
   requestAnimationFrame(() => { placeUnderline(); placeBand(); });
 }
 try { const t = localStorage.getItem(themeKey); setTheme(t === 'dark' ? '' : t); } catch (e) { }
+if (remembered('motion') === 'reduce') document.documentElement.dataset.motion = 'reduce';
 $('theme').onchange = e => {
   setTheme(e.target.value);
   try { if (e.target.value) localStorage.setItem(themeKey, e.target.value); else localStorage.removeItem(themeKey); } catch (err) { }
 };
-$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; sel = null; render(); } };
-$('syncColor').oninput = e => { syncPicked = true; sendSync(e.target.value.slice(1).toUpperCase()); };
-$('syncBtn').onclick = () => sendSync($('syncColor').value.slice(1).toUpperCase());
+$('home').onclick = () => { if (devices.length || unsupported.length) { showAll = true; showSettings = false; sel = null; render(); } };
+$('gear').innerHTML = icon('gear');
+$('gear').onclick = () => { showSettings = !showSettings; sel = null; render(); };
+const topColor = () => ({ color: $('syncColor').value.slice(1).toUpperCase() });
+$('syncColor').oninput = () => { syncPicked = true; sendSync(topColor()); };
+$('syncBtn').onclick = () => sendSync(topColor());
 const updateTabsRow = scrollRow($('tabsRow')), updateProfilesRow = scrollRow($('profilesRow'));
 // Narrow windows lay the sections out as a row: the wheel scrolls it and a fade shows there is more.
 (() => {

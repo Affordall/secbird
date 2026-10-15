@@ -89,6 +89,8 @@ pub struct SimState {
     pub grid_effect: Vec<u8>,
     /// Button assignments by (slot, button id, layer): (function, data).
     pub buttons: BTreeMap<(u8, u8, u8), (u8, [u8; 5])>,
+    /// The mouse's own button id list (02:84), or `None` for a device that doesn't answer it.
+    pub button_list: Option<Vec<u8>>,
     /// Answer this many reads with Busy before the real reply.
     pub busy_reads: u32,
     /// Every well-formed command received, in order.
@@ -122,6 +124,7 @@ impl SimState {
             led_rgb: BTreeMap::new(),
             grid_effect: Vec::new(),
             buttons: BTreeMap::new(),
+            button_list: None,
             busy_reads: 0,
             log: Vec::new(),
             reply: None,
@@ -253,6 +256,10 @@ impl SimState {
                 // Like the real mouse: size byte 1 whatever the function's data length.
                 Some(&(function, d)) => ok(vec![a[0], a[1], a[2], function, 1, d[0], d[1], d[2], d[3], d[4]]),
                 None => (Failed, vec![]),
+            },
+            c if c == cmd::BUTTON_IDS.get() => match &self.button_list {
+                Some(ids) => ok([vec![ids.len() as u8], ids.clone()].concat()),
+                None => (NotSupported, vec![]),
             },
             cmd::BUTTON => {
                 if !self.buttons.contains_key(&(1, a[1], a[2])) {
@@ -1053,7 +1060,8 @@ mod tests {
                 }
             }
         }
-        let dev = open(&sim, MOUSE_PID);
+        // A Basilisk's buttons with a grid added, opened as a Naga (which gets side plates).
+        let dev = open(&sim, NAGA_PID);
         let ids: Vec<u8> = dev.buttons().iter().map(|b| b.0).collect();
         assert_eq!(ids, [1, 2, 3, 4, 5, 14, 15, 52, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 96]);
         let labels: Vec<String> = dev.buttons().iter().filter(|b| b.0 >= 64 && b.0 <= 75).map(|b| b.1.to_string()).collect();
@@ -1107,6 +1115,34 @@ mod tests {
             assert_eq!(dev.battery().unwrap(), Some(95));
             assert_eq!(dev.polling_rate().unwrap(), 1000);
         }
+    }
+
+    #[test]
+    fn docked_basilisk_v4_pro_is_named_and_shows_only_its_buttons() {
+        use crate::buttons::BUTTONS;
+        let (sim, mut dev, db) = docked_basilisk();
+        {
+            // Like #16: the dock answers for every button id, Naga plates included.
+            let mut s = sim.state();
+            s.paired = vec![(true, 0x00E3)];
+            for &(id, _, _) in BUTTONS {
+                s.buttons.insert((0, id, 0), (0, [0; 5]));
+                s.buttons.insert((1, id, 0), (0, [0; 5]));
+            }
+        }
+        dev.identify_docked_mouse(&db);
+        assert_eq!(dev.name(), "Basilisk V4 Pro on Mouse Dock Pro");
+        let ids: Vec<u8> = dev.buttons().iter().map(|b| b.0).collect();
+        assert!(ids.contains(&1) && ids.contains(&106));
+        assert!(!ids.iter().any(|id| (64..=86).contains(id)), "no Naga side plates: {ids:?}");
+
+        // When the mouse lists its buttons, that list wins, unnamed ids included.
+        sim.state().button_list = Some(vec![1, 2, 0x34, 15, 120]);
+        sim.state().buttons.insert((0, 120, 0), (33, [0x79, 0xC4, 0x73, 0xCE, 0x11]));
+        let ids: Vec<u8> = dev.buttons().iter().map(|b| b.0).collect();
+        assert_eq!(ids, [1, 2, 15, 0x34, 120]);
+        assert_eq!(crate::buttons::button_name(120), "button-120");
+        assert_eq!(crate::buttons::button_id("button-120"), Some(120));
     }
 
     #[test]

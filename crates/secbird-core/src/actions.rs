@@ -188,3 +188,34 @@ pub fn sync_color(devices: &[Device], store: &mut Store, color: Rgb) -> Vec<Sync
     }
     out
 }
+
+/// The same built-in effect on every lighting zone of every device, started together so
+/// they run in step (each device keeps its own timer, so they can drift apart over time;
+/// syncing again lines them up). The zones are all sent first and the profiles saved
+/// once after, to keep the start times close.
+pub fn sync_effect(devices: &[Device], store: &mut Store, effect: &crate::effects::Effect) -> Vec<Synced> {
+    let mut out = Vec::new();
+    for dev in devices {
+        let zones: Vec<String> = dev.spec.as_ref().map(|s| s.leds.iter().map(|l| l.name.clone()).collect()).unwrap_or_default();
+        for zone in zones {
+            let result = dev.led_id(&zone).and_then(|led| dev.set_effect(led, effect));
+            out.push(Synced { pid: dev.pid, key: dev.key(), device: dev.name(), zone, result });
+        }
+    }
+    for dev in devices {
+        let done: Vec<&Synced> = out.iter().filter(|r| r.key == dev.key() && r.result.is_ok()).collect();
+        if done.is_empty() {
+            continue;
+        }
+        store.for_device(dev).active_mut().keys.clear();
+        for r in done {
+            let z = zone(store, dev, &r.zone);
+            z.effect = Some(effect.clone());
+            z.off = false;
+        }
+    }
+    if let Err(e) = store.save() {
+        out.iter_mut().filter(|r| r.result.is_ok()).for_each(|r| r.result = Err(crate::error::Error::System(format!("set, but not saved: {e}"))));
+    }
+    out
+}

@@ -142,6 +142,9 @@ pub const MOUSE_LED_EFFECT: Command = Command::new(0x03, 0x0D);
 /// Replies always carry 5 data bytes but report size 1, so readers take all 5.
 pub const BUTTON: Command = Command::new(0x02, 0x0C);
 pub const BUTTON_SIZE: u8 = 0x50;
+/// The button ids the mouse has (Synapse "Get Button ID list"): `[count, id...]`.
+pub const BUTTON_IDS: Command = Command::new(0x02, 0x04);
+pub const BUTTON_IDS_SIZE: u8 = 0x50;
 /// Button slot 0 is live and unsaved, and wins over the saved profile slots 1-5.
 /// Verified (Basilisk V3): a remap in slot 0 took effect while slot 1 was active.
 pub const BUTTON_LIVE_SLOT: u8 = 0x00;

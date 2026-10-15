@@ -1,10 +1,10 @@
 use crate::engine::{ApplyReport, Battery, Engine};
 use secbird_core::log;
 use std::collections::HashSet;
+use crate::settings::{autostart_enabled, open_config_folder, set_autostart, TraySettings};
 use crate::{apps, osd, server};
 use std::ffi::CString;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use secbird_core::config_dir;
 use secbird_core::update::Release;
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -15,7 +15,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Registry::*;
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::Shell::*;
@@ -70,7 +69,6 @@ const ID_GET_UPDATE: u32 = 11;
 const ID_PROFILE_BASE: u32 = 1000;
 
 const GUID_DEVINTERFACE_HID: GUID = GUID::from_u128(0x4d1e55b2_f16f_11cf_88cb_001111000030);
-const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// "TaskbarCreated" is broadcast when Explorer restarts; the icon must be re-added.
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
@@ -117,48 +115,6 @@ struct UpdateResult {
     found: Result<Option<Release>, String>,
 }
 
-/// Tray settings in `tray.json`.
-#[derive(Default, serde::Serialize, serde::Deserialize)]
-struct TraySettings {
-    /// Check Razer's product pages for newer firmware once a week. Off until turned on.
-    #[serde(default)]
-    firmware_weekly: bool,
-    /// Unix time of the last weekly check.
-    #[serde(default)]
-    firmware_checked: u64,
-    /// Device key -> firmware version already announced, so each is announced once.
-    #[serde(default)]
-    firmware_notified: std::collections::BTreeMap<String, String>,
-    /// Don't check GitHub for a newer Secretarybird. The check is on unless turned off.
-    #[serde(default)]
-    updates_off: bool,
-    /// Unix time of the last daily new-version check.
-    #[serde(default)]
-    update_checked: u64,
-    /// The newest version already announced, so each is announced once.
-    #[serde(default)]
-    update_notified: String,
-}
-
-impl TraySettings {
-    fn path() -> std::path::PathBuf {
-        config_dir().join("tray.json")
-    }
-
-    fn load() -> Self {
-        std::fs::read_to_string(Self::path())
-            .ok()
-            .and_then(|t| serde_json::from_str(t.trim_start_matches('\u{feff}')).ok())
-            .unwrap_or_default()
-    }
-
-    fn save(&self) {
-        if let Ok(text) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::create_dir_all(config_dir());
-            let _ = std::fs::write(Self::path(), text);
-        }
-    }
-}
 
 /// A device with newer firmware out, found by the weekly check.
 struct FirmwareNews {
@@ -518,15 +474,25 @@ impl App {
             match event {
                 DeviceEvent::Dpi { key, x, y } => {
                     self.engine().dpi_changed(&key, x, y);
-                    osd::show(&if x == y { format!("{x} DPI") } else { format!("{x} × {y} DPI") });
+                    if !TraySettings::load().popups_off {
+                        osd::show(&if x == y { format!("{x} DPI") } else { format!("{x} × {y} DPI") });
+                    }
                 }
-                DeviceEvent::OnboardProfile(n) => osd::show(&format!("On-board profile {n}")),
+                DeviceEvent::OnboardProfile(n) => {
+                    if !TraySettings::load().popups_off {
+                        osd::show(&format!("On-board profile {n}"));
+                    }
+                }
             }
         }
     }
 
     /// Switch devices to the profile tied to the program now in front, or back.
     fn foreground_changed(&mut self) {
+        let settings = TraySettings::load();
+        if settings.auto_switch_off {
+            return;
+        }
         let exe = apps::foreground();
         let reports = self.engine().set_foreground(exe.clone());
         if reports.is_empty() {
@@ -536,7 +502,9 @@ impl App {
         log::append(&format!("{} in front: {}", exe.as_deref().unwrap_or("?"), what.join(", ")));
         let mut names: Vec<&str> = reports.iter().map(|r| r.profile.as_str()).collect();
         names.dedup();
-        osd::show(&format!("{} profile", names.join(", ")));
+        if !settings.popups_off {
+            osd::show(&format!("{} profile", names.join(", ")));
+        }
         self.notify_failures(&reports);
         self.update_tooltip();
     }
@@ -565,7 +533,9 @@ impl App {
                 self.low_battery.remove(&b.key);
             } else if b.percent <= LOW_BATTERY && self.low_battery.insert(b.key.clone()) {
                 log::append(&format!("low battery: {} {}%", b.name, b.percent));
-                self.balloon("Battery low", &format!("{}: {}%", b.name, b.percent));
+                if !TraySettings::load().battery_warning_off {
+                    self.balloon("Battery low", &format!("{}: {}%", b.name, b.percent));
+                }
             }
         }
         self.batteries = batteries;
@@ -965,43 +935,6 @@ unsafe fn is_razer(lparam: LPARAM) -> bool {
     name.to_ascii_uppercase().contains("VID_1532")
 }
 
-fn autostart_enabled() -> bool {
-    unsafe {
-        let mut key: HKEY = null_mut();
-        if RegOpenKeyExW(HKEY_CURRENT_USER, wide(RUN_KEY).as_ptr(), 0, KEY_READ, &mut key) != ERROR_SUCCESS {
-            return false;
-        }
-        let found =
-            RegQueryValueExW(key, wide(APP_NAME).as_ptr(), null(), null_mut(), null_mut(), null_mut()) == ERROR_SUCCESS;
-        RegCloseKey(key);
-        found
-    }
-}
-
-fn set_autostart(enable: bool) {
-    unsafe {
-        let mut key: HKEY = null_mut();
-        if RegOpenKeyExW(HKEY_CURRENT_USER, wide(RUN_KEY).as_ptr(), 0, KEY_SET_VALUE, &mut key) != ERROR_SUCCESS {
-            return;
-        }
-        if enable {
-            if let Ok(exe) = std::env::current_exe() {
-                let value = wide(&format!("\"{}\"", exe.display()));
-                RegSetValueExW(
-                    key,
-                    wide(APP_NAME).as_ptr(),
-                    0,
-                    REG_SZ,
-                    value.as_ptr() as *const u8,
-                    (value.len() * 2) as u32,
-                );
-            }
-        } else {
-            RegDeleteValueW(key, wide(APP_NAME).as_ptr());
-        }
-        RegCloseKey(key);
-    }
-}
 
 /// Put text on the clipboard. False if another program holds it.
 fn set_clipboard(text: &str) -> bool {
@@ -1039,20 +972,6 @@ fn set_clipboard(text: &str) -> bool {
     }
 }
 
-fn open_config_folder() {
-    let dir = config_dir();
-    let _ = std::fs::create_dir_all(&dir);
-    unsafe {
-        ShellExecuteW(
-            null_mut(),
-            wide("open").as_ptr(),
-            wide(&dir.display().to_string()).as_ptr(),
-            null(),
-            null(),
-            SW_SHOWNORMAL,
-        );
-    }
-}
 
 /// The tray variant of the logo (white background, resource id 2 from build.rs), at the
 /// small-icon size Windows uses for the notification area. Resource 1 is the app icon.

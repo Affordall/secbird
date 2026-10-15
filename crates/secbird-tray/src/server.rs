@@ -20,7 +20,8 @@ use std::time::{Duration, SystemTime};
 const PAGE: &str = include_str!("editor.html");
 const LOGO_PNG: &[u8] = include_bytes!("../../../assets/logo-64.png");
 const MAX_HEADER: usize = 16 * 1024;
-const MAX_BODY: usize = 64 * 1024;
+/// Profile imports with painted keys can be a few hundred KB.
+const MAX_BODY: usize = 2 * 1024 * 1024;
 
 pub struct Editor {
     pub url: String,
@@ -224,6 +225,9 @@ impl Server {
                 engine.rescan();
                 Ok(state(&engine))
             }
+            ("GET", "/api/settings") => Ok(settings_json(&engine)),
+            ("GET", "/api/export") => Store::load(&config_dir().join("profiles.json"))
+                .and_then(|s| serde_json::to_value(&s).map_err(|e| Error::Db(e.to_string()))),
             ("POST", path) => post(&mut engine, path, &req.body),
             _ => return Response::text("404 Not Found", "Not found"),
         };
@@ -261,6 +265,13 @@ struct Body {
     keys: Vec<String>,
     #[serde(default)]
     apps: Vec<String>,
+    /// A Settings page switch (`key`) and whether it is on; `data` for an imported file.
+    #[serde(default)]
+    key: String,
+    #[serde(default)]
+    on: bool,
+    #[serde(default)]
+    data: Value,
     /// Button name, layer ("normal" / "hypershift") and action text ("" = reset).
     #[serde(default)]
     button: String,
@@ -297,9 +308,9 @@ fn buttons_json(dev: &Device, store: &mut Store) -> Value {
         .buttons()
         .into_iter()
         .map(|(id, normal)| {
-            let name = button_name(id).unwrap_or("?");
+            let name = button_name(id);
             let hyper = dev.button(id, Layer::HyperShift).map(|a| a.to_string()).ok();
-            let is_remapped = |layer| remapped.contains_key(&setting_key(name, layer));
+            let is_remapped = |layer| remapped.contains_key(&setting_key(&name, layer));
             // What the mouse itself holds: the live value unless the active profile remapped it.
             let saved = |layer, live: Option<String>| match is_remapped(layer) {
                 true => dev.saved_button(id, layer).map(|a| a.to_string()).ok(),
@@ -324,7 +335,10 @@ fn buttons_json(dev: &Device, store: &mut Store) -> Value {
 fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
     let b: Body = serde_json::from_slice(body).map_err(|e| Error::InvalidArg(e.to_string()))?;
     if path == "/api/sync" {
-        return sync(engine, &b.color);
+        return sync(engine, &b.color, &b.effect);
+    }
+    if let Some(answer) = app_post(engine, path, &b) {
+        return answer;
     }
     let target = if b.id.is_empty() { b.pid.to_ascii_uppercase() } else { b.id.clone() };
 
@@ -460,19 +474,92 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
     }
 }
 
-/// One color on every zone of every connected device.
-fn sync(engine: &mut Engine, color: &str) -> Result<Value, Error> {
-    let color: Rgb = color.parse()?;
+/// One color, or one effect started together, on every zone of every connected device.
+fn sync(engine: &mut Engine, color: &str, effect: &str) -> Result<Value, Error> {
     let mut store = Store::load(&config_dir().join("profiles.json"))?;
-    let results = actions::sync_color(engine.devices(), &mut store, color);
+    let results = match effect.is_empty() {
+        true => actions::sync_color(engine.devices(), &mut store, color.parse()?),
+        false => actions::sync_effect(engine.devices(), &mut store, &effect.parse()?),
+    };
     let zones = results.iter().filter(|r| r.result.is_ok()).count();
     let mut pids: Vec<&str> = results.iter().filter(|r| r.result.is_ok()).map(|r| r.key.as_str()).collect();
     pids.dedup();
-    let failed: Vec<String> = results
-        .iter()
-        .filter_map(|r| r.result.as_ref().err().map(|e| format!("{} {}: {e}", r.device, r.zone)))
-        .collect();
-    Ok(json!({ "zones": zones, "devices": pids.len(), "failed": failed, "state": state(engine) }))
+    // Devices that can't show it at all (older lighting, or an effect the firmware doesn't
+    // run) are named once; anything else is a real failure, per zone.
+    let mut skipped: Vec<String> = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    for r in &results {
+        match &r.result {
+            Err(Error::Unsupported(_)) => {
+                if !skipped.contains(&r.device) {
+                    skipped.push(r.device.clone());
+                }
+            }
+            Err(e) => failed.push(format!("{} {}: {e}", r.device, r.zone)),
+            Ok(()) => {}
+        }
+    }
+    Ok(json!({ "zones": zones, "devices": pids.len(), "skipped": skipped, "failed": failed, "state": state(engine) }))
+}
+
+/// The app's own settings, for the editor's Settings page.
+fn settings_json(engine: &Engine) -> Value {
+    let s = crate::settings::TraySettings::load();
+    json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "repository": env!("CARGO_PKG_REPOSITORY"),
+        "folder": config_dir().display().to_string(),
+        "autostart": crate::settings::autostart_enabled(),
+        "updates": !s.updates_off,
+        "firmware_weekly": s.firmware_weekly,
+        "popups": !s.popups_off,
+        "battery_warning": !s.battery_warning_off,
+        "auto_switch": !s.auto_switch_off,
+        "synapse": engine.synapse(),
+    })
+}
+
+/// Settings page actions that are about the app, not one device. `None` for other paths.
+fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, Error>> {
+    use crate::settings::{set_autostart, TraySettings};
+    Some(match path {
+        "/api/settings" => {
+            let mut s = TraySettings::load();
+            match b.key.as_str() {
+                "autostart" => set_autostart(b.on),
+                "updates" => s.updates_off = !b.on,
+                "firmware_weekly" => s.firmware_weekly = b.on,
+                "popups" => s.popups_off = !b.on,
+                "battery_warning" => s.battery_warning_off = !b.on,
+                "auto_switch" => s.auto_switch_off = !b.on,
+                other => return Some(Err(Error::InvalidArg(format!("unknown setting '{other}'")))),
+            }
+            s.save();
+            Ok(settings_json(engine))
+        }
+        "/api/update-check" => secbird_core::update::check().map(|r| match r {
+            Some(r) => json!({ "latest": r.version, "url": r.url }),
+            None => json!({ "latest": null }),
+        }),
+        "/api/import" => (|| {
+            let incoming: Store = serde_json::from_value(b.data.clone())
+                .map_err(|e| Error::InvalidArg(format!("not a Secretarybird export: {e}")))?;
+            let mut store = Store::load(&config_dir().join("profiles.json"))?;
+            let added = store.import(incoming);
+            store.save()?;
+            Ok(json!({ "added": added, "state": state(engine) }))
+        })(),
+        "/api/open-folder" => {
+            crate::settings::open_config_folder();
+            Ok(json!({}))
+        }
+        "/api/report" => Ok(json!({ "text": engine.report_text() })),
+        "/api/restore-all-buttons" => Ok(json!({ "results": engine.restore_buttons().into_iter().map(|(name, r)| match r {
+            Ok(n) => json!({ "device": name, "restored": n }),
+            Err(e) => json!({ "device": name, "error": e.to_string() }),
+        }).collect::<Vec<_>>() })),
+        _ => return None,
+    })
 }
 
 fn state(engine: &Engine) -> Value {

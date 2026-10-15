@@ -545,7 +545,7 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
                 return Err(Error::Unsupported(format!("{} has no on-board button assignments", dev.name())));
             }
             for (id, normal) in buttons {
-                let name = button_name(id).unwrap_or("?");
+                let name = button_name(id);
                 let action = match layer {
                     Layer::Normal => normal.to_string(),
                     Layer::HyperShift => dev.button(id, layer).map_or_else(|e| e.to_string(), |a| a.to_string()),

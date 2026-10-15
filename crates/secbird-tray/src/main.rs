@@ -12,6 +12,8 @@ mod osd;
 #[cfg(windows)]
 mod server;
 #[cfg(windows)]
+mod settings;
+#[cfg(windows)]
 mod win;
 
 #[cfg(windows)]

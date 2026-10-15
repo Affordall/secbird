@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.4.2] - 2026-10-15
+
+### Added
+- A Settings page (the gear in the top bar): theme and motion; start with Windows; switching
+  profiles with games; DPI and profile popups, the low battery warning, new version notices and
+  the weekly firmware check, each with an on/off switch; back up every profile to a file and
+  restore from one; open the settings folder; copy a device report and open a GitHub issue; put
+  every mouse button back to what the mouse stores.
+- Use a zone's lighting elsewhere: a zone's panel has "Use this lighting on: All zones · Every
+  device", which copies its colour or effect (with its options, like wave direction or the
+  breathing colour). Effects start together on every device, so a mouse, keyboard, mousepad and
+  dock cycle in step; each device keeps its own timer, so they can drift apart over time, and
+  copying again lines them up. A device that can't run the effect (older lighting, or firmware
+  without it, like the Basilisk V3 and breathing) is named and left as it is.
+- Basilisk V4 Pro, Basilisk V4 HyperSpeed, Naga V3 Pro and the Basilisk V3 Pro 35K Xbox Edition
+  (wired and wireless), so they are named and set up right, also on the Mouse Dock Pro (#16).
+- `secbird report` reads the mouse's own button list.
+
+### Changed
+- DPI panel: one readout card with − and + (steps of 50) and the value typed in place, a
+  full-width slider with the range at its ends, and presets in an even row with the current one
+  filled. Sliders everywhere take the theme's colours instead of the browser's default bar.
+- Themes: each has its own colour for what is active (the live profile, current section,
+  selected tile and selected option), filled solid as Bridge already did; the profile underline
+  is gone. Light is a soft light blue, Workshop forest green, Roast latte cream and Classic
+  azure; Bridge and Neon stay as they were. New: Acid, black with vivid green.
+
+### Fixed
+- BlackWidow 2019: the device list had the wrong transaction id (3F; it answers on 1F). It
+  worked anyway because Secretarybird tries the others, but it now finds it first time (#12).
+- "Same color on all zones" copied the first zone's colour, not the one just changed. It is now
+  "Same on all zones" and copies the colour or effect of the zone you changed last.
+- Buttons showed every button Secretarybird knows, Naga side grids included, on a mouse behind
+  the Mouse Dock Pro (#16). The editor now asks the mouse which buttons it has, as Synapse does,
+  and shows only those; buttons without a name yet appear as "Button 120", and functions only
+  Synapse knows as "Set by Synapse".
+
 ## [0.4.1] - 2026-10-14
 
 ### Added

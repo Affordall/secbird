@@ -57,16 +57,17 @@ pub const BUTTONS: &[(u8, &str, &str)] = &[
     (106, "wheel-mode", "Wheel mode button"),
 ];
 
+/// The id of a button name; buttons not in [`BUTTONS`] are named `button-<id>`.
 pub fn button_id(name: &str) -> Option<u8> {
-    BUTTONS.iter().find(|b| b.1 == name).map(|b| b.0)
+    BUTTONS.iter().find(|b| b.1 == name).map(|b| b.0).or_else(|| name.strip_prefix("button-")?.parse().ok())
 }
 
-pub fn button_name(id: u8) -> Option<&'static str> {
-    BUTTONS.iter().find(|b| b.0 == id).map(|b| b.1)
+pub fn button_name(id: u8) -> String {
+    BUTTONS.iter().find(|b| b.0 == id).map_or_else(|| format!("button-{id}"), |b| b.1.to_string())
 }
 
-pub fn button_label(id: u8) -> &'static str {
-    BUTTONS.iter().find(|b| b.0 == id).map_or("Button", |b| b.2)
+pub fn button_label(id: u8) -> String {
+    BUTTONS.iter().find(|b| b.0 == id).map_or_else(|| format!("Button {id}"), |b| b.2.to_string())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -571,14 +572,39 @@ impl Device {
         self.set_button(id, layer, saved)
     }
 
+    /// Button ids the mouse says it has (Synapse's "Get Button ID list"), in [`BUTTONS`]
+    /// order with any ids we have no name for after them. `None` if it doesn't answer.
+    /// Verified on a Basilisk V3: 13 ids, exactly its buttons.
+    pub fn button_ids(&self) -> Option<Vec<u8>> {
+        let reply = self.get(cmd::BUTTON_IDS, cmd::BUTTON_IDS_SIZE, &[]).ok()?;
+        let args = reply.args();
+        let listed = args.get(1..1 + *args.first()? as usize)?;
+        let listed: Vec<u8> = listed.iter().copied().filter(|&id| id != 0).collect();
+        if listed.is_empty() {
+            return None;
+        }
+        let mut ids: Vec<u8> = BUTTONS.iter().map(|b| b.0).filter(|id| listed.contains(id)).collect();
+        ids.extend(listed.iter().filter(|id| !BUTTONS.iter().any(|b| b.0 == **id)));
+        Some(ids)
+    }
+
     /// Buttons this device has, with their current (live, normal-layer) action. Empty for
-    /// devices without on-board button assignments. Asks about each known button id, so
-    /// it takes a moment; call it when the buttons are about to be shown.
+    /// devices without on-board button assignments. Uses the mouse's own button list, or
+    /// asks about each known button id when it has none (a mouse behind a receiver may
+    /// answer for buttons it doesn't have). Takes a moment; call it when the buttons are
+    /// about to be shown.
     pub fn buttons(&self) -> Vec<(u8, Action)> {
         if !matches!(self.spec.as_ref().map(|s| s.kind), Some(crate::Kind::Mouse)) {
             return Vec::new();
         }
-        BUTTONS.iter().filter_map(|&(id, _, _)| self.button(id, Layer::Normal).ok().map(|a| (id, a))).collect()
+        let ids = self.button_ids().unwrap_or_else(|| {
+            // Without the mouse's list, only a Naga (or a docked mouse we can't name) gets
+            // the side-plate buttons.
+            let name = self.spec.as_ref().map_or("", |s| s.name.as_str());
+            let plates = name.contains("Naga") || name.starts_with("Mouse on");
+            BUTTONS.iter().map(|b| b.0).filter(|id| plates || !(64..=86).contains(id)).collect()
+        });
+        ids.into_iter().filter_map(|id| self.button(id, Layer::Normal).ok().map(|a| (id, a))).collect()
     }
 }
 
