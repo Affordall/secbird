@@ -10,6 +10,8 @@ DEVICE:
   list                      Connected devices
   info                      Firmware, serial, DPI, polling rate, battery
   battery                   Battery level and charging state
+  lighting [on|off]         Show or change lighting control for this device (all profiles);
+                            off leaves RGB untouched for another app, not lights out
   firmware                  Is newer firmware out? Asks Razer's public product page
                             (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
@@ -30,7 +32,7 @@ SETTINGS (saved to the active profile):
                             wave:left|right[@speed 1-5], reactive:RRGGBB[@1-3],
                             starlight:RRGGBB[,RRGGBB]|random[@1-3]
   keys <RRGGBB>             Every key one color (keyboards with per-key lighting)
-  sync <RRGGBB>             Same color on every zone of every connected device
+  sync <RRGGBB>             Same color everywhere (skips devices with lighting control off)
 
 BUTTONS (mice with on-board button memory; add --hypershift for the HyperShift layer):
   button [list]             Buttons and what they do now
@@ -228,7 +230,7 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
         let mut store = Store::load(&dir.join("profiles.json"))?;
         let results = actions::sync_color(&devices, &mut store, color);
         if results.is_empty() {
-            println!("No connected device has lighting.");
+            println!("No connected device has lighting control enabled.");
         }
         let mut failed = 0;
         for r in &results {
@@ -260,6 +262,15 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
 
     match command.as_str() {
         "info" => info(dev, &mut store),
+        "lighting" => {
+            match rest.first().map(String::as_str) {
+                None => {}
+                Some(v @ ("on" | "off")) if rest.len() == 1 => actions::set_lighting_control(dev, &mut store, v == "on")?,
+                _ => return Err(Error::InvalidArg("usage: lighting [on|off]".into())),
+            }
+            println!("Lighting control: {}", if store.for_device(dev).lighting_off { "off (RGB left untouched)" } else { "on" });
+            Ok(())
+        }
         "battery" => match dev.battery()? {
             None => {
                 println!("Wired device, no battery.");
