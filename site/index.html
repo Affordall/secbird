@@ -8,15 +8,15 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <meta property="og:title" content="Secretarybird">
 <meta property="og:description" content="Your Razer gear, minus the bloat. Free and open source, for Windows.">
-<meta property="og:image" content="overview.webp">
+<meta property="og:image" content="https://secbird.94.249.197.142.nip.io/overview.webp">
 <style>
   :root {
     --bg: #0c0c0e; --panel: #15151a; --line: #26262e; --text: #f2f2f4; --muted: #9a9ca3;
-    --accent: #f26b21; --accent-ink: #ffffff; --ok: #4ade80;
+    --accent: #f26b21; --accent-text: #f26b21; --accent-ink: #0c0c0e; --ok: #4ade80;
     color-scheme: dark;
   }
   @media (prefers-color-scheme: light) {
-    :root { --bg: #ffffff; --panel: #f5f5f7; --line: #e3e3e9; --text: #16161a; --muted: #62626d; --accent: #e05a12; --ok: #15803d; color-scheme: light; }
+    :root { --bg: #ffffff; --panel: #f5f5f7; --line: #e3e3e9; --text: #16161a; --muted: #62626d; --accent: #e05a12; --accent-text: #b4470c; --accent-ink: #16161a; --ok: #15803d; color-scheme: light; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; }
@@ -27,7 +27,7 @@
   .hero img.logo { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 18px 50px #0006; }
   h1 { font-size: clamp(40px, 7vw, 68px); letter-spacing: -.035em; line-height: 1.05; margin: 22px 0 10px; }
   .tag { font-size: clamp(19px, 2.6vw, 24px); color: var(--muted); margin: 0; }
-  .tag b { color: var(--accent); font-weight: 600; }
+  .tag b { color: var(--accent-text); font-weight: 600; }
   .cta { display: inline-flex; align-items: center; gap: 12px; margin-top: 34px; padding: 16px 30px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-size: 20px; font-weight: 650; text-decoration: none; box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 35%, transparent); transition: transform .15s; }
   .cta:hover { transform: translateY(-2px); }
   .cta svg { width: 22px; height: 22px; }
@@ -35,7 +35,7 @@
   .small a { color: var(--muted); }
   .oss { display: inline-flex; align-items: center; gap: 8px; margin: 18px 0 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: 15px; }
   .oss svg { width: 18px; height: 18px; flex: none; }
-  .oss a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .oss a { color: var(--accent-text); font-weight: 600; text-decoration: none; }
 
   .shot { margin: 28px auto 0; }
   .shot img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 30px 80px #0007; }
@@ -65,13 +65,13 @@
   .btn2:hover { border-color: var(--accent); }
 
   footer { margin: 72px 0 40px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: space-between; }
-  footer a { color: var(--muted); }
+  footer a { color: var(--muted); display: inline-block; padding: 6px 0; margin: -6px 0; }
 </style>
 </head>
 <body>
 <main>
   <header class="hero">
-    <img class="logo" src="logo.png" alt="Secretarybird logo" width="112" height="112">
+    <img class="logo" src="logo.webp" alt="Secretarybird logo" width="112" height="112">
     <h1>Secretarybird</h1>
     <p class="tag">Your Razer gear, <b>minus the bloat.</b></p>
     <a class="cta" id="download" href="https://github.com/infinityInfinite/secbird/releases/latest">
@@ -89,11 +89,11 @@
   </figure>
 
   <section>
-    <h2>Everything Synapse does for your lights and DPI. Nothing else.</h2>
+    <h2>Lighting, DPI, buttons and profiles. Without the rest of Synapse.</h2>
     <div class="grid">
       <div class="card"><b>No background services</b><span>An optional cleanup command turns Razer's services off. Your devices keep working, and it can be undone.</span></div>
       <div class="card"><b>No pop-ups, no ads</b><span>No account, no tracking. It only goes online to check for a new version once a day, and you can turn that off.</span></div>
-      <div class="card"><b>Tiny</b><span>A 1 MB app using about 11 MB of memory in the tray.</span></div>
+      <div class="card"><b>Tiny</b><span>A 1 MB app that uses about 12 MB of memory while it sits in the tray.</span></div>
       <div class="card"><b>No restarts</b><span>Finds your devices in about a second. Settings come back after unplugging, sleep and reboot.</span></div>
     </div>
   </section>
@@ -124,7 +124,7 @@
 
   <section>
     <div class="note">
-      <p><strong>Help us test it.</strong> It's a beta and has only been tested on one mouse so far, the Basilisk V3. Other Razer devices should work but haven't been tried yet.</p>
+      <p><strong>Help us test it.</strong> It's a beta. Nine Razer devices are confirmed working so far, mice, keyboards and a keypad among them (<a href="https://github.com/infinityInfinite/secbird#help-us-support-your-device">see the list</a>). Others should work but haven't been tried yet.</p>
       <p>If you try it, tell us how it went, working or not. It takes two minutes and helps us a lot.</p>
       <a class="btn2" href="https://github.com/infinityInfinite/secbird/issues/new?template=device-report.yml">Report how your device works</a>
     </div>
