@@ -1345,6 +1345,107 @@ mod tests {
     }
 
     #[test]
+    fn disabled_lighting_sends_no_rgb_commands_and_keeps_other_settings() {
+        use crate::{actions, Store};
+        let path = std::env::temp_dir().join(format!("secbird-lighting-control-{}.json", std::process::id()));
+        let mut store = Store::load(&path).unwrap();
+        for (sim, pid) in [(Sim::mouse(), MOUSE_PID), (Sim::keyboard(), KEYBOARD_PID), (Sim::old_keyboard(), OLD_KEYBOARD_PID)] {
+            let dev = open(&sim, pid);
+            let profiles = store.for_device(&dev);
+            let profile = profiles.active_mut();
+            profile.polling = Some(500);
+            if pid == MOUSE_PID {
+                profile.dpi = Some((1600, 1600));
+                profile.buttons.insert("side-forward".into(), "key:a".into());
+            }
+            for led in &dev.spec.as_ref().unwrap().leds {
+                profile.lighting.insert(led.name.clone(), Zone {
+                    color: Some(Rgb(1, 2, 3)), brightness: Some(25), ..Zone::default()
+                });
+            }
+            if let Some(m) = dev.matrix() {
+                profile.keys = vec![Rgb(4, 5, 6); m.rows as usize * m.cols as usize];
+            }
+            profiles.create("Gaming").unwrap();
+            profiles.profiles.get_mut("Gaming").unwrap().lighting.values_mut().for_each(|z| {
+                z.off = true;
+                z.effect = Some(crate::effects::Effect::Spectrum);
+            });
+            profiles.set_apps("Gaming", &["game.exe".into()]).unwrap();
+            let saved = profiles.profiles.clone();
+            sim.state().log.clear();
+            actions::set_lighting_control(&dev, &mut store, false).unwrap();
+            assert!(sim.state().log.is_empty(), "opting out must not send even an off command");
+            store = Store::load(&path).unwrap();
+            let profiles = store.for_device(&dev);
+            assert!(profiles.lighting_off);
+            for foreground in [None, Some("game.exe"), None] {
+                let name = profiles.effective(foreground);
+                assert!(profiles.apply(name, &dev).iter().all(|a| a.result.is_ok()));
+            }
+            assert!(sim.state().log.iter().all(|c| c.class != 0x03 && c.class != 0x0F));
+            assert_eq!(dev.polling_rate().unwrap(), 500);
+            if pid == MOUSE_PID {
+                assert_eq!(dev.dpi().unwrap(), (1600, 1600));
+                assert_eq!(dev.button(5, crate::buttons::Layer::Normal).unwrap(), "key:a".parse().unwrap());
+            }
+            sim.state().log.clear();
+            let zone = &dev.spec.as_ref().unwrap().leds[0].name;
+            for result in [
+                actions::set_color(&dev, &mut store, zone, Rgb(9, 9, 9)),
+                actions::set_effect(&dev, &mut store, zone, crate::effects::Effect::Spectrum),
+                actions::set_brightness(&dev, &mut store, zone, 100),
+                actions::lights_off(&dev, &mut store, zone),
+                actions::set_keys(&dev, &mut store, vec![Rgb(9, 9, 9); 132]),
+            ] {
+                assert!(matches!(result, Err(Error::InvalidArg(_))));
+            }
+            assert!(sim.state().log.is_empty(), "editor and CLI writes must be rejected before USB access");
+            assert_eq!(store.for_device(&dev).profiles, saved, "saved lighting must not change");
+            actions::set_lighting_control(&dev, &mut store, true).unwrap();
+            assert!(sim.state().log.is_empty(), "opting in only changes ownership");
+            actions::set_color(&dev, &mut store, zone, Rgb(9, 9, 9)).unwrap();
+            assert!(!sim.state().log.is_empty(), "opting back in allows RGB writes");
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn sync_skips_disabled_devices_including_identical_models() {
+        use crate::{actions, Store};
+        let path = std::env::temp_dir().join(format!("secbird-lighting-sync-{}.json", std::process::id()));
+        let mut store = Store::load(&path).unwrap();
+        let a = Sim::mouse();
+        let b = Sim::mouse();
+        b.state().serial = "SIMMOUSE0002".into();
+        let keyboard = Sim::keyboard();
+        let devices = [open(&a, MOUSE_PID), open(&b, MOUSE_PID), open(&keyboard, KEYBOARD_PID)];
+        for dev in [&devices[0], &devices[2]] {
+            actions::set_lighting_control(dev, &mut store, false).unwrap();
+        }
+        a.state().log.clear();
+        keyboard.state().log.clear();
+        for results in [
+            actions::sync_color(&devices, &mut store, Rgb(1, 2, 3)),
+            actions::sync_effect(&devices, &mut store, &crate::effects::Effect::Spectrum),
+        ] {
+            assert_eq!(results.len(), 3, "only the second mouse's zones count");
+            assert!(results.iter().all(|r| r.key == devices[1].key() && r.result.is_ok()));
+        }
+        assert!(a.state().log.is_empty());
+        assert!(keyboard.state().log.is_empty());
+        assert!(!b.state().log.is_empty());
+        assert_eq!(*store.for_device(&devices[0]).active(), Profile::default());
+        assert_eq!(*store.for_device(&devices[2]).active(), Profile::default());
+        actions::set_lighting_control(&devices[1], &mut store, false).unwrap();
+        b.state().log.clear();
+        assert!(actions::sync_color(&devices, &mut store, Rgb(9, 9, 9)).is_empty());
+        assert!(actions::sync_effect(&devices, &mut store, &crate::effects::Effect::Spectrum).is_empty());
+        assert!(b.state().log.is_empty());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn sync_colors_every_zone_on_every_device() {
         use crate::{actions, Store};
         let path = std::env::temp_dir().join(format!("secbird-sync-{}.json", std::process::id()));

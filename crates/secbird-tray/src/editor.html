@@ -374,7 +374,7 @@
   <div class="actions">
     <div class="sync" id="sync" hidden>
       <label class="mini" title="Color to sync"><input type="color" id="syncColor" value="#ff2800" aria-label="Color to sync"></label>
-      <button id="syncBtn" title="Same color on every zone of every device">Sync<span class="synclabel"> color everywhere</span></button>
+      <button id="syncBtn" title="Same color on every device with lighting control enabled">Sync<span class="synclabel"> color everywhere</span></button>
     </div>
     <button class="ghost" id="rescan">Rescan</button>
     <label class="themepick" title="Theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
@@ -588,7 +588,7 @@ function render() {
   $('work').hidden = !onDevice || view === 'compare';
   $('compare').hidden = !onDevice || view !== 'compare';
   $('synBanner').hidden = !synapse.length;
-  $('sync').hidden = !devices.some(d => d.leds.length);
+  $('sync').hidden = !devices.some(d => d.lighting_control && d.leds.length);
   if (!syncPicked && dev) { // until a sync color is picked, offer the color on screen
     const lit = dev.leds.map(l => zoneOf(dev.profile || {}, l.name)).find(z => z.color && !z.off);
     if (lit) $('syncColor').value = '#' + lit.color.toLowerCase();
@@ -663,7 +663,7 @@ window.addEventListener('resize', () => requestAnimationFrame(() => { placeUnder
 
 function paintPreview() {
   const leds = dev.leds.map(l => l.name);
-  $('preview').style.display = dev.kind === 'mouse' && leds.some(n => ['scroll', 'logo', 'underglow'].includes(n)) ? '' : 'none';
+  $('preview').style.display = dev.lighting_control && dev.kind === 'mouse' && leds.some(n => ['scroll', 'logo', 'underglow'].includes(n)) ? '' : 'none';
   ['scroll', 'logo', 'underglow'].forEach(n => {
     const e = $('z-' + n), z = zoneOf(dev.profile, n), lit = leds.includes(n) && !z.off && z.color;
     const color = lit ? '#' + z.color : 'var(--zone-off)';
@@ -678,7 +678,9 @@ function sections() {
   const s = [];
   const light = dev.leds.map(l => ({ key: 'zone:' + l.name, label: label(l.name) }));
   if (dev.matrix) light.push({ key: 'keys', label: 'Per-key colors' });
-  if (light.length) s.push({ id: 'light', name: 'Lighting', rows: light, tools: dev.leds.length > 1 ? 'allzones' : null });
+  if (light.length) s.push({ id: 'light', name: 'Lighting',
+    rows: [{ key: 'lighting-control', label: 'Control lighting' }, ...(dev.lighting_control ? light : [])],
+    tools: dev.lighting_control && dev.leds.length > 1 ? 'allzones' : null });
   const sens = [];
   if (dev.dpi) sens.push({ key: 'dpi', label: 'DPI' });
   if (dev.stages) sens.push({ key: 'stages', label: 'DPI stages' });
@@ -702,6 +704,7 @@ const sectionOf = key => (sections().find(s => s.rows.some(r => r.key === key))
 function railSummary(s) {
   const p = dev.profile;
   if (s.id === 'light') {
+    if (!dev.lighting_control) return 'Not controlled';
     if (p.keys && p.keys.length && dev.matrix) return 'Per-key colors';
     const box = el('span');
     dev.leds.forEach(l => { const paint = zonePaint(zoneOf(p, l.name)); const d = el('i', { className: 'dot' + (paint ? '' : ' off') });
@@ -915,7 +918,7 @@ function refreshCell(row) {
 // ---------- Compare: every profile side by side ----------
 
 function renderCompare() {
-  const t = $('sheet'), names = dev.profiles, secs = sections().filter(s => !['macros', 'profile', 'device'].includes(s.id));
+  const t = $('sheet'), names = dev.profiles, secs = sections().filter(s => !['macros', 'profile', 'device'].includes(s.id) && (s.id !== 'light' || dev.lighting_control));
   if (secs.some(s => s.id === 'buttons')) loadButtons(dev);
   // Buttons that play a macro show its name, so the list is needed here too.
   if (dev.macros && macroData[dev.id] === undefined) loadMacros(dev);
@@ -928,7 +931,7 @@ function renderCompare() {
   secs.forEach(s => {
     const body = el('tbody');
     body.append(el('tr', { className: 'grp' }, el('th', { colSpan: span, scope: 'rowgroup', textContent: s.name + (s.id === 'buttons' && btnLayer === 'hypershift' ? ' · HyperShift' : '') })));
-    const rowsOf = s.loading ? [{ key: 'loading', label: 'Reading buttons…' }] : s.rows;
+    const rowsOf = s.loading ? [{ key: 'loading', label: 'Reading buttons…' }] : s.rows.filter(r => r.key !== 'lighting-control');
     rowsOf.forEach(r => {
       const tr = el('tr');
       tr.append(el('th', { scope: 'row', textContent: r.label }));
@@ -970,6 +973,7 @@ const differs = (key, name) => name !== dev.active && cellValue(key, name) !== c
 // mouse saved. Other columns get their mark from differs().
 function cellView(key, name) {
   const p = prof(name), active = name === dev.active;
+  if (key === 'lighting-control') return [dev.lighting_control ? 'Secretarybird' : '<span class="unset">Not controlled</span>'];
   if (key.startsWith('zone:')) {
     const z = zoneOf(p, key.slice(5));
     if (p.keys && p.keys.length && dev.matrix) return ['<span class="unset">Per-key colors</span>'];
@@ -1065,7 +1069,8 @@ function profileHeader(n) {
 function buildEditor(host, r) {
   const box = el('div', { className: 'edbox' });
   host.append(box);
-  if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
+  if (r.key === 'lighting-control') lightingControlEditor(box);
+  else if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
   else if (r.key === 'keys') keysEditor(box);
   else if (r.key === 'dpi') dpiEditor(box);
   else if (r.key === 'polling') pollingEditor(box);
@@ -1097,6 +1102,28 @@ function appsEditor(box) {
     el('p', { className: 'note', textContent: 'Running programs are suggested as you type. While one is in front, the tray switches to this profile, then back when you leave it.' }));
   if (dev.profiles.length > 1) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'This profile' }),
     el('div', { className: 'row' }, el('button', { className: 'ghost danger', textContent: 'Delete ' + n, onclick: () => deleteProfile(n) }))));
+}
+
+function lightingControlEditor(box) {
+  const target = dev;
+  const input = el('input', { type: 'checkbox', className: 'switch', id: 'lightingControl', checked: dev.lighting_control,
+    ariaLabel: 'Secretarybird controls lighting' });
+  input.setAttribute('aria-describedby', 'lightingControlHelp');
+  input.onchange = async () => {
+    const enabled = input.checked;
+    input.disabled = true;
+    try {
+      const r = await api('/api/lighting-control', { id: target.id, enabled });
+      target.lighting_control = r.lighting_control;
+      if (dev === target) { render(); $('lightingControl')?.focus({ preventScroll: true }); }
+      toast(enabled ? 'Lighting control enabled' : 'Lighting left untouched for another app');
+    } catch (e) { input.checked = !enabled; toast(e.message, true); }
+    input.disabled = false;
+  };
+  box.append(el('div', { className: 'edgroup' },
+    el('div', { className: 'row' }, input, el('label', { htmlFor: 'lightingControl', textContent: 'Secretarybird controls lighting' })),
+    el('p', { className: 'note', id: 'lightingControlHelp', textContent: 'Off leaves this device’s RGB untouched so another app can control it. Sync, profile changes, startup and wake skip its lighting. DPI, buttons and other settings still work.' })),
+    el('p', { className: 'note', textContent: 'Applies to this device, across all profiles. Saved colors are kept. Turning this on sends nothing immediately; edit lighting or apply a profile to use them again.' }));
 }
 
 function deviceEditor(box) {
@@ -1147,14 +1174,14 @@ function zoneEditor(box, name) {
 }
 // Use this zone's colour or effect elsewhere: this device's other zones, or every device.
 function copyGroup(name) {
-  const others = devices.some(d => d !== dev && d.leds.length);
+  const others = devices.some(d => d !== dev && d.lighting_control && d.leds.length);
   if (dev.leds.length < 2 && !others) return '';
   const pick = fn => () => { const what = zoneLighting(name); if (what) fn(what); else toast('Pick a color or effect first', true); };
   return el('div', { className: 'edgroup' }, el('h3', { textContent: 'Use this lighting on' }),
     el('div', { className: 'row' },
       dev.leds.length > 1 ? el('button', { className: 'ghost', textContent: 'All zones', title: 'Every zone of this ' + (KINDS[dev.kind] || 'device').toLowerCase(), onclick: pick(() => copyToZones(name)) }) : '',
-      others ? el('button', { className: 'ghost', textContent: 'Every device', title: 'Every zone of every device, started together', onclick: pick(what => sendSync(what)) }) : ''),
-    el('p', { className: 'note', textContent: 'Effects start together on every device. A device that can’t run the effect is left as it is.' }));
+      others ? el('button', { className: 'ghost', textContent: 'Every device', title: 'Every device with lighting control enabled, started together', onclick: pick(what => sendSync(what)) }) : ''),
+    el('p', { className: 'note', textContent: 'Effects start together. Devices with lighting control off, or that can’t run the effect, are left as they are.' }));
 }
 
 // Built-in effects the device runs by itself. Colors come from the zone's color above.
@@ -1874,7 +1901,8 @@ function renderOverview() {
     const dots = el('div', { className: 'dots' });
     const p = d.profile || {}, keys = p.keys;
     const colors = keys && keys.length ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
-    colors.forEach(z => { const i = el('i'), paint = zonePaint(z); if (paint) i.style.background = paint; else i.className = 'off'; dots.append(i); });
+    if (d.lighting_control) colors.forEach(z => { const i = el('i'), paint = zonePaint(z); if (paint) i.style.background = paint; else i.className = 'off'; dots.append(i); });
+    else if (d.leds.length || d.matrix) dots.append(el('span', { className: 'hint', textContent: 'Lighting not controlled' }));
     const meta = el('div', { className: 'dmeta num', textContent: [KINDS[d.kind] || 'Device', d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
     grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, dots, meta));
   });

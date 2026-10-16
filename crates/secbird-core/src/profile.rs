@@ -71,6 +71,9 @@ pub fn normalize_app(name: &str) -> String {
 pub struct DeviceProfiles {
     pub active: String,
     pub profiles: BTreeMap<String, Profile>,
+    /// Leave this device's lighting to another app, across every profile.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lighting_off: bool,
 }
 
 impl Default for DeviceProfiles {
@@ -78,6 +81,7 @@ impl Default for DeviceProfiles {
         Self {
             active: DEFAULT_PROFILE.into(),
             profiles: BTreeMap::from([(DEFAULT_PROFILE.into(), Profile::default())]),
+            lighting_off: false,
         }
     }
 }
@@ -137,7 +141,7 @@ impl DeviceProfiles {
         let Some(profile) = self.profiles.get(name) else {
             return vec![Applied { setting: format!("profile '{name}'"), result: Err(Error::NotFound(name.into())) }];
         };
-        let mut out = profile.apply(dev);
+        let mut out = profile.apply_settings(dev, !self.lighting_off);
         let others: std::collections::BTreeSet<&String> = self
             .profiles
             .values()
@@ -213,6 +217,7 @@ impl Store {
             let target = self.devices.entry(key).or_insert_with(|| DeviceProfiles {
                 active: incoming.active.clone(),
                 profiles: BTreeMap::new(),
+                lighting_off: incoming.lighting_off,
             });
             for (name, profile) in incoming.profiles {
                 let mut unique = name.clone();
@@ -267,7 +272,12 @@ pub struct Applied {
 
 impl Profile {
     /// Send every recorded setting to the device. Keeps going past individual failures.
+    /// For stored profiles, use [`DeviceProfiles::apply`] to respect lighting ownership.
     pub fn apply(&self, dev: &Device) -> Vec<Applied> {
+        self.apply_settings(dev, true)
+    }
+
+    fn apply_settings(&self, dev: &Device, lighting: bool) -> Vec<Applied> {
         let mut out = Vec::new();
         let mut push = |setting: String, result: Result<()>| out.push(Applied { setting, result });
 
@@ -287,7 +297,7 @@ impl Profile {
         if let Some(minutes) = self.sleep_minutes {
             push(format!("sleep after {minutes} min"), dev.set_sleep_minutes(minutes));
         }
-        for (name, zone) in &self.lighting {
+        for (name, zone) in self.lighting.iter().filter(|_| lighting) {
             let led = match dev.led_id(name) {
                 Ok(led) => led,
                 Err(e) => {
@@ -306,7 +316,7 @@ impl Profile {
                 push(format!("{name} color {color}"), dev.set_static_color(led, color));
             }
         }
-        if !self.keys.is_empty() {
+        if lighting && !self.keys.is_empty() {
             push(format!("per-key colors ({} keys)", self.keys.len()), dev.show_frame(&self.keys));
         }
         for (key, action) in &self.buttons {
@@ -335,6 +345,29 @@ impl<'de> Deserialize<'de> for Rgb {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lighting_ownership_defaults_migrates_and_survives_import() {
+        let mut old: DeviceProfiles = serde_json::from_str(r#"{"active":"Default","profiles":{"Default":{}}}"#).unwrap();
+        assert!(!old.lighting_off);
+        assert!(serde_json::to_value(&old).unwrap().get("lighting_off").is_none());
+        old.lighting_off = true;
+        let restored: DeviceProfiles = serde_json::from_value(serde_json::to_value(&old).unwrap()).unwrap();
+        assert!(restored.lighting_off);
+
+        let mut mine = Store::default();
+        mine.devices.insert("0099".into(), restored);
+        assert!(mine.profiles_for("0099:UNIT1", 0x0099).lighting_off);
+        assert!(!mine.profiles_for("0099:UNIT2", 0x0099).lighting_off);
+        let mut incoming = Store::default();
+        incoming.devices.insert("0099:UNIT1".into(), DeviceProfiles::default());
+        incoming.devices.insert("0084:NEW".into(), old.clone());
+        incoming.devices.insert("0099:UNIT2".into(), old);
+        mine.import(incoming);
+        assert!(mine.devices["0099:UNIT1"].lighting_off, "import must not re-enable an existing device");
+        assert!(!mine.devices["0099:UNIT2"].lighting_off, "existing ownership is kept in both directions");
+        assert!(mine.devices["0084:NEW"].lighting_off, "new devices restore backed-up ownership");
+    }
 
     #[test]
     fn create_copies_active_and_switch_changes_it() {

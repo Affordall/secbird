@@ -270,6 +270,9 @@ struct Body {
     key: String,
     #[serde(default)]
     on: bool,
+    /// Device-wide lighting ownership, independent of the active profile.
+    #[serde(default)]
+    enabled: Option<bool>,
     #[serde(default)]
     data: Value,
     /// Button name, layer ("normal" / "hypershift") and action text ("" = reset).
@@ -351,6 +354,11 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
             .ok_or_else(|| Error::NotFound(format!("device {target}")))?;
         let mut store = Store::load(&config_dir().join("profiles.json"))?;
         match path {
+            "/api/lighting-control" => {
+                let enabled = b.enabled.ok_or_else(|| Error::InvalidArg("enabled must be a boolean".into()))?;
+                actions::set_lighting_control(dev, &mut store, enabled)?;
+                Ok(json!({ "lighting_control": enabled }))
+            }
             "/api/dpi" => {
                 let (x, y) = actions::set_dpi(dev, &mut store, b.x, b.y)?;
                 Ok(json!({ "dpi": [x, y] }))
@@ -612,6 +620,7 @@ fn device_json(dev: &Device) -> Value {
     let (profile_names, active) = Engine::profiles(dev);
     let all = Store::load(&config_dir().join("profiles.json")).ok().map(|mut s| s.for_device(dev).clone());
     let profile = all.as_ref().and_then(|p| serde_json::to_value(p.active()).ok()).unwrap_or(Value::Null);
+    let lighting_control = all.as_ref().is_some_and(|p| !p.lighting_off);
     // Every profile's settings, so the editor can show them side by side.
     let profiles_data = all.and_then(|p| serde_json::to_value(p.profiles).ok()).unwrap_or(Value::Null);
     let dpi_range = spec.and_then(|s| s.dpi.as_ref());
@@ -635,6 +644,7 @@ fn device_json(dev: &Device) -> Value {
         "name": dev.name(),
         "kind": kind,
         "known": spec.is_some(),
+        "lighting_control": lighting_control,
         "firmware": dev.firmware_version().ok(),
         // Read once at discovery; asking the device again costs a USB round trip per page load.
         "serial": (!dev.serial.is_empty()).then(|| dev.serial.clone()),

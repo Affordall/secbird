@@ -10,6 +10,21 @@ fn zone<'a>(store: &'a mut Store, dev: &Device, name: &str) -> &'a mut Zone {
     store.for_device(dev).active_mut().lighting.entry(name.to_string()).or_default()
 }
 
+/// Only change ownership; neither enabling nor disabling sends a lighting command.
+pub fn set_lighting_control(dev: &Device, store: &mut Store, enabled: bool) -> Result<()> {
+    store.for_device(dev).lighting_off = !enabled;
+    store.save()
+}
+
+fn check_lighting(dev: &Device, store: &mut Store) -> Result<()> {
+    if store.for_device(dev).lighting_off {
+        return Err(crate::error::Error::InvalidArg(format!(
+            "lighting control is disabled for {}; enable it before changing lighting", dev.name()
+        )));
+    }
+    Ok(())
+}
+
 /// Returns the DPI actually set, after rounding to the device's step.
 pub fn set_dpi(dev: &Device, store: &mut Store, x: u16, y: u16) -> Result<(u16, u16)> {
     let applied = dev.set_dpi(x, y)?;
@@ -48,6 +63,7 @@ pub fn set_polling(dev: &Device, store: &mut Store, hz: u32) -> Result<()> {
 }
 
 pub fn set_color(dev: &Device, store: &mut Store, zone_name: &str, color: Rgb) -> Result<()> {
+    check_lighting(dev, store)?;
     dev.set_static_color(dev.led_id(zone_name)?, color)?;
     store.for_device(dev).active_mut().keys.clear();
     let z = zone(store, dev, zone_name);
@@ -59,6 +75,7 @@ pub fn set_color(dev: &Device, store: &mut Store, zone_name: &str, color: Rgb) -
 
 /// A built-in effect on one zone. Like a color, it replaces per-key colors.
 pub fn set_effect(dev: &Device, store: &mut Store, zone_name: &str, effect: crate::effects::Effect) -> Result<()> {
+    check_lighting(dev, store)?;
     dev.set_effect(dev.led_id(zone_name)?, &effect)?;
     store.for_device(dev).active_mut().keys.clear();
     let z = zone(store, dev, zone_name);
@@ -69,6 +86,7 @@ pub fn set_effect(dev: &Device, store: &mut Store, zone_name: &str, effect: crat
 
 /// Brightness in percent, clamped to 0-100.
 pub fn set_brightness(dev: &Device, store: &mut Store, zone_name: &str, percent: u8) -> Result<()> {
+    check_lighting(dev, store)?;
     let percent = percent.min(100);
     dev.set_brightness(dev.led_id(zone_name)?, percent)?;
     zone(store, dev, zone_name).brightness = Some(percent);
@@ -76,6 +94,7 @@ pub fn set_brightness(dev: &Device, store: &mut Store, zone_name: &str, percent:
 }
 
 pub fn lights_off(dev: &Device, store: &mut Store, zone_name: &str) -> Result<()> {
+    check_lighting(dev, store)?;
     dev.lights_off(dev.led_id(zone_name)?)?;
     store.for_device(dev).active_mut().keys.clear();
     zone(store, dev, zone_name).off = true;
@@ -85,6 +104,7 @@ pub fn lights_off(dev: &Device, store: &mut Store, zone_name: &str) -> Result<()
 /// Per-key colors (row-major). They replace any whole-zone color or off state;
 /// brightness is kept.
 pub fn set_keys(dev: &Device, store: &mut Store, keys: Vec<Rgb>) -> Result<()> {
+    check_lighting(dev, store)?;
     dev.show_frame(&keys)?;
     let profile = store.for_device(dev).active_mut();
     for z in profile.lighting.values_mut() {
@@ -176,10 +196,13 @@ pub struct Synced {
 }
 
 /// The same static color on every lighting zone of every device, each recorded in
-/// that device's active profile. Devices without lighting are skipped.
+/// that device's active profile. Devices without lighting or with control disabled are skipped.
 pub fn sync_color(devices: &[Device], store: &mut Store, color: Rgb) -> Vec<Synced> {
     let mut out = Vec::new();
     for dev in devices {
+        if store.for_device(dev).lighting_off {
+            continue;
+        }
         let zones: Vec<String> = dev.spec.as_ref().map(|s| s.leds.iter().map(|l| l.name.clone()).collect()).unwrap_or_default();
         for zone in zones {
             let result = set_color(dev, store, &zone, color);
@@ -192,10 +215,13 @@ pub fn sync_color(devices: &[Device], store: &mut Store, color: Rgb) -> Vec<Sync
 /// The same built-in effect on every lighting zone of every device, started together so
 /// they run in step (each device keeps its own timer, so they can drift apart over time;
 /// syncing again lines them up). The zones are all sent first and the profiles saved
-/// once after, to keep the start times close.
+/// once after, to keep the start times close. Devices with lighting control disabled are skipped.
 pub fn sync_effect(devices: &[Device], store: &mut Store, effect: &crate::effects::Effect) -> Vec<Synced> {
     let mut out = Vec::new();
     for dev in devices {
+        if store.for_device(dev).lighting_off {
+            continue;
+        }
         let zones: Vec<String> = dev.spec.as_ref().map(|s| s.leds.iter().map(|l| l.name.clone()).collect()).unwrap_or_default();
         for zone in zones {
             let result = dev.led_id(&zone).and_then(|led| dev.set_effect(led, effect));

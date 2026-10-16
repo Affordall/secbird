@@ -62,6 +62,13 @@ and run `secbird-tray.exe`.
 - **Lighting:** colors and brightness per zone, per-key painting on per-key keyboards, and the
   effects the device runs itself (spectrum, wave, breathing, reactive, starlight; each device
   only has some of them). Verified on the Basilisk V3 (spectrum, wave).
+- **Leave RGB to another app:** open a device's **Lighting → Control lighting** tile and
+  turn off **Secretarybird controls lighting** (CLI: `secbird -d SERIAL lighting off`).
+  It leaves the lights as they are, not off: no colors, effects, brightness or per-key writes,
+  including Sync, profile switches, startup, replug and wake. DPI, buttons and other settings
+  still work. This choice is saved per device, across all profiles; saved colors are kept.
+  Turn it back on, then edit lighting or apply a profile to use them again. Other apps may
+  still conflict over non-lighting settings; this is not an exclusive device lock.
 - **Sensitivity:** DPI, the DPI stages the DPI button cycles through, and polling rate. DPI stages
   verified on the Basilisk V3.
 - **Button remapping** (mice with on-board button memory): keys and shortcuts, turbo, sniper/DPI
