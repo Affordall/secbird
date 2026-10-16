@@ -94,7 +94,9 @@ const LAPTOP_PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("cpu boost / power mode", Command::new(0x07, 0x8F), 0x01, &[]),
     ("charge limiter", Command::new(0x07, 0x92), 0x01, &[]),
     ("adapter wattage", Command::new(0x07, 0x8C), 0x02, &[]),
-    ("smart illumination", Command::new(0x07, 0x93), 0x03, &[]),
+    // Profile 1, as Synapse asks; profile 0 answers all zeros (#20).
+    ("smart dimming", Command::new(0x07, 0x93), 0x03, &[1]),
+    ("time to dim", Command::new(0x07, 0x8B), 0x05, &[0]),
 ];
 
 /// LED ids tried with a brightness GET. Razer uses 0x00-0x14 across its products.

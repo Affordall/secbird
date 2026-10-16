@@ -55,6 +55,8 @@ pub const BUTTONS: &[(u8, &str, &str)] = &[
     (104, "scroll-left", "Scroll left"),
     (105, "scroll-right", "Scroll right"),
     (106, "wheel-mode", "Wheel mode button"),
+    // Basilisk V4 Pro: the third button on top, Synapse's "AI Prompt Master" (#16).
+    (128, "top-extra", "Extra top button"),
 ];
 
 /// The id of a button name; buttons not in [`BUTTONS`] are named `button-<id>`.
@@ -356,6 +358,24 @@ const KEY_NAMES: &[(u8, &str)] = &[
     (0x50, "left"),
     (0x51, "down"),
     (0x52, "up"),
+    (0x53, "numlock"),
+    (0x54, "num-slash"),
+    (0x55, "num-star"),
+    (0x56, "num-minus"),
+    (0x57, "num-plus"),
+    (0x58, "num-enter"),
+    (0x59, "num1"),
+    (0x5A, "num2"),
+    (0x5B, "num3"),
+    (0x5C, "num4"),
+    (0x5D, "num5"),
+    (0x5E, "num6"),
+    (0x5F, "num7"),
+    (0x60, "num8"),
+    (0x61, "num9"),
+    (0x62, "num0"),
+    (0x63, "num-period"),
+    (0x65, "menu"),
 ];
 
 pub(crate) fn key_name(usage: u8) -> String {
@@ -365,6 +385,8 @@ pub(crate) fn key_name(usage: u8) -> String {
         0x27 => "0".into(),
         0x3A..=0x45 => format!("f{}", usage - 0x3A + 1),
         0x68..=0x73 => format!("f{}", usage - 0x68 + 13),
+        // A modifier sent as a key (Synapse stores a lone Ctrl or Alt this way, #16).
+        0xE0..=0xE7 => MODIFIERS[(usage - 0xE0) as usize].1.to_string(),
         _ => KEY_NAMES.iter().find(|k| k.0 == usage).map_or(format!("0x{usage:02x}"), |k| k.1.to_string()),
     }
 }
@@ -624,6 +646,9 @@ mod tests {
             "key:ctrl+shift+f13",
             "key:ctrl",
             "key:space",
+            "key:num1",
+            "key:ctrl+num-plus",
+            "key:menu",
             "turbo:left@15",
             "turbo:key:e@10",
             "dpi-up",
@@ -656,6 +681,9 @@ mod tests {
         // Written to real hardware: side button typed "a".
         assert_eq!("key:a".parse::<Action>().unwrap().encode(), (2, 2, [0, 4, 0, 0, 0]));
         assert_eq!("forward".parse::<Action>().unwrap().encode(), (1, 1, [5, 0, 0, 0, 0]));
+        // Synapse stores a lone Alt as the key E2, not as a modifier bit (#16).
+        assert_eq!(Action::decode(2, [0, 0xE2, 0, 0, 0]).to_string(), "key:alt");
+        assert_eq!(button_label(128), "Extra top button");
     }
 
     #[test]

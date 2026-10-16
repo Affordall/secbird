@@ -88,6 +88,10 @@ pub const IDLE_TIME_SIZE: u8 = 0x02;
 /// idle times up to 60 minutes.
 pub const AUTO_SLEEP: Command = Command::new(0x07, 0x08);
 pub const AUTO_SLEEP_SIZE: u8 = 0x02;
+/// Laptops: what the keyboard backlight does when idle (Synapse's "Smart Dimming",
+/// `[profile 1, enabled, level]`).
+pub const SMART_DIMMING: Command = Command::new(0x07, 0x13);
+pub const SMART_DIMMING_SIZE: u8 = 0x03;
 
 /// Battery level: reply `[_, level 0..=255]`.
 pub const BATTERY: Command = Command::new(0x07, 0x00);

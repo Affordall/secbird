@@ -40,6 +40,10 @@ pub struct Profile {
     /// Sleeping when idle on or off, for devices with that switch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_sleep: Option<bool>,
+    /// Laptops: what the keyboard backlight does when idle (`stays-lit`, `half`, `quarter`,
+    /// `dark`), see [`crate::Dimming`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimming: Option<String>,
     /// Lighting zone name (or numeric id) -> state.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub lighting: BTreeMap<String, Zone>,
@@ -296,6 +300,9 @@ impl Profile {
         }
         if let Some(minutes) = self.sleep_minutes {
             push(format!("sleep after {minutes} min"), dev.set_sleep_minutes(minutes));
+        }
+        if let Some(d) = &self.dimming {
+            push(format!("keyboard when idle: {d}"), d.parse().and_then(|d| dev.set_dimming(d)));
         }
         for (name, zone) in self.lighting.iter().filter(|_| lighting) {
             let led = match dev.led_id(name) {

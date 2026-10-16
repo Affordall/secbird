@@ -292,6 +292,9 @@ struct Body {
     minutes: u16,
     #[serde(default)]
     auto: Option<bool>,
+    /// Laptop keyboard when idle: stays-lit, half, quarter or dark.
+    #[serde(default)]
+    dimming: String,
     /// Macro steps as text (`tap:ctrl+c wait:50`), and a macro id.
     #[serde(default)]
     script: String,
@@ -369,6 +372,10 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                 let sent = actions::set_dpi_stages(dev, &mut store, &want)?;
                 let (x, y) = sent.stages[sent.active as usize - 1];
                 Ok(json!({ "stages": { "active": sent.active, "list": sent.stages }, "dpi": [x, y] }))
+            }
+            "/api/dimming" => {
+                actions::set_dimming(dev, &mut store, b.dimming.parse()?)?;
+                Ok(json!({ "dimming": dev.dimming().ok().flatten().map(|d| d.to_string()) }))
             }
             "/api/sleep" => {
                 if let Some(on) = b.auto {
@@ -668,6 +675,7 @@ fn device_json(dev: &Device) -> Value {
             .flatten()
             .map(|s| json!({ "active": s.active, "list": s.stages, "max": secbird_core::commands::MAX_DPI_STAGES })),
         "sleep": sleep_json(dev),
+        "dimming": dev.dimming().ok().flatten().map(|d| d.to_string()),
         "macros": dev.macro_storage().is_ok(),
         "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols })),
         "leds": spec.map(|s| s.leds.iter().map(|l| json!({ "name": l.name, "id": l.id })).collect::<Vec<_>>()).unwrap_or_default(),

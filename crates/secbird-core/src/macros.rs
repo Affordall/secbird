@@ -136,10 +136,15 @@ fn button_bit(name: &str) -> Result<u8> {
         .ok_or_else(|| Error::InvalidArg(format!("unknown mouse button '{name}' (left, right, middle, back, forward)")))
 }
 
+/// How long `tap:` and `click:` hold a key or button. Without a hold the press lasts about
+/// 1 ms, which Windows sees but games checking the keyboard once per frame miss (#22).
+pub const TAP_MS: u32 = 50;
+
 /// A whole macro as text, one token per step, e.g. `tap:ctrl+c wait:50 click:left`.
 ///
-/// Tokens: `down:<key>`, `up:<key>`, `tap:<key or combo>` (all down, then up in reverse),
-/// `press:<button>`, `release:<button>`, `click:<button>`, `wheel:up|down`, `wait:<ms>`,
+/// Tokens: `down:<key>`, `up:<key>`, `tap:<key or combo>` (all down, hold [`TAP_MS`], then up
+/// in reverse), `press:<button>`, `release:<button>`, `click:<button>` (held [`TAP_MS`] too),
+/// `wheel:up|down`, `wait:<ms>`,
 /// `cursor:<x>,<y>`. Keys use the names of `key:` actions (a, f5, space, ctrl, shift, ...).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Script(pub Vec<Step>);
@@ -160,6 +165,7 @@ impl FromStr for Script {
                 "tap" => {
                     let keys = arg.split('+').map(usage_of).collect::<Result<Vec<_>>>()?;
                     steps.extend(keys.iter().map(|&k| Step::KeyDown(k)));
+                    steps.push(Step::Delay(TAP_MS));
                     steps.extend(keys.iter().rev().map(|&k| Step::KeyUp(k)));
                 }
                 "press" => {
@@ -173,6 +179,7 @@ impl FromStr for Script {
                 "click" => {
                     let bit = button_bit(arg)?;
                     steps.push(Step::Buttons(held | bit));
+                    steps.push(Step::Delay(TAP_MS));
                     steps.push(Step::Buttons(held & !bit));
                 }
                 "wheel" => match arg {
@@ -199,8 +206,9 @@ impl FromStr for Script {
 }
 
 impl fmt::Display for Script {
-    /// The most compact text that parses back to the same steps: a key that goes down and
-    /// straight back up is `tap:`, a button pressed and released is `click:`.
+    /// The most compact text that parses back to the same steps: keys that go down, wait
+    /// [`TAP_MS`] and come back up are `tap:`, a button held that long is `click:`. Presses
+    /// with no hold (older macros) print as `down:` and `up:`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = &self.0;
         let mut out: Vec<String> = Vec::new();
@@ -208,9 +216,17 @@ impl fmt::Display for Script {
         let mut i = 0;
         while i < s.len() {
             match s[i] {
-                Step::KeyDown(k) if s.get(i + 1) == Some(&Step::KeyUp(k)) => {
-                    out.push(format!("tap:{}", usage_name(k)));
-                    i += 1;
+                Step::KeyDown(_) if tap_len(&s[i..]) > 0 => {
+                    let n = tap_len(&s[i..]);
+                    let keys: Vec<String> = s[i..i + n]
+                        .iter()
+                        .map(|st| match st {
+                            Step::KeyDown(k) => usage_name(*k),
+                            _ => unreachable!(),
+                        })
+                        .collect();
+                    out.push(format!("tap:{}", keys.join("+")));
+                    i += 2 * n;
                 }
                 Step::KeyDown(k) => out.push(format!("down:{}", usage_name(k))),
                 Step::KeyUp(k) => out.push(format!("up:{}", usage_name(k))),
@@ -218,10 +234,10 @@ impl fmt::Display for Script {
                     let pressed = mask & !held;
                     let released = held & !mask;
                     let single = |bits: u8| BUTTON_BITS.iter().find(|b| b.0 == bits).map(|b| b.1);
-                    match (single(pressed), released, s.get(i + 1)) {
-                        (Some(name), 0, Some(&Step::Buttons(next))) if next == held => {
+                    match (single(pressed), released, s.get(i + 1), s.get(i + 2)) {
+                        (Some(name), 0, Some(&Step::Delay(TAP_MS)), Some(&Step::Buttons(next))) if next == held => {
                             out.push(format!("click:{name}"));
-                            i += 1;
+                            i += 2;
                         }
                         _ => {
                             for b in BUTTON_BITS {
@@ -244,6 +260,20 @@ impl fmt::Display for Script {
         }
         f.write_str(&out.join(" "))
     }
+}
+
+/// Keys in a `tap:` at the start of `s`: n downs, a [`TAP_MS`] wait, the same n ups in
+/// reverse. 0 if `s` doesn't start with one.
+fn tap_len(s: &[Step]) -> usize {
+    let n = s.iter().take_while(|st| matches!(st, Step::KeyDown(_))).count();
+    if n == 0 || s.get(n) != Some(&Step::Delay(TAP_MS)) || s.len() < 2 * n + 1 {
+        return 0;
+    }
+    let ups = (0..n).all(|j| match (s[j], s[2 * n - j]) {
+        (Step::KeyDown(d), Step::KeyUp(u)) => d == u,
+        _ => false,
+    });
+    if ups { n } else { 0 }
 }
 
 /// The device's macro memory.
@@ -415,14 +445,28 @@ impl Device {
                 args.extend_from_slice(chunk);
                 self.transact_slow(cmd::MACRO_NAME, args.len() as u8, &args)?;
             }
-            for (i, chunk) in data.chunks(cmd::MACRO_DATA_CHUNK).enumerate() {
-                let [o0, o1, o2, o3] = ((i * cmd::MACRO_DATA_CHUNK) as u32).to_be_bytes();
-                let mut args = vec![ih, il, o0, o1, o2, o3, chunk.len() as u8];
-                args.extend_from_slice(chunk);
-                self.transact_slow(cmd::MACRO_DATA, args.len() as u8, &args)?;
+            // The mouse sometimes acknowledges a data write and still leaves the flash
+            // blank (about 1 in 4 on a Basilisk V3), so write again until it reads back.
+            let mut back = Vec::new();
+            for _ in 0..3 {
+                for (i, chunk) in data.chunks(cmd::MACRO_DATA_CHUNK).enumerate() {
+                    let [o0, o1, o2, o3] = ((i * cmd::MACRO_DATA_CHUNK) as u32).to_be_bytes();
+                    let mut args = vec![ih, il, o0, o1, o2, o3, chunk.len() as u8];
+                    args.extend_from_slice(chunk);
+                    self.transact_slow(cmd::MACRO_DATA, args.len() as u8, &args)?;
+                }
+                back = self.macro_bytes(id)?;
+                if back == data {
+                    break;
+                }
             }
-            if self.macro_bytes(id)? != data {
-                return Err(Error::Unsupported("the macro read back differently from what was written".into()));
+            if back != data {
+                let hex = |b: &[u8]| b.iter().map(|x| format!("{x:02X}")).collect::<Vec<_>>().join(" ");
+                return Err(Error::Unsupported(format!(
+                    "the macro read back differently from what was written (wrote {}, read {})",
+                    hex(&data),
+                    hex(&back)
+                )));
             }
             Ok(())
         })();
@@ -480,10 +524,12 @@ mod tests {
             [
                 Step::KeyDown(0xE0),
                 Step::KeyDown(0x06),
+                Step::Delay(TAP_MS),
                 Step::KeyUp(0x06),
                 Step::KeyUp(0xE0),
                 Step::Delay(50),
                 Step::Buttons(1),
+                Step::Delay(TAP_MS),
                 Step::Buttons(0),
                 Step::Buttons(2),
                 Step::Wheel(false),
@@ -494,8 +540,12 @@ mod tests {
         );
         // Printing is compact but parses back to the same steps.
         let text = s.to_string();
-        assert_eq!(text, "down:ctrl tap:c up:ctrl wait:50 click:left press:right wheel:down release:right tap:shift");
+        assert_eq!(text, "tap:ctrl+c wait:50 click:left press:right wheel:down release:right down:shift up:shift");
         assert_eq!(text.parse::<Script>().unwrap(), s);
+        // A tap holds the key long enough for a game to see it (#22).
+        let tap: Script = "tap:space".parse().unwrap();
+        assert_eq!(tap.0, [Step::KeyDown(0x2C), Step::Delay(TAP_MS), Step::KeyUp(0x2C)]);
+        assert_eq!(tap.to_string(), "tap:space");
         for bad in ["", "tap:nope", "click:thumb", "wait:soon", "hello"] {
             assert!(bad.parse::<Script>().is_err(), "{bad}");
         }

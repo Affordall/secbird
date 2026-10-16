@@ -117,6 +117,7 @@ secbird poll 1000               set polling rate
 secbird stages 400 800 1600 --use 2
                                 DPI stages the DPI button cycles through
 secbird sleep 10                wireless: sleep after 10 minutes idle
+secbird dimming quarter         Blade laptops: dim the keyboard to a quarter when idle
 secbird macro new Copy "tap:ctrl+c"
                                 store a macro on the device
 secbird button side-back macro:1
@@ -158,9 +159,9 @@ numbers. Reports are how devices move from "listed" to "verified".
 
 | Status | Devices |
 |---|---|
-| Verified on real hardware | **Mice:** Basilisk V3 (ours), Cobra wired ([#1](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([#4](https://github.com/infinityInfinite/secbird/issues/4), [#13](https://github.com/infinityInfinite/secbird/issues/13)), Naga V2 HyperSpeed with side grid, battery and HyperShift ([#8](https://github.com/infinityInfinite/secbird/issues/8), [#11](https://github.com/infinityInfinite/secbird/issues/11)), Viper Ultimate wired and wireless ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Keyboards and keypads:** BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12)), Cynosa V2, Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Accessories:** Mouse Dock ([#14](https://github.com/infinityInfinite/secbird/issues/14)) |
+| Verified on real hardware | **Mice:** Basilisk V3 (ours), Cobra wired ([#1](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([#4](https://github.com/infinityInfinite/secbird/issues/4), [#13](https://github.com/infinityInfinite/secbird/issues/13)), Naga V2 HyperSpeed with side grid, battery and HyperShift ([#8](https://github.com/infinityInfinite/secbird/issues/8), [#11](https://github.com/infinityInfinite/secbird/issues/11)), Viper Ultimate wired and wireless ([#14](https://github.com/infinityInfinite/secbird/issues/14)), DeathAdder V3 Pro through a HyperPolling dongle ([#17](https://github.com/infinityInfinite/secbird/pull/17))<br>**Keyboards and keypads:** BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12)), Cynosa V2, Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Accessories:** Mouse Dock ([#14](https://github.com/infinityInfinite/secbird/issues/14)) |
 | Reported working by users | Basilisk X HyperSpeed (2.4 GHz dongle; [#10](https://github.com/infinityInfinite/secbird/issues/10)), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
-| Partly working | Basilisk V4 Pro on the Mouse Dock Pro: DPI, polling, sleep and most buttons work; its name and button list are fixed in the next version ([#16](https://github.com/infinityInfinite/secbird/issues/16)) |
+| Partly working | Basilisk V4 Pro on the Mouse Dock Pro: DPI, polling, sleep and most buttons work, named right since 0.4.2; the extra top button is named in 0.4.3 ([#16](https://github.com/infinityInfinite/secbird/issues/16)) |
 | Listed, waiting for reports | About 260 more mice, keyboards, keypads, mousepads, laptops and accessories, including the Basilisk V4 Pro, Basilisk V4 HyperSpeed and Naga V3 Pro |
 | Not supported yet | Headsets (Kraken, BlackShark V3; [#15](https://github.com/infinityInfinite/secbird/issues/15)), Bluetooth connections ([#10](https://github.com/infinityInfinite/secbird/issues/10)), laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
 

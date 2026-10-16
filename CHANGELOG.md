@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.3] - 2026-10-17
+
+### Added
+- Smart Dimming on Blade laptops (#20): the editor's Power section has "Keyboard when idle"
+  (stays lit, half, a quarter, or off), and the CLI has `secbird dimming`. Not yet tried on a
+  real laptop; please tell us if it works on yours.
+- Turn off lighting control per device (#19, thanks Monratis): Lighting → Control lighting, or
+  `secbird lighting off`. Secretarybird then never touches that device's lights, so another RGB
+  app can run them. DPI, buttons and the rest keep working.
+- HyperPolling dongle (#17, thanks Monratis): the editor names the mouse paired to it, and polling
+  rate changes stick after the mouse wakes. Verified on a DeathAdder V3 Pro.
+- Numpad keys and the Menu key for button remaps and macros.
+- The Basilisk V4 Pro's extra top button has its name (#16). Tartarus V2 Pro (#21).
+- Blade, tenkeyless and mini keyboards are drawn with their own layout in the per-key editor.
+  When a keyboard's layout isn't known, the editor says so.
+
+### Fixed
+- Macros: `tap:` and `click:` hold the key for 50 ms, so games that check keys once per frame
+  see every press (#22). Macro writes that the device reads back empty are retried.
+- Lone modifier keys (Left Ctrl, Right Alt and so on) show their names instead of a code (#16).
+- `secbird report` reads Smart Dimming the way Blade laptops answer it.
+- Editor: focus outlines are no longer cut off in the device and profile rows, long device
+  names wrap, and in a narrow window tile values wrap and the per-key keyboard scrolls sideways
+  instead of shrinking.
+
 ## [0.4.2] - 2026-10-15
 
 ### Added

@@ -85,6 +85,8 @@
   .profiles { position: relative; display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   #profilesRow { flex: 1; }
   .profiles::-webkit-scrollbar { display: none; }
+  /* Sideways-scrolling rows clip vertically too: room above and below so focus rings show whole. */
+  .tabs, .profiles { padding-top: 5px; padding-bottom: 5px; margin-top: -5px; margin-bottom: -5px; }
   .pbtn { position: relative; flex: none; white-space: nowrap; background: none; border: 0; border-radius: 8px; padding: 7px 12px 9px; color: var(--muted); cursor: pointer; font-weight: 600; }
   .pbtn:hover { color: var(--text); background: var(--raise); }
   .pbtn[aria-current=true] { color: var(--text); }
@@ -126,6 +128,15 @@
   .tile.changed .tl::after { content: " · changed"; color: var(--accent-text); }
   .tile.changed .tv { color: var(--accent-text); }
   .tv .unset { color: var(--faint); font-weight: 400; }
+  /* Laptop keyboard when idle: one tile per choice, its keycap lit as bright as the keyboard stays. */
+  .dimgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dimgrid .tile { flex-direction: row; align-items: center; gap: 11px; min-height: 0; padding: 10px 12px; }
+  .dimgrid .tile > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .dimgrid .tv, .dimgrid .tl { white-space: normal; overflow: visible; line-height: 1.3; min-height: 0; }
+  .dimkey { flex: none; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--accent) calc(var(--lvl) * 100%), transparent); }
+  @media (max-width: 420px) { .dimgrid { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 600px) { .tile .tv { white-space: normal; overflow-wrap: anywhere; } }
   .tv small { color: var(--muted); font-weight: 400; }
   .big { font-size: 17px; font-weight: 650; color: var(--value); }
   .sw { width: 16px; height: 16px; border-radius: 5px; border: 1px solid #00000066; flex: none; display: inline-block; }
@@ -229,7 +240,8 @@
   .game button { background: none; border: 0; color: var(--faint); cursor: pointer; width: 22px; height: 22px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
   .game button .ico { width: 10px; height: 10px; }
   .game button:hover { color: var(--text); background: var(--line); }
-  #kb { width: 100%; max-width: 1040px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; flex-basis: 100%; }
+  .kbwrap { overflow-x: auto; flex-basis: 100%; min-width: 0; max-width: 100%; }
+  #kb { width: 100%; min-width: 600px; max-width: 1040px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; flex-basis: 100%; }
   #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
   #kb g:hover rect { stroke: var(--muted); }
   #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
@@ -274,7 +286,8 @@
   .dcard.muted { cursor: default; opacity: .6; }
   .dcard.muted:hover { transform: none; border-color: var(--line); }
   .dtop { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
-  .dcard h3 { margin: 0; font-size: 15px; font-weight: 650; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dcard h3 { margin: 0; font-size: 15px; font-weight: 650; min-width: 0; line-height: 1.3; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .dots { display: flex; gap: 7px; min-height: 16px; flex-wrap: wrap; }
   .dots i { width: 16px; height: 16px; border-radius: 50%; background: currentColor; border: 1px solid #00000066; }
   .dots i.off { background: none; border: 1.5px dashed var(--line-strong); }
@@ -463,11 +476,26 @@ const FULLSIZE = [
   [['Ctrl', 1, 1.25], ['Win', 2, 1.25], ['Alt', 3, 1.25], ['', 7, 6.25], ['Alt', 11, 1.25], ['Fn', 12, 1.25], ['Menu', 13, 1.25],
    ['Ctrl', 14, 1.25], ['←', 15, 1, .25], ['↓', 16], ['→', 17], ['0', 18, 2, .25], ['.', 20]],
 ];
-function layout(m) {
+// Blade laptops (6 x 16), tenkeyless (6 x 18) and 60% (5 x 15) boards, each key placed where it
+// sits: [label, matrix row, matrix column, x, y, width, height] in key units. Which key is at which
+// matrix position comes from Polychromatic's device maps (Blade 15 Advanced 2021, Huntsman TE,
+// Huntsman Mini); the space bar's light is column 7, as on the full-size boards.
+const BLADE = [['Esc', 0, 1, 0, 0, 1, 1], ['F1', 0, 2, 1, 0, 1, 1], ['F2', 0, 3, 2, 0, 1, 1], ['F3', 0, 4, 3, 0, 1, 1], ['F4', 0, 5, 4, 0, 1, 1], ['F5', 0, 6, 5, 0, 1, 1], ['F6', 0, 7, 6, 0, 1, 1], ['F7', 0, 8, 7, 0, 1, 1], ['F8', 0, 9, 8, 0, 1, 1], ['F9', 0, 10, 9, 0, 1, 1], ['F10', 0, 11, 10, 0, 1, 1], ['F11', 0, 12, 11, 0, 1, 1], ['F12', 0, 13, 12, 0, 1, 1], ['Ins', 0, 14, 12.95, 0, 1, 1], ['Del', 0, 15, 13.95, 0, 1, 1], ['`', 1, 1, 0, 0.95, 1, 1], ['1', 1, 2, 1, 0.95, 1, 1], ['2', 1, 3, 2, 0.95, 1, 1], ['3', 1, 4, 3, 0.95, 1, 1], ['4', 1, 5, 4, 0.95, 1, 1], ['5', 1, 6, 5, 0.95, 1, 1], ['6', 1, 7, 6, 0.95, 1, 1], ['7', 1, 8, 7, 0.95, 1, 1], ['8', 1, 9, 8, 0.95, 1, 1], ['9', 1, 10, 9, 0.95, 1, 1], ['0', 1, 11, 10, 0.95, 1, 1], ['-', 1, 12, 11, 0.95, 1, 1], ['=', 1, 13, 12, 0.95, 1, 1], ['Backspace', 1, 15, 13, 0.95, 1.95, 0.95], ['Tab', 2, 1, 0, 1.9, 1.45, 1], ['Q', 2, 2, 1.45, 1.9, 1, 1], ['W', 2, 3, 2.45, 1.9, 1, 1], ['E', 2, 4, 3.5, 1.9, 1, 1], ['R', 2, 5, 4.5, 1.9, 1, 1], ['T', 2, 6, 5.5, 1.9, 1, 1], ['Y', 2, 7, 6.5, 1.9, 1, 1], ['U', 2, 8, 7.5, 1.9, 1, 1], ['I', 2, 9, 8.5, 1.9, 1, 1], ['O', 2, 10, 9.5, 1.9, 1, 1], ['P', 2, 11, 10.5, 1.9, 1, 1], ['[', 2, 12, 11.5, 1.9, 1, 1], [']', 2, 13, 12.5, 1.9, 1, 1], ['\\', 2, 15, 13.45, 1.9, 1.5, 1], ['Caps', 3, 1, 0, 2.85, 1.7, 1], ['A', 3, 2, 1.7, 2.85, 1, 1], ['S', 3, 3, 2.7, 2.85, 1, 1], ['D', 3, 4, 3.7, 2.85, 1, 1], ['F', 3, 5, 4.7, 2.85, 1, 1], ['G', 3, 6, 5.75, 2.85, 1, 1], ['H', 3, 7, 6.75, 2.85, 1, 1], ['J', 3, 8, 7.75, 2.85, 1, 1], ['K', 3, 9, 8.75, 2.85, 1, 1], ['L', 3, 10, 9.75, 2.85, 1, 1], [';', 3, 11, 10.75, 2.85, 1, 1], ["'", 3, 12, 11.75, 2.85, 1, 1], ['Enter', 3, 15, 12.65, 2.85, 2.25, 1], ['Shift', 4, 1, 0, 3.8, 2, 1], ['Z', 4, 3, 1.95, 3.8, 1, 1], ['X', 4, 4, 2.95, 3.8, 1, 1], ['C', 4, 5, 3.95, 3.8, 1, 1], ['V', 4, 6, 5, 3.8, 1, 1], ['B', 4, 7, 6, 3.8, 1, 1], ['N', 4, 8, 7, 3.8, 1, 1], ['M', 4, 9, 8, 3.8, 1, 1], [',', 4, 10, 9, 3.8, 1, 1], ['.', 4, 11, 10, 3.8, 1, 1], ['/', 4, 12, 11, 3.8, 1, 1], ['Shift', 4, 15, 11.95, 3.8, 3, 1], ['Ctrl', 5, 1, 0, 4.7, 1, 1], ['Fn', 5, 2, 1, 4.7, 1, 1], ['Win', 5, 3, 2, 4.7, 1, 1], ['Alt', 5, 5, 3, 4.7, 1, 1], ['Space', 5, 7, 4, 4.7, 5, 1], ['Alt', 5, 9, 9, 4.7, 1, 1], ['Fn', 5, 10, 10, 4.7, 1, 1], ['Ctrl', 5, 11, 11, 4.7, 1, 1], ['←', 5, 12, 11.95, 4.7, 1, 1], ['↑', 5, 13, 12.95, 4.7, 1, 0.5], ['↓', 5, 15, 12.95, 5.2, 1, 0.5], ['→', 5, 14, 13.95, 4.7, 1, 1]];
+const TKL = [['Esc', 0, 1, 0, 0, 1, 1], ['F1', 0, 3, 2.05, 0, 1, 1], ['F2', 0, 4, 3.05, 0, 1, 1], ['F3', 0, 5, 4.05, 0, 1, 1], ['F4', 0, 6, 5.05, 0, 1, 1], ['F5', 0, 7, 6.55, 0, 1, 1], ['F6', 0, 8, 7.55, 0, 1, 1], ['F7', 0, 9, 8.55, 0, 1, 1], ['F8', 0, 10, 9.55, 0, 1, 1], ['F9', 0, 11, 11.05, 0, 1, 1], ['F10', 0, 12, 12.05, 0, 1, 1], ['F11', 0, 13, 13.05, 0, 1, 1], ['F12', 0, 14, 14.05, 0, 1, 1], ['PrtSc', 0, 15, 15.4, 0, 1, 1], ['ScrLk', 0, 16, 16.4, 0, 1, 1], ['Pause', 0, 17, 17.4, 0, 1, 1], ['`', 1, 1, 0, 1.35, 1, 1], ['1', 1, 2, 1, 1.35, 1, 1], ['2', 1, 3, 2, 1.35, 1, 1], ['3', 1, 4, 3, 1.35, 1, 1], ['4', 1, 5, 4, 1.35, 1, 1], ['5', 1, 6, 5, 1.35, 1, 1], ['6', 1, 7, 6, 1.3, 1, 1], ['7', 1, 8, 7, 1.3, 1, 1], ['8', 1, 9, 8, 1.35, 1, 1], ['9', 1, 10, 9, 1.35, 1, 1], ['0', 1, 11, 10, 1.35, 1, 1], ['-', 1, 12, 11, 1.35, 1, 1], ['=', 1, 13, 12, 1.35, 1, 1], ['Backspace', 1, 14, 13, 1.35, 2, 1], ['Ins', 1, 15, 15.4, 1.35, 1, 1], ['Home', 1, 16, 16.4, 1.35, 1, 1], ['PgUp', 1, 17, 17.4, 1.35, 1, 1], ['Tab', 2, 1, 0, 2.35, 1.5, 1], ['Q', 2, 2, 1.5, 2.35, 1, 1], ['W', 2, 3, 2.5, 2.35, 1, 1], ['E', 2, 4, 3.5, 2.35, 1, 1], ['R', 2, 5, 4.5, 2.35, 1, 1], ['T', 2, 6, 5.5, 2.35, 1, 1], ['Y', 2, 7, 6.5, 2.35, 1, 1], ['U', 2, 8, 7.5, 2.35, 1, 1], ['I', 2, 9, 8.5, 2.35, 1, 1], ['O', 2, 10, 9.5, 2.35, 1, 1], ['P', 2, 11, 10.5, 2.35, 1, 1], ['[', 2, 12, 11.5, 2.35, 1, 1], [']', 2, 13, 12.5, 2.35, 1, 1], ['\\', 2, 14, 13.5, 2.35, 1.5, 1], ['Del', 2, 15, 15.4, 2.35, 1, 1], ['End', 2, 16, 16.4, 2.35, 1, 1], ['PgDn', 2, 17, 17.4, 2.35, 1, 1], ['Caps', 3, 1, 0, 3.35, 1.75, 1], ['A', 3, 2, 1.75, 3.35, 1, 1], ['S', 3, 3, 2.75, 3.35, 1, 1], ['D', 3, 4, 3.75, 3.35, 1, 1], ['F', 3, 5, 4.75, 3.35, 1, 1], ['G', 3, 6, 5.75, 3.35, 1, 1], ['H', 3, 7, 6.75, 3.35, 1, 1], ['J', 3, 8, 7.75, 3.35, 1, 1], ['K', 3, 9, 8.75, 3.35, 1, 1], ['L', 3, 10, 9.75, 3.35, 1, 1], [';', 3, 11, 10.75, 3.35, 1, 1], ["'", 3, 12, 11.75, 3.35, 1, 1], ['Enter', 3, 14, 12.75, 3.35, 2.25, 1], ['Shift', 4, 1, 0, 4.35, 2.25, 1], ['Z', 4, 3, 2.25, 4.35, 1, 1], ['X', 4, 4, 3.25, 4.35, 1, 1], ['C', 4, 5, 4.25, 4.35, 1, 1], ['V', 4, 6, 5.25, 4.35, 1, 1], ['B', 4, 7, 6.25, 4.35, 1, 1], ['N', 4, 8, 7.25, 4.35, 1, 1], ['M', 4, 9, 8.25, 4.35, 1, 1], [',', 4, 10, 9.25, 4.35, 1, 1], ['.', 4, 11, 10.25, 4.35, 1, 1], ['/', 4, 12, 11.25, 4.35, 1, 1], ['Shift', 4, 14, 12.25, 4.35, 2.75, 1], ['↑', 4, 16, 16.4, 4.35, 1, 1], ['Ctrl', 5, 1, 0, 5.35, 1.3, 1], ['Win', 5, 2, 1.3, 5.35, 1.2, 1], ['Alt', 5, 3, 2.5, 5.35, 1.3, 1], ['Space', 5, 7, 3.8, 5.35, 6.2, 1], ['Alt', 5, 11, 10, 5.3, 1.3, 1], ['Fn', 5, 12, 11.25, 5.35, 1.25, 1], ['Menu', 5, 13, 12.5, 5.3, 1.25, 1], ['Ctrl', 5, 14, 13.75, 5.3, 1.25, 1], ['←', 5, 15, 15.4, 5.35, 1, 1], ['↓', 5, 16, 16.4, 5.35, 1, 1], ['→', 5, 17, 17.4, 5.35, 1, 1]];
+const MINI = [['Esc', 0, 1, 0, 0, 1, 1], ['1', 0, 2, 1, 0, 1, 1], ['2', 0, 3, 2, 0, 1, 1], ['3', 0, 4, 3, 0, 1, 1], ['4', 0, 5, 4, 0, 1, 1], ['5', 0, 6, 5, 0, 1, 1], ['6', 0, 7, 6, 0, 1, 1], ['7', 0, 8, 7, 0, 1, 1], ['8', 0, 9, 8, 0, 1, 1], ['9', 0, 10, 9, 0, 1, 1], ['0', 0, 11, 10, 0, 1, 1], ['-', 0, 12, 11, 0, 1, 1], ['=', 0, 13, 12, 0, 1, 1], ['Backspace', 0, 14, 13, 0, 2, 1], ['Tab', 1, 1, 0, 1, 1.5, 1], ['Q', 1, 2, 1.5, 1, 1, 1], ['W', 1, 3, 2.5, 1, 1, 1], ['E', 1, 4, 3.5, 1, 1, 1], ['R', 1, 5, 4.5, 1, 1, 1], ['T', 1, 6, 5.5, 1, 1, 1], ['Y', 1, 7, 6.5, 1, 1, 1], ['U', 1, 8, 7.5, 1, 1, 1], ['I', 1, 9, 8.5, 1, 1, 1], ['O', 1, 10, 9.5, 1, 1, 1], ['P', 1, 11, 10.5, 1, 1, 1], ['[', 1, 12, 11.5, 1, 1, 1], [']', 1, 13, 12.5, 1, 1, 1], ['\\', 1, 14, 13.5, 1, 1.5, 1], ['Caps', 2, 1, 0, 2, 1.75, 1], ['A', 2, 2, 1.75, 2, 1, 1], ['S', 2, 3, 2.75, 2, 1, 1], ['D', 2, 4, 3.75, 2, 1, 1], ['F', 2, 5, 4.75, 2, 1, 1], ['G', 2, 6, 5.75, 2, 1, 1], ['H', 2, 7, 6.75, 2, 1, 1], ['J', 2, 8, 7.75, 2, 1, 1], ['K', 2, 9, 8.75, 2, 1, 1], ['L', 2, 10, 9.75, 2, 1, 1], [';', 2, 11, 10.75, 2, 1, 1], ["'", 2, 12, 11.75, 2, 1, 1], ['Enter', 2, 14, 12.75, 2, 2.25, 1], ['Shift', 3, 1, 0, 3, 2.25, 1], ['Z', 3, 3, 2.25, 3, 1, 1], ['X', 3, 4, 3.25, 3, 1, 1], ['C', 3, 5, 4.25, 3, 1, 1], ['V', 3, 6, 5.25, 3, 1, 1], ['B', 3, 7, 6.25, 3, 1, 1], ['N', 3, 8, 7.25, 3, 1, 1], ['M', 3, 9, 8.25, 3, 1, 1], [',', 3, 10, 9.25, 3, 1, 1], ['.', 3, 11, 10.25, 3, 1, 1], ['/', 3, 12, 11.25, 3, 1, 1], ['Shift', 3, 14, 12.25, 3, 2.75, 1], ['Ctrl', 4, 1, 0, 4, 1.3, 1], ['Win', 4, 2, 1.3, 4, 1.2, 1], ['Alt', 4, 3, 2.5, 4, 1.3, 1], ['Space', 4, 7, 3.8, 4, 6.2, 1], ['Alt', 4, 11, 10, 4, 1.3, 1], ['Fn', 4, 12, 11.25, 4, 1.25, 1], ['Menu', 4, 13, 12.5, 4, 1.25, 1], ['Ctrl', 4, 14, 13.75, 4, 1.25, 1]];
+const PLACED = { '6x16:laptop': BLADE, '6x18:keyboard': TKL, '5x15:keyboard': MINI };
+// The keys of a per-key device, or null when its layout isn't known (one square per light).
+function knownLayout(m, kind) {
   if (m.rows === 6 && m.cols === 22) return FULLSIZE.flatMap((keys, row) => {
     let x = 0;
     return keys.map(([label, col, w = 1, gap = 0, h = 1]) => { x += gap; const k = { label, row, col, x, y: row + (row ? .25 : 0), w, h }; x += w; return k; });
   });
+  const placed = PLACED[m.rows + 'x' + m.cols + ':' + kind];
+  return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col, x, y, w, h })) : null;
+}
+function layout(m, kind) {
+  const known = knownLayout(m, kind);
+  if (known) return known;
   const out = []; // unknown layout: one square per matrix cell
   for (let row = 0; row < m.rows; row++) for (let col = 0; col < m.cols; col++) out.push({ label: '', row, col, x: col, y: row, w: 1, h: 1 });
   return out;
@@ -692,7 +720,10 @@ function sections() {
       rows: (list || []).filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label, name: b.name })) });
   }
   if (dev.macros) s.push({ id: 'macros', name: 'Macros', rows: [{ key: 'macros', label: 'Macros on the device' }] });
-  if (dev.sleep) s.push({ id: 'power', name: 'Power', rows: [{ key: 'sleep', label: 'Sleep when idle' }] });
+  const power = [];
+  if (dev.sleep) power.push({ key: 'sleep', label: 'Sleep when idle' });
+  if (dev.dimming) power.push({ key: 'dimming', label: 'Keyboard when idle' });
+  if (power.length) s.push({ id: 'power', name: 'Power', rows: power });
   s.push({ id: 'profile', name: 'Profile', rows: [{ key: 'apps', label: 'Switches with' }] });
   s.push({ id: 'device', name: 'Device', rows: [{ key: 'device', label: 'About this device' }] });
   return s;
@@ -720,7 +751,11 @@ function railSummary(s) {
     return n ? plural(n, 'button') + ' changed' : 'As saved in the mouse';
   }
   if (s.id === 'macros') { const m = macroData[dev.id]; return m ? (m.macros.length ? plural(m.macros.length, 'macro') : 'None yet') : 'On the device'; }
-  if (s.id === 'power') { const sl = dev.sleep; return sl.auto === false ? 'Never sleeps' : 'Sleeps after ' + sl.minutes + ' min'; }
+  if (s.id === 'power') {
+    const sl = dev.sleep;
+    if (!sl) return 'When idle: ' + DIMMING[dev.dimming].toLowerCase();
+    return sl.auto === false ? 'Never sleeps' : 'Sleeps after ' + sl.minutes + ' min';
+  }
   if (s.id === 'profile') { const a = p.apps || []; return a.length ? a.join(', ') : 'No games yet'; }
   if (s.id === 'device') return dev.firmware ? 'Firmware ' + dev.firmware : (KINDS[dev.kind] || 'Device');
   return '';
@@ -959,6 +994,7 @@ function cellValue(key, name) {
   if (key === 'polling') return String(active && dev.polling ? dev.polling.hz : p.polling || '');
   if (key === 'stages') { const st = stagesOf(name); return st ? st.active + ':' + st.list.join(' ') : ''; }
   if (key === 'sleep') { const sl = sleepOf(name); return sl ? sl.auto + ':' + sl.minutes : ''; }
+  if (key === 'dimming') return dimmingOf(name) || '';
   if (key === 'macros') return 'shared'; // the device's, the same in every profile
   if (key.startsWith('btn:')) {
     const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return '';
@@ -1002,6 +1038,10 @@ function cellView(key, name) {
     if (!st) return ['<span class="unset">Not set</span>'];
     return [st.list.map((d, i) => { const v = d[0] === d[1] ? d[0] : d[0] + '×' + d[1];
       return i + 1 === st.active ? `<b class="num">${v}</b>` : `<span class="num">${v}</span>`; }).join(' · ')];
+  }
+  if (key === 'dimming') {
+    const d = dimmingOf(name);
+    return [d ? DIMMING[d] : '<span class="unset">Not set</span>'];
   }
   if (key === 'sleep') {
     const sl = sleepOf(name);
@@ -1076,6 +1116,7 @@ function buildEditor(host, r) {
   else if (r.key === 'polling') pollingEditor(box);
   else if (r.key === 'stages') stagesEditor(box);
   else if (r.key === 'sleep') sleepEditor(box);
+  else if (r.key === 'dimming') dimmingEditor(box);
   else if (r.key === 'macros') macrosEditor(box);
   else if (r.key === 'apps') appsEditor(box);
   else if (r.key === 'device') deviceEditor(box);
@@ -1244,7 +1285,10 @@ function keysEditor(box) {
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Quick' }),
       el('button', { className: 'ghost', textContent: 'Fill all keys', onclick: () => setKeys(Array(keyCount()).fill(brush)) }),
       el('button', { className: 'ghost', textContent: 'Back to whole keyboard', onclick: () => { const c = dev.leds[0] && (zoneOf(dev.profile, dev.leds[0].name).color || brush); if (c) setColor(c, dev.leds[0].name); } })),
-    el('p', { className: 'note', textContent: 'Pick a brush color, then click or drag across keys to paint them.' }), svg);
+    el('p', { className: 'note', textContent: knownLayout(dev.matrix, dev.kind)
+      ? 'Pick a brush color, then click or drag across keys to paint them.'
+      : 'This keyboard’s key layout isn’t known yet, so each square is one of its lights, in rows from the top left. Paint one to see which key lights up.' }),
+    el('div', { className: 'kbwrap' }, svg));
   renderKb(svg);
 }
 
@@ -1371,6 +1415,35 @@ function sleepEditor(box) {
     : 'How long the device waits, untouched, before it sleeps to save battery (1 to ' + sl.max + ' minutes).' }));
 }
 
+// Laptops: what the keyboard backlight does when the laptop sits idle (Synapse's Smart Dimming).
+const DIMMING = { 'stays-lit': 'Stays lit', half: 'Dims to half', quarter: 'Dims to quarter', dark: 'Turns off' };
+// [how bright the keyboard stays, the line under it]
+const DIM_INFO = { 'stays-lit': [1, 'Never dims'], half: [.5, '50% brightness'], quarter: [.25, '25% brightness'], dark: [0, 'Until a keypress'] };
+function dimmingOf(name) { return name === dev.active && dev.dimming ? dev.dimming : prof(name).dimming; }
+
+function dimmingEditor(box) {
+  const grid = el('div', { className: 'dimgrid', role: 'group', ariaLabel: 'Keyboard backlight when the laptop is idle' });
+  const draw = () => [...grid.children].forEach(t => t.setAttribute('aria-pressed', t.dataset.v === dev.dimming));
+  Object.entries(DIMMING).forEach(([v, text]) => {
+    const [lvl, sub] = DIM_INFO[v];
+    const key = el('span', { className: 'dimkey', ariaHidden: 'true' }); key.style.setProperty('--lvl', lvl);
+    grid.append(el('button', { className: 'tile', dataset: { v }, onclick: async e => {
+      const t = e.currentTarget; t.disabled = true;
+      try {
+        const r = await api('/api/dimming', { dimming: v });
+        dev.dimming = r.dimming; dev.profile.dimming = v;
+        draw(); refreshCell('dimming');
+        toast('Keyboard ' + DIMMING[v].toLowerCase() + ' when idle · saved to ' + dev.active);
+      } catch (err) { toast(err.message, true); }
+      t.disabled = false;
+    } }, key, el('div', {}, el('span', { className: 'tv', textContent: text }), el('span', { className: 'tl', textContent: sub }))));
+  });
+  draw();
+  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'When the laptop is idle' }), grid),
+    el('p', { className: 'note', textContent: 'A keypress brings it back to full brightness. Synapse calls this Smart Dimming.' }),
+    el('p', { className: 'note', textContent: 'New and not yet confirmed on a laptop. If it goes dark anyway with Stays lit, please tell us.' }));
+}
+
 // Asks Razer's public product page whether newer firmware is out. Never installs anything.
 const fwResult = {};
 function firmwareCheck() {
@@ -1415,12 +1488,19 @@ const KEY_CODES = { Enter: 'enter', Escape: 'esc', Backspace: 'backspace', Tab: 
   Equal: 'equal', BracketLeft: 'lbracket', BracketRight: 'rbracket', Backslash: 'backslash', Semicolon: 'semicolon',
   Quote: 'quote', Backquote: 'grave', Comma: 'comma', Period: 'period', Slash: 'slash', CapsLock: 'capslock',
   PrintScreen: 'printscreen', ScrollLock: 'scrolllock', Pause: 'pause', Insert: 'insert', Home: 'home', PageUp: 'pageup',
-  Delete: 'delete', End: 'end', PageDown: 'pagedown', ArrowRight: 'right', ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up' };
+  Delete: 'delete', End: 'end', PageDown: 'pagedown', ArrowRight: 'right', ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up',
+  NumLock: 'numlock', NumpadDivide: 'num-slash', NumpadMultiply: 'num-star', NumpadSubtract: 'num-minus', NumpadAdd: 'num-plus',
+  NumpadEnter: 'num-enter', NumpadDecimal: 'num-period', ContextMenu: 'menu' };
 const MOD_CODES = { ControlLeft: 'ctrl', ShiftLeft: 'shift', AltLeft: 'alt', MetaLeft: 'win',
   ControlRight: 'rctrl', ShiftRight: 'rshift', AltRight: 'ralt', MetaRight: 'rwin' };
 const keyName = code => KEY_CODES[code] || (/^Key[A-Z]$/.test(code) && code.slice(3).toLowerCase())
-  || (/^Digit\d$/.test(code) && code.slice(5)) || (/^F\d{1,2}$/.test(code) && code.toLowerCase()) || null;
-const combo = c => c.split('+').map(k => k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1)).join('+');
+  || (/^Digit\d$/.test(code) && code.slice(5)) || (/^Numpad\d$/.test(code) && 'num' + code.slice(6)) || (/^F\d{1,2}$/.test(code) && code.toLowerCase()) || null;
+const NUM_SIGNS = { slash: '/', star: '*', minus: '-', plus: '+', enter: 'Enter', period: '.' };
+const keyLabel = k => k.length === 1 ? k.toUpperCase()
+  : /^num(\d)$/.test(k) ? 'Num ' + k.slice(3)
+  : /^num-/.test(k) ? 'Num ' + NUM_SIGNS[k.slice(4)]
+  : k.charAt(0).toUpperCase() + k.slice(1);
+const combo = c => c.split('+').map(keyLabel).join('+');
 
 // Action text -> [choice, combo, number] for the controls, and back.
 function splitAction(a) {
@@ -1685,7 +1765,7 @@ function frame() {
   return Array(keyCount()).fill(!z.off && z.color ? z.color : '000000');
 }
 function renderKb(svg) {
-  const keys = layout(dev.matrix), cols = dev.matrix.cols;
+  const keys = layout(dev.matrix, dev.kind), cols = dev.matrix.cols;
   const w = Math.max(...keys.map(k => k.x + k.w)), h = Math.max(...keys.map(k => k.y + k.h));
   svg.setAttribute('viewBox', `-0.05 -0.05 ${w + 0.1} ${h + 0.1}`);
   svg.innerHTML = keys.map(k =>

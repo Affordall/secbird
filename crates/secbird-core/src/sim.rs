@@ -65,6 +65,8 @@ pub struct SimState {
     pub dpi_stages: Option<(u8, Vec<(u16, u16)>)>,
     /// Sleep timer in seconds (`07:83`), and the auto-sleep switch where there is one.
     pub idle_seconds: Option<u16>,
+    /// Laptops: Smart Dimming as (enabled, level), level 0 half, 1 quarter, 2 dark.
+    pub smart_dimming: Option<(u8, u8)>,
     pub auto_sleep: Option<bool>,
     /// On-device macro memory (`None` = no macros): id -> (header, steps). Sized like a Basilisk V3.
     pub macros: Option<BTreeMap<u16, SimMacro>>,
@@ -111,6 +113,7 @@ impl SimState {
             macros: None,
             macro_recyclable: 0,
             idle_seconds: None,
+            smart_dimming: None,
             auto_sleep: None,
             paired: Vec::new(),
             battery: None,
@@ -328,6 +331,17 @@ impl SimState {
                     ok(a[..2].to_vec())
                 }
                 None => (NotSupported, vec![]),
+            },
+            c if c == cmd::SMART_DIMMING.get() => match self.smart_dimming {
+                Some((on, level)) => ok(vec![a[0], on, level]),
+                None => (NotSupported, vec![]),
+            },
+            cmd::SMART_DIMMING => match self.smart_dimming {
+                Some(_) if a[1] <= 1 && a[2] <= 2 => {
+                    self.smart_dimming = Some((a[1], a[2]));
+                    ok(a[..3].to_vec())
+                }
+                _ => (NotSupported, vec![]),
             },
             c if c == cmd::AUTO_SLEEP.get() => match self.auto_sleep {
                 Some(on) => ok(vec![0, on as u8]),
@@ -741,6 +755,8 @@ pub fn preset(name: &str) -> Option<(Sim, u16)> {
             s.standard = true;
             s.leds = vec![5, 4];
             s.matrix = Some((6, 16, vec![[0; 3]; 6 * 16]));
+            // Smart Dimming on, going dark when idle, as in issue #20.
+            s.smart_dimming = Some((1, 2));
             (Sim::new(s), 0x026D)
         }
         // Base Station V2 Chroma, issue #6.
@@ -981,7 +997,7 @@ mod tests {
         let list = dev.macros().unwrap();
         assert_eq!(list.iter().map(|m| m.name.as_str()).collect::<Vec<_>>(), ["Long one", "Copy ✓"]);
         assert_eq!(dev.macro_steps(first).unwrap(), script.0);
-        assert_eq!(Script(dev.macro_steps(second).unwrap()).to_string(), "down:ctrl tap:c up:ctrl");
+        assert_eq!(Script(dev.macro_steps(second).unwrap()).to_string(), "tap:ctrl+c");
         assert!(dev.macro_storage().unwrap().free_bytes < free);
 
         // A button plays it.
@@ -1113,6 +1129,26 @@ mod tests {
         assert_eq!(dev.set_dpi(31000, 31000).unwrap(), (30000, 30000));
         let leds: Vec<u8> = dev.spec.as_ref().unwrap().leds.iter().map(|l| l.id).collect();
         assert_eq!(leds, [4, 1]);
+    }
+
+    #[test]
+    fn laptop_keyboard_dimming_reads_sets_and_reads_back() {
+        use crate::Dimming;
+        let (sim, pid) = preset("blade").unwrap();
+        let db = crate::db::Db::builtin().unwrap();
+        let dev = sim.open(pid, db.get(pid).cloned()).unwrap();
+        assert_eq!(dev.dimming().unwrap(), Some(Dimming::Dark));
+        dev.set_dimming(Dimming::StaysLit).unwrap();
+        assert_eq!(dev.dimming().unwrap(), Some(Dimming::StaysLit));
+        assert_eq!(sim.state().smart_dimming, Some((0, 2)), "turning it off keeps the level");
+        dev.set_dimming(Dimming::Half).unwrap();
+        assert_eq!(sim.state().smart_dimming, Some((1, 0)));
+        for d in Dimming::ALL {
+            assert_eq!(d.to_string().parse::<Dimming>().unwrap(), d);
+        }
+        // Only laptops have it.
+        let mouse = open(&Sim::mouse(), MOUSE_PID);
+        assert_eq!(mouse.dimming().unwrap(), None);
     }
 
     #[test]

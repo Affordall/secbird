@@ -39,6 +39,62 @@ pub struct DpiStages {
     pub stages: Vec<(u16, u16)>,
 }
 
+/// What a laptop's keyboard backlight does when the laptop sits idle: Synapse's "Smart
+/// Dimming". With it on, the backlight dims or goes dark until the next keypress (#20).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dimming {
+    /// Smart Dimming off: the backlight stays as set.
+    StaysLit,
+    Half,
+    Quarter,
+    Dark,
+}
+
+impl Dimming {
+    pub const ALL: [Dimming; 4] = [Dimming::StaysLit, Dimming::Half, Dimming::Quarter, Dimming::Dark];
+
+    /// Synapse's level byte: 0 half, 1 quarter, 2 off.
+    fn level(self) -> Option<u8> {
+        match self {
+            Dimming::StaysLit => None,
+            Dimming::Half => Some(0),
+            Dimming::Quarter => Some(1),
+            Dimming::Dark => Some(2),
+        }
+    }
+
+    fn from_reply(enabled: u8, level: u8) -> Dimming {
+        match (enabled, level) {
+            (0, _) => Dimming::StaysLit,
+            (_, 0) => Dimming::Half,
+            (_, 1) => Dimming::Quarter,
+            _ => Dimming::Dark,
+        }
+    }
+}
+
+impl std::fmt::Display for Dimming {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Dimming::StaysLit => "stays-lit",
+            Dimming::Half => "half",
+            Dimming::Quarter => "quarter",
+            Dimming::Dark => "dark",
+        })
+    }
+}
+
+impl std::str::FromStr for Dimming {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Dimming::ALL
+            .into_iter()
+            .find(|d| d.to_string() == s)
+            .ok_or_else(|| Error::InvalidArg(format!("'{s}': use stays-lit, half, quarter or dark")))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SleepTimer {
     pub minutes: u16,
@@ -150,6 +206,32 @@ impl Device {
         let r = self.get(cmd::IDLE_TIME, cmd::IDLE_TIME_SIZE, &[])?;
         if u16::from_be_bytes([r.args()[0], r.args()[1]]) != seconds {
             return Err(Error::Unsupported(format!("the device didn't keep a {minutes} min sleep timer")));
+        }
+        Ok(())
+    }
+
+    /// What the keyboard backlight does when the laptop is idle. `None` for anything that
+    /// isn't a laptop.
+    pub fn dimming(&self) -> Result<Option<Dimming>> {
+        if !self.spec.as_ref().is_some_and(|s| s.kind == crate::Kind::Laptop) {
+            return Ok(None);
+        }
+        let r = self.get(cmd::SMART_DIMMING, cmd::SMART_DIMMING_SIZE, &[1])?;
+        Ok(Some(Dimming::from_reply(r.args()[1], r.args()[2])))
+    }
+
+    /// Set it, then read it back. Turning it off keeps the level the laptop has, as
+    /// Synapse does.
+    pub fn set_dimming(&self, want: Dimming) -> Result<()> {
+        let now = self.get(cmd::SMART_DIMMING, cmd::SMART_DIMMING_SIZE, &[1])?;
+        let args = match want.level() {
+            Some(level) => [1, 1, level],
+            None => [1, 0, now.args()[2]],
+        };
+        self.transact(cmd::SMART_DIMMING, cmd::SMART_DIMMING_SIZE, &args)?;
+        let got = self.dimming()?;
+        if got != Some(want) {
+            return Err(Error::Unsupported(format!("the laptop didn't keep it (asked for {want}, reads {got:?})")));
         }
         Ok(())
     }

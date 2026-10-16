@@ -25,6 +25,9 @@ SETTINGS (saved to the active profile):
                             (1-5, each 1600 or 1600x800); --use picks the active one
   sleep [MINUTES|on|off]    Show or set how long a wireless device waits before it
                             sleeps; on/off where the device can stop sleeping
+  dimming [stays-lit|half|quarter|dark]
+                            Laptops: what the keyboard backlight does when idle
+                            (Synapse's Smart Dimming). Untested on hardware yet
   color <zone> <RRGGBB>     Static color for a lighting zone (name or id)
   brightness <zone> <0-100> Brightness for a lighting zone
   off <zone>                Turn a lighting zone off
@@ -343,6 +346,21 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
                 Ok(())
             }
         },
+        "dimming" => match rest.first() {
+            None => {
+                match dev.dimming()? {
+                    None => println!("Only laptops have keyboard dimming."),
+                    Some(d) => println!("Keyboard when idle: {}", dimming_text(d)),
+                }
+                Ok(())
+            }
+            Some(v) => {
+                let d = v.parse()?;
+                actions::set_dimming(dev, &mut store, d)?;
+                println!("Keyboard when idle: {}", dimming_text(d));
+                Ok(())
+            }
+        },
         "macro" => macro_cmd(dev, &mut store, rest),
         "poll" => match rest.first() {
             None => {
@@ -428,6 +446,9 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
             }
             if let Some(on) = p.auto_sleep {
                 println!("  sleeping   {}", if on { "on" } else { "off" });
+            }
+            if let Some(d) = &p.dimming {
+                println!("  dimming    {d}");
             }
             for (zone, z) in &p.lighting {
                 let state = match (z.off, z.color) {
@@ -606,6 +627,16 @@ fn report_apply(results: Vec<secbird_core::profile::Applied>) -> Result<(), Erro
     Ok(())
 }
 
+fn dimming_text(d: secbird_core::Dimming) -> &'static str {
+    use secbird_core::Dimming::*;
+    match d {
+        StaysLit => "stays lit",
+        Half => "dims to half",
+        Quarter => "dims to a quarter",
+        Dark => "turns off until a key is pressed",
+    }
+}
+
 fn info(dev: &Device, store: &mut Store) -> Result<(), Error> {
     let (major, minor) = dev.firmware()?;
     println!("Device    {} ({:04X})", dev.name(), dev.pid);
@@ -630,6 +661,9 @@ fn info(dev: &Device, store: &mut Store) -> Result<(), Error> {
     if let Ok(Some(t)) = dev.sleep_timer() {
         let off = if t.auto_sleep == Some(false) { ", sleeping off" } else { "" };
         println!("Sleep     after {} min{off}", t.minutes);
+    }
+    if let Ok(Some(d)) = dev.dimming() {
+        println!("Dimming   {}", dimming_text(d));
     }
     if let Some(spec) = &dev.spec {
         if !spec.leds.is_empty() {

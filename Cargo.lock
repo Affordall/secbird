@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "secbird"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "embed-resource",
  "secbird-core",
@@ -135,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "secbird-core"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "hidapi",
  "serde",
@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "secbird-tray"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "embed-resource",
  "secbird-core",

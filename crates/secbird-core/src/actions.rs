@@ -50,6 +50,12 @@ pub fn set_sleep_minutes(dev: &Device, store: &mut Store, minutes: u16) -> Resul
     store.save()
 }
 
+pub fn set_dimming(dev: &Device, store: &mut Store, dimming: crate::Dimming) -> Result<()> {
+    dev.set_dimming(dimming)?;
+    store.for_device(dev).active_mut().dimming = Some(dimming.to_string());
+    store.save()
+}
+
 pub fn set_auto_sleep(dev: &Device, store: &mut Store, enabled: bool) -> Result<()> {
     dev.set_auto_sleep(enabled)?;
     store.for_device(dev).active_mut().auto_sleep = Some(enabled);
