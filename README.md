@@ -157,15 +157,49 @@ run `secbird report` and [open a device report](https://github.com/infinityInfin
 saying what works and what doesn't. The report only reads from your devices and shortens serial
 numbers. Reports are how devices move from "listed" to "verified".
 
-| Status | Devices |
-|---|---|
-| Verified on real hardware | **Mice:** Basilisk V3 (ours), Cobra wired ([#1](https://github.com/infinityInfinite/secbird/issues/1)), Naga V2 Pro ([#4](https://github.com/infinityInfinite/secbird/issues/4), [#13](https://github.com/infinityInfinite/secbird/issues/13)), Naga V2 HyperSpeed with side grid, battery and HyperShift ([#8](https://github.com/infinityInfinite/secbird/issues/8), [#11](https://github.com/infinityInfinite/secbird/issues/11)), Viper Ultimate wired and wireless ([#14](https://github.com/infinityInfinite/secbird/issues/14)), DeathAdder V3 Pro through a HyperPolling dongle ([#17](https://github.com/infinityInfinite/secbird/pull/17))<br>**Keyboards and keypads:** BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12)), Cynosa V2, Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))<br>**Accessories:** Mouse Dock ([#14](https://github.com/infinityInfinite/secbird/issues/14)) |
-| Reported working by users | Basilisk X HyperSpeed (2.4 GHz dongle; [#10](https://github.com/infinityInfinite/secbird/issues/10)), Basilisk V3 Pro 35K Phantom Green Edition, BlackWidow V3 Mini HyperSpeed, Goliathus Chroma, Thunderbolt 4 Dock Chroma |
-| Partly working | Basilisk V4 Pro on the Mouse Dock Pro: DPI, polling, sleep and most buttons work, named right since 0.4.2; the extra top button is named in 0.4.3 ([#16](https://github.com/infinityInfinite/secbird/issues/16)) |
-| Listed, waiting for reports | About 260 more mice, keyboards, keypads, mousepads, laptops and accessories, including the Basilisk V4 Pro, Basilisk V4 HyperSpeed and Naga V3 Pro |
-| Not supported yet | Headsets (Kraken, BlackShark V3; [#15](https://github.com/infinityInfinite/secbird/issues/15)), Bluetooth connections ([#10](https://github.com/infinityInfinite/secbird/issues/10)), laptop cooling pads, the Chroma Addressable RGB Controller (shows up, but has no setup screen yet) |
+### Verified on real hardware
 
-"Reported working" means a user said so; a `secbird report` from them moves a device to verified.
+**Mice**
+- Basilisk V3 (ours)
+- Cobra, wired ([#1](https://github.com/infinityInfinite/secbird/issues/1))
+- Naga V2 Pro ([#4](https://github.com/infinityInfinite/secbird/issues/4), [#13](https://github.com/infinityInfinite/secbird/issues/13))
+- Naga V2 HyperSpeed, with side grid, battery and HyperShift ([#8](https://github.com/infinityInfinite/secbird/issues/8), [#11](https://github.com/infinityInfinite/secbird/issues/11))
+- Viper Ultimate, wired and wireless ([#14](https://github.com/infinityInfinite/secbird/issues/14))
+- DeathAdder V3 Pro, through a HyperPolling dongle ([#17](https://github.com/infinityInfinite/secbird/pull/17))
+
+**Keyboards and keypads**
+- BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12))
+- Cynosa V2
+- Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))
+
+**Accessories**
+- Mouse Dock ([#14](https://github.com/infinityInfinite/secbird/issues/14))
+
+### Reported working by users
+
+A user said it works, but there's no `secbird report` yet. One from them moves it to verified.
+
+- Basilisk X HyperSpeed, on the 2.4 GHz dongle ([#10](https://github.com/infinityInfinite/secbird/issues/10))
+- Basilisk V3 Pro 35K Phantom Green Edition
+- BlackWidow V3 Mini HyperSpeed
+- Goliathus Chroma
+- Thunderbolt 4 Dock Chroma
+
+### Partly working
+
+- Basilisk V4 Pro on the Mouse Dock Pro: DPI, polling, sleep and most buttons work ([#16](https://github.com/infinityInfinite/secbird/issues/16))
+
+### Listed, waiting for reports
+
+About 260 more mice, keyboards, keypads, mousepads, laptops and accessories, including the
+Basilisk V4 Pro, Basilisk V4 HyperSpeed and Naga V3 Pro.
+
+### Not supported yet
+
+- Headsets: Kraken, BlackShark V3 ([#15](https://github.com/infinityInfinite/secbird/issues/15))
+- Bluetooth connections ([#10](https://github.com/infinityInfinite/secbird/issues/10))
+- Laptop cooling pads
+- Chroma Addressable RGB Controller (shows up, but has no setup screen yet)
 
 ## Files
 
