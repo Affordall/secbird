@@ -7,14 +7,15 @@ A small, lightweight replacement for Razer Synapse on Windows. Set your Razer mo
 keyboard and other peripherals: lighting, DPI, polling rate, button remapping and profiles, without
 Synapse's background services, account, ads, pop-ups or restart prompts.
 
-- **Light:** a 1 MB tray app using about 11 MB of RAM, next to the hundreds of MB Synapse keeps running.
+- **Light:** a 1 MB tray app using about 12 MB of RAM, next to the hundreds of MB Synapse keeps running.
 - **Quiet:** no services, no account, no telemetry. It sits in the tray and
   applies your settings when you sign in, plug a device in or wake the PC. The only time it goes
   online is a daily check for a new Secretarybird version, which you can turn off.
 - **Built for many devices:** one screen for all of them, and one click to put a color or effect on every device, in step.
 
-> **Beta.** Only the Basilisk V3 is tested by us on real hardware; a few more are confirmed by
-> users (see below). Other devices are supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
+> **Beta.** We test on a Basilisk V3, and users have confirmed nine more devices, from Naga and
+> Viper mice to BlackWidow keyboards and a Tartarus keypad (see below). Other devices are
+> supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
 
 ### [⬇ Download for Windows](https://github.com/infinityInfinite/secbird/releases/latest)
 
@@ -57,8 +58,8 @@ and run `secbird-tray.exe`.
   one-time key. Made to be quick mid-game: it opens on the live profile, with your profiles in a
   switcher on top; pick a section (Lighting, Sensitivity, Buttons, Macros, Power, Profile,
   Device), click a tile, change it in the side panel. Nothing scrolls on a desktop window, even
-  a Naga with all its side buttons. Compare shows every profile side by side. Six themes
-  (Bridge, Roast, Classic, Light, Workshop, Neon), or Auto to follow Windows.
+  a Naga with all its side buttons. Compare shows every profile side by side. Seven themes
+  (Bridge, Roast, Classic, Light, Workshop, Neon, Acid), or Auto to follow Windows.
 - **Lighting:** colors and brightness per zone, per-key painting on per-key keyboards, and the
   effects the device runs itself (spectrum, wave, breathing, reactive, starlight; each device
   only has some of them). Verified on the Basilisk V3 (spectrum, wave).
@@ -76,12 +77,14 @@ and run `secbird-tray.exe`.
   a second function while a HyperShift button is held. Changes go to the mouse's live memory, so
   what Synapse or the factory saved stays put. Every change has Undo, **Restore all** puts every
   button back (also in the tray menu, which works from the keyboard), and the app won't let you
-  remap away your last left click. Verified on the Basilisk V3. Naga side buttons (12-button grid
-  and 6-button plate) included.
+  remap away your last left click. Verified on the Basilisk V3, and by users on the Naga V2
+  HyperSpeed's 12-button side grid and HyperShift. The Naga's 6-button plate is included too.
 - **Macros** stored on the device: keys, shortcuts, mouse buttons, wheel and delays, typed as steps
   or recorded in the editor. Play one from any button once, several times, while held, or as a
   toggle; it runs without Secretarybird open. Macros made in Synapse show up too. Verified on
   the Basilisk V3.
+- **Power:** sleep timer and battery level for wireless mice. On Blade laptops, whether the
+  keyboard dims or turns off when idle (Smart Dimming; not yet tested on a real laptop).
 - **Firmware check:** asks Razer's public product page whether newer firmware is out and links to
   Razer's updater (on request, or weekly if you turn it on in the tray). Nothing is installed.
 - **New versions:** once a day the tray asks GitHub whether a newer Secretarybird is out and tells
