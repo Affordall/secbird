@@ -20,6 +20,7 @@ Synapse's background services, account, ads, pop-ups or restart prompts.
 ### [⬇ Download for Windows](https://github.com/infinityInfinite/secbird/releases/latest)
 
 Free · Windows 10 and 11 · on the page that opens, click `Secretarybird-Setup-<version>.exe`.
+On Linux there's the command line, in beta: see [Linux](#linux-command-line-beta).
 
 ![All devices](docs/overview.png)
 
@@ -41,6 +42,27 @@ and run `secbird-tray.exe`.
 
 **Updating:** run the newer installer; your settings are kept.
 **Uninstalling:** Windows Settings → Apps → Secretarybird. It asks whether to keep your profiles.
+
+### Linux (command line, beta)
+
+The `secbird` command line runs on Linux: DPI, polling rate, lighting and effects, button
+remaps, macros, profiles and reports, the same as on Windows. The tray and the editor are
+Windows-only for now.
+
+1. From the [latest release](https://github.com/infinityInfinite/secbird/releases/latest), download
+   `secbird-<version>-linux-x86_64.tar.gz`. It's one static binary for any x86_64 distribution.
+2. Unpack it and install the binary and the udev rule, which lets you use Razer devices
+   without root:
+   ```sh
+   tar xf secbird-*-linux-x86_64.tar.gz
+   cd secbird-*-linux-x86_64
+   sudo ./install.sh
+   ```
+3. Unplug the device and plug it back in, then run `secbird list`.
+
+Settings live in `~/.config/secretarybird`. `sudo ./install.sh --uninstall` removes it again.
+If OpenRazer is installed, its daemon and Secretarybird can both change the same device; use
+one at a time. Bug reports from Linux are very welcome, with `secbird report` output.
 
 ## Using it
 
@@ -207,8 +229,9 @@ Basilisk V4 Pro, Basilisk V4 HyperSpeed and Naga V3 Pro.
 
 ## Files
 
-Settings live in `%APPDATA%\Secretarybird`: `profiles.json`, `secbird.log` (helpful for bug
-reports) and an optional `devices.json` override. The tray menu has **Open settings folder**.
+Settings live in `%APPDATA%\Secretarybird` (on Linux, `~/.config/secretarybird`):
+`profiles.json`, `secbird.log` (helpful for bug reports) and an optional `devices.json`
+override. The tray menu has **Open settings folder**.
 
 ## Build from source
 

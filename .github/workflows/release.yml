@@ -1,7 +1,8 @@
 name: Release
 
 # Push a tag like v0.1.0 (or v0.1.0-rc1 for a test build). This builds the installer,
-# the portable zip and checksums, and attaches them to a DRAFT release to review and publish.
+# the portable zip, the Linux CLI and checksums, and attaches them to a DRAFT release to review
+# and publish.
 on:
   push:
     tags: ['v*']
@@ -10,7 +11,31 @@ permissions:
   contents: write
 
 jobs:
+  # The CLI for Linux: one static binary (musl), so it runs on any x86_64 distribution.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: cargo test --release -p secbird-core -p secbird
+      - run: cargo build --release -p secbird --target x86_64-unknown-linux-musl
+      - name: Tarball
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          name="secbird-$version-linux-x86_64"
+          mkdir -p "dist/$name"
+          cp target/x86_64-unknown-linux-musl/release/secbird packaging/linux/install.sh packaging/linux/70-secretarybird.rules README.md LICENSE-MIT LICENSE-APACHE NOTICE "dist/$name/"
+          chmod 755 "dist/$name/secbird" "dist/$name/install.sh"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
   release:
+    needs: linux
     runs-on: windows-latest
     defaults:
       run:
@@ -33,6 +58,11 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
           "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //Qp "//DAppVersion=$VERSION" installer/secbird.iss
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: dist
 
       - name: Portable zip and checksums
         run: |

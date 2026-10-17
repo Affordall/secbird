@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.5] - 2026-10-17
+
+### Added
+- Linux (beta): the `secbird` command line, as one static binary for any x86_64 distribution,
+  with a udev rule and `install.sh` so it works without root. DPI, polling, lighting, remaps,
+  macros, profiles and reports work as on Windows; the tray and editor are Windows-only for now.
+  When Linux blocks access to a Razer device, `secbird` says how to fix it.
+
 ## [0.4.4] - 2026-10-17
 
 ### Added

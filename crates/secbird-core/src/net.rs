@@ -92,7 +92,30 @@ fn fetch(host: &str, path: &str, max: usize, receive_ms: i32) -> Result<Option<V
     }
 }
 
+/// Linux and the rest: hand the request to `curl`, which every desktop distribution ships,
+/// rather than carry a TLS stack for three GETs.
 #[cfg(not(windows))]
-fn fetch(_host: &str, _path: &str, _max: usize, _receive_ms: i32) -> Result<Option<Vec<u8>>> {
-    Err(Error::Unsupported("network checks are only built for Windows".into()))
+fn fetch(host: &str, path: &str, max: usize, receive_ms: i32) -> Result<Option<Vec<u8>>> {
+    let fail = |what: &str| Error::Unsupported(format!("couldn't reach {host} ({what}); check the internet connection"));
+    let out = std::process::Command::new("curl")
+        .args(["--silent", "--location", "--proto", "=https", "--connect-timeout", "5"])
+        .args(["--max-time", &(receive_ms / 1000 + 5).to_string(), "--max-filesize", &max.to_string()])
+        .args(["--user-agent", concat!("Secretarybird/", env!("CARGO_PKG_VERSION"))])
+        .args(["--write-out", "\n%{http_code}", &format!("https://{host}{path}")])
+        .output()
+        .map_err(|e| fail(&format!("curl: {e}")))?;
+    // The body, then a newline and the status code from --write-out.
+    let body = out.stdout;
+    let split = body.iter().rposition(|&b| b == b'\n').ok_or_else(|| fail("no reply"))?;
+    let status = String::from_utf8_lossy(&body[split + 1..]).trim().parse::<u32>().unwrap_or(0);
+    match status {
+        200 => {}
+        403 | 404 => return Ok(None),
+        0 => return Err(fail(&format!("curl exit {}", out.status.code().unwrap_or(-1)))),
+        other => return Err(fail(&format!("HTTP {other}"))),
+    }
+    if split > max {
+        return Err(fail("reply too large"));
+    }
+    Ok(Some(body[..split].to_vec()))
 }

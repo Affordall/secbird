@@ -164,6 +164,11 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
         .into_iter()
         .filter(|d| selects(d.pid, &d.key(), &d.serial))
         .collect();
+    #[cfg(target_os = "linux")]
+    if hidraw_blocked(&api) {
+        eprintln!("Note: Linux won't let this user open some Razer devices. Install the udev rule that comes");
+        eprintln!("with Secretarybird (see the README, Linux), then unplug and replug them.");
+    }
 
     if command == "report" {
         let report = secbird_core::report::build(&api, &db);
@@ -190,7 +195,7 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
                 Some(spec) if spec.lighting == secbird_core::Lighting::Kraken => {
                     println!("{pid:04X}  {}  (connected; its headset protocol isn't supported yet)", spec.name)
                 }
-                Some(spec) => println!("{pid:04X}  {}  (connected but not answering; is Synapse running?)", spec.name),
+                Some(spec) => println!("{pid:04X}  {}  (connected but not answering{})", spec.name, NOT_ANSWERING_HINT),
                 None => println!("{pid:04X}  Unknown Razer device  (connected, not answering; please share `secbird report`)"),
             }
         }
@@ -695,6 +700,20 @@ fn two<'a>(rest: &'a [String], usage: &str) -> Result<(&'a str, &'a str), Error>
         _ => Err(Error::InvalidArg(format!("usage: {usage}"))),
     }
 }
+
+/// A Razer `/dev/hidraw*` node this user may not open: the udev rule isn't installed.
+#[cfg(target_os = "linux")]
+fn hidraw_blocked(api: &HidApi) -> bool {
+    api.device_list().filter(|d| d.vendor_id() == secbird_core::db::RAZER_VID).any(|d| {
+        let path = std::path::Path::new(d.path().to_str().unwrap_or_default());
+        std::fs::OpenOptions::new().read(true).write(true).open(path).is_err_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied)
+    })
+}
+
+#[cfg(windows)]
+const NOT_ANSWERING_HINT: &str = "; is Synapse running?";
+#[cfg(not(windows))]
+const NOT_ANSWERING_HINT: &str = "";
 
 #[cfg(not(windows))]
 fn debloat_cmd(_: &[String]) -> Result<(), Error> {
