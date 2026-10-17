@@ -17,10 +17,10 @@ Synapse's background services, account, ads, pop-ups or restart prompts.
 > Viper mice to BlackWidow keyboards and a Tartarus keypad (see below). Other devices are
 > supported from public protocol facts and may not work yet. [Tell us how yours does](#help-us-support-your-device).
 
-### [⬇ Download for Windows](https://github.com/infinityInfinite/secbird/releases/latest)
+### [⬇ Download for Windows](https://github.com/infinityInfinite/secbird/releases/latest) · [⬇ Download for Linux](#linux-command-line-beta)
 
 Free · Windows 10 and 11 · on the page that opens, click `Secretarybird-Setup-<version>.exe`.
-On Linux there's the command line, in beta: see [Linux](#linux-command-line-beta).
+On Linux it's the command line, in beta: see [Linux](#linux-command-line-beta).
 
 ![All devices](docs/overview.png)
 
@@ -49,12 +49,16 @@ The `secbird` command line runs on Linux: DPI, polling rate, lighting and effect
 remaps, macros, profiles and reports, the same as on Windows. The tray and the editor are
 Windows-only for now.
 
-1. From the [latest release](https://github.com/infinityInfinite/secbird/releases/latest), download
-   `secbird-<version>-linux-x86_64.tar.gz`. It's one static binary for any x86_64 distribution.
-2. Unpack it and install the binary and the udev rule, which lets you use Razer devices
-   without root:
+1. Download and unpack the latest version. It's one static binary for any x86_64 distribution:
    ```sh
-   tar xf secbird-*-linux-x86_64.tar.gz
+   url=$(curl -s https://api.github.com/repos/infinityInfinite/secbird/releases/latest | grep -o 'https://[^"]*linux-x86_64[.]tar[.]gz')
+   curl -sL "$url" | tar xz
+   ```
+   Or download `secbird-<version>-linux-x86_64.tar.gz` from the
+   [latest release](https://github.com/infinityInfinite/secbird/releases/latest) and run
+   `tar xf secbird-*-linux-x86_64.tar.gz`.
+2. Install the binary and the udev rule, which lets you use Razer devices without root:
+   ```sh
    cd secbird-*-linux-x86_64
    sudo ./install.sh
    ```
