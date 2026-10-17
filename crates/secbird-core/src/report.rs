@@ -97,6 +97,12 @@ const LAPTOP_PROBES: &[(&str, Command, u8, &[u8])] = &[
     // Profile 1, as Synapse asks; profile 0 answers all zeros (#20).
     ("smart dimming", Command::new(0x07, 0x93), 0x03, &[1]),
     ("time to dim", Command::new(0x07, 0x8B), 0x05, &[0]),
+    // Keyboard backlight level, three ways: the Blade-only brightness (class 0E), and the
+    // newer and older lighting commands on the backlight LED. A report taken while the
+    // keyboard is dark shows which one the laptop turned down (#24).
+    ("keyboard brightness", Command::new(0x0E, 0x84), 0x02, &[1]),
+    ("backlight brightness", cmd::MATRIX_BRIGHTNESS.get(), cmd::MATRIX_BRIGHTNESS_SIZE, &[cmd::VARSTORE, 5]),
+    ("backlight brightness (old)", cmd::LED_BRIGHTNESS.get(), 0x03, &[cmd::VARSTORE, 5]),
 ];
 
 /// LED ids tried with a brightness GET. Razer uses 0x00-0x14 across its products.

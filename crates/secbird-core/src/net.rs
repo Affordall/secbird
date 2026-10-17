@@ -1,11 +1,23 @@
-//! The little network use there is: HTTPS GETs for the firmware check (apps.razer.com) and
-//! the new-version check (api.github.com). Nothing is ever sent but the request itself.
+//! The little network use there is: HTTPS GETs for the firmware check (apps.razer.com),
+//! the new-version check (api.github.com) and downloading an update the user asked for
+//! (github.com). Nothing is ever sent but the request itself.
 
 use crate::error::{Error, Result};
 
 /// HTTPS GET. `None` on 403 or 404 (nothing there, or a rate limit).
-#[cfg(windows)]
 pub fn get(host: &str, path: &str) -> Result<Option<String>> {
+    // Short: the editor waits on firmware checks, and a failed check is harmless.
+    Ok(fetch(host, path, 4 << 20, 8_000)?.map(|b| String::from_utf8_lossy(&b).into_owned()))
+}
+
+/// HTTPS GET of a file (an update's installer), following GitHub's redirect to its
+/// download host. `None` on 403 or 404.
+pub fn download(host: &str, path: &str) -> Result<Option<Vec<u8>>> {
+    fetch(host, path, 64 << 20, 60_000)
+}
+
+#[cfg(windows)]
+fn fetch(host: &str, path: &str, max: usize, receive_ms: i32) -> Result<Option<Vec<u8>>> {
     use std::ptr::{null, null_mut};
     use windows_sys::Win32::Networking::WinHttp::*;
     fn wide(s: &str) -> Vec<u16> {
@@ -26,8 +38,7 @@ pub fn get(host: &str, path: &str) -> Result<Option<String>> {
         if session.0.is_null() {
             return Err(fail("open"));
         }
-        // Short: the editor waits on firmware checks, and a failed check is harmless.
-        WinHttpSetTimeouts(session.0, 5_000, 5_000, 5_000, 8_000);
+        WinHttpSetTimeouts(session.0, 5_000, 5_000, 5_000, receive_ms);
         let connect = Handle(WinHttpConnect(session.0, wide(host).as_ptr(), INTERNET_DEFAULT_HTTPS_PORT, 0));
         if connect.0.is_null() {
             return Err(fail("connect"));
@@ -73,15 +84,15 @@ pub fn get(host: &str, path: &str) -> Result<Option<String>> {
                 break;
             }
             body.extend_from_slice(&buf[..read as usize]);
-            if body.len() > 4 << 20 {
+            if body.len() > max {
                 return Err(fail("reply too large"));
             }
         }
-        Ok(Some(String::from_utf8_lossy(&body).into_owned()))
+        Ok(Some(body))
     }
 }
 
 #[cfg(not(windows))]
-pub fn get(_host: &str, _path: &str) -> Result<Option<String>> {
+fn fetch(_host: &str, _path: &str, _max: usize, _receive_ms: i32) -> Result<Option<Vec<u8>>> {
     Err(Error::Unsupported("network checks are only built for Windows".into()))
 }

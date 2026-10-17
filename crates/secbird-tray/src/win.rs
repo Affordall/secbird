@@ -32,6 +32,10 @@ const WM_FIRMWARE: u32 = WM_APP + 4;
 const WM_REPORT_READY: u32 = WM_APP + 5;
 /// Sent by the new-version check thread: the result is waiting in `App::updates`.
 const WM_UPDATE: u32 = WM_APP + 6;
+/// Sent by the update download thread: the result is waiting in `App::installs`.
+const WM_UPDATE_INSTALL: u32 = WM_APP + 7;
+/// Sent by the editor's "Update now": the release is waiting in `REQUESTED_UPDATE`.
+const WM_START_UPDATE: u32 = WM_APP + 8;
 const CLASS_NAME: &str = "SecretarybirdTray";
 const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
@@ -104,8 +108,34 @@ struct App {
     updates: Receiver<UpdateResult>,
     /// A newer Secretarybird, once a check found one: offered at the top of the menu.
     update: Option<Release>,
-    /// Opened when the last notification is clicked (the update's release page).
-    balloon_url: RefCell<Option<String>>,
+    /// What clicking the last notification does.
+    balloon_click: RefCell<Option<Click>>,
+    /// An update is downloading; a second request waits for it.
+    updating: bool,
+    installs_tx: Sender<Result<(), String>>,
+    installs: Receiver<Result<(), String>>,
+}
+
+/// What clicking a notification does.
+enum Click {
+    Open(String),
+    Update(Release),
+}
+
+/// The release the editor asked to update to, for the tray's window to pick up.
+static REQUESTED_UPDATE: Mutex<Option<Release>> = Mutex::new(None);
+
+/// The editor's "Update now": hand the release to the tray, which downloads and installs it
+/// and shows its progress. `false` when no tray is running (the editor alone, `--serve`).
+pub fn request_update(r: Release) -> bool {
+    unsafe {
+        let tray = FindWindowW(wide(CLASS_NAME).as_ptr(), null());
+        if tray.is_null() {
+            return false;
+        }
+        *REQUESTED_UPDATE.lock().unwrap_or_else(|p| p.into_inner()) = Some(r);
+        PostMessageW(tray, WM_START_UPDATE, 0, 0) != 0
+    }
 }
 
 /// A new-version check's answer, and whether it was asked for from the menu (then
@@ -230,6 +260,7 @@ pub fn run() {
         let (events_tx, events) = channel();
         let (firmware_tx, firmware) = channel();
         let (updates_tx, updates) = channel();
+        let (installs_tx, installs) = channel();
         APP.with(|cell| {
             *cell.borrow_mut() = Some(App {
                 hwnd,
@@ -250,10 +281,14 @@ pub fn run() {
                 updates_tx,
                 updates,
                 update: None,
-                balloon_url: RefCell::new(None),
+                balloon_click: RefCell::new(None),
+                updating: false,
+                installs_tx,
+                installs,
             })
         });
         log::append("tray started");
+        with_app(|app| app.announce_updated());
         with_app(|app| app.rescan());
         start_retries(hwnd);
         SetTimer(hwnd, TIMER_BATTERY, BATTERY_MS, None);
@@ -279,10 +314,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             } else if event == WM_LBUTTONDBLCLK {
                 with_app(|app| app.open_editor());
             } else if event == NIN_BALLOONUSERCLICK {
-                with_app(|app| {
-                    if let Some(url) = app.balloon_url.take() {
-                        open_url(&url);
-                    }
+                with_app(|app| match app.balloon_click.take() {
+                    Some(Click::Open(url)) => open_url(&url),
+                    Some(Click::Update(r)) => app.start_update(r),
+                    None => {}
                 });
             }
             0
@@ -301,6 +336,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_UPDATE => {
             with_app(|app| app.update_news());
+            0
+        }
+        WM_UPDATE_INSTALL => {
+            with_app(|app| app.install_news());
+            0
+        }
+        WM_START_UPDATE => {
+            if let Some(r) = REQUESTED_UPDATE.lock().unwrap_or_else(|p| p.into_inner()).take() {
+                with_app(|app| app.start_update(r));
+            }
             0
         }
         WM_REPORT_READY => {
@@ -611,7 +656,11 @@ impl App {
 
     /// A tray notification; clicking it opens `url` when there is one.
     fn notify(&self, title: &str, body: &str, icon: NOTIFY_ICON_INFOTIP_FLAGS, url: Option<String>) {
-        self.balloon_url.replace(url);
+        self.notify_click(title, body, icon, url.map(Click::Open));
+    }
+
+    fn notify_click(&self, title: &str, body: &str, icon: NOTIFY_ICON_INFOTIP_FLAGS, click: Option<Click>) {
+        self.balloon_click.replace(click);
         unsafe {
             let mut nid = icon_data(self.hwnd, self.icon);
             nid.uFlags = NIF_INFO;
@@ -695,12 +744,14 @@ impl App {
                     if manual || settings.update_notified != r.version {
                         settings.update_notified = r.version.clone();
                         settings.save();
-                        self.notify(
-                            &format!("Secretarybird {} is out", r.version),
-                            &format!("You have {current}. Click here for the download; the installer keeps your settings and profiles."),
-                            NIIF_INFO,
-                            Some(r.url.clone()),
-                        );
+                        let title = format!("Secretarybird {} is out", r.version);
+                        if secbird_core::update::installed() {
+                            let body = format!("You have {current}. Click to update now; your settings and profiles are kept.");
+                            self.notify_click(&title, &body, NIIF_INFO, Some(Click::Update(r.clone())));
+                        } else {
+                            let body = format!("You have {current}. Click here for the download; your settings and profiles are kept.");
+                            self.notify(&title, &body, NIIF_INFO, Some(r.url.clone()));
+                        }
                     }
                     self.update = Some(r);
                 }
@@ -713,6 +764,69 @@ impl App {
                 Err(e) if manual => self.balloon("Could not check for updates", &e),
                 Err(_) => {}
             }
+        }
+    }
+
+    /// Download the update, check its signature and run its installer, which closes this
+    /// tray and starts the new one. Copies that weren't installed get the release page.
+    fn start_update(&mut self, r: Release) {
+        if !secbird_core::update::installed() {
+            return open_url(&r.url);
+        }
+        if self.updating {
+            return;
+        }
+        self.updating = true;
+        self.notify(
+            &format!("Updating to Secretarybird {}", r.version),
+            "Downloading. It installs by itself and starts again in a few seconds; your settings and profiles are kept.",
+            NIIF_INFO,
+            None,
+        );
+        let tx = self.installs_tx.clone();
+        let hwnd = self.hwnd as usize;
+        std::thread::spawn(move || {
+            log::append(&format!("updating to {}", r.version));
+            let result = secbird_core::update::download_installer(&r.version)
+                .and_then(|path| secbird_core::update::run_installer(&path))
+                .map_err(|e| format!("{e}\n{}", r.url));
+            match &result {
+                Ok(()) => log::append("update: installer started"),
+                Err(e) => log::append(&format!("update failed: {e}")),
+            }
+            if tx.send(result).is_ok() {
+                unsafe { PostMessageW(hwnd as HWND, WM_UPDATE_INSTALL, 0, 0) };
+            }
+        });
+    }
+
+    /// An update that couldn't be installed. A started installer closes the tray itself.
+    fn install_news(&mut self) {
+        while let Ok(result) = self.installs.try_recv() {
+            if let Err(e) = result {
+                self.updating = false;
+                let (why, url) = e.rsplit_once('\n').unwrap_or((&e, ""));
+                let body = format!("{why}\nClick for the download page.");
+                self.notify("Couldn't update Secretarybird", &body, NIIF_WARNING, Some(url.to_string()).filter(|u| !u.is_empty()));
+            }
+        }
+    }
+
+    /// Once after an update: open the new version's release notes (a notification alone is
+    /// easy to miss) and say which version is running now.
+    fn announce_updated(&mut self) {
+        let current = secbird_core::update::CURRENT;
+        let mut settings = TraySettings::load();
+        if settings.last_version == current {
+            return;
+        }
+        let updated = !settings.last_version.is_empty() && secbird_core::firmware::is_newer(current, &settings.last_version);
+        settings.last_version = current.to_string();
+        settings.save();
+        if updated {
+            let url = format!("{}/releases/tag/v{current}", env!("CARGO_PKG_REPOSITORY"));
+            open_url(&url);
+            self.notify(&format!("Updated to Secretarybird {current}"), "What's new is open in your browser.", NIIF_INFO, None);
         }
     }
 
@@ -757,7 +871,15 @@ impl App {
         let menu = CreatePopupMenu();
         self.profile_items.clear();
         if let Some(r) = &self.update {
-            append(menu, MF_STRING, ID_GET_UPDATE as usize, &format!("Get Secretarybird {}…", r.version));
+            let label = if self.updating {
+                format!("Updating to Secretarybird {}…", r.version)
+            } else if secbird_core::update::installed() {
+                format!("Update to Secretarybird {}", r.version)
+            } else {
+                format!("Get Secretarybird {}…", r.version)
+            };
+            let grey = if self.updating { MF_GRAYED } else { 0 };
+            append(menu, MF_STRING | grey, ID_GET_UPDATE as usize, &label);
             AppendMenuW(menu, MF_SEPARATOR, 0, null());
         }
         append(menu, MF_STRING, ID_EDITOR as usize, "Open editor");
@@ -820,8 +942,8 @@ impl App {
             ID_AUTOSTART => set_autostart(!autostart_enabled()),
             ID_CHECK_UPDATE => self.check_update(true),
             ID_GET_UPDATE => {
-                if let Some(r) = &self.update {
-                    open_url(&r.url);
+                if let Some(r) = self.update.clone() {
+                    self.start_update(r);
                 }
             }
             ID_UPDATE_NOTIFY => {

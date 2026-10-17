@@ -36,6 +36,9 @@ pub struct TraySettings {
     /// The newest version already announced, so each is announced once.
     #[serde(default)]
     pub update_notified: String,
+    /// The version that ran last, to say "Updated to ..." once after an update.
+    #[serde(default)]
+    pub last_version: String,
     /// No small popups above the clock for DPI, on-board profile and game profile changes.
     #[serde(default)]
     pub popups_off: bool,

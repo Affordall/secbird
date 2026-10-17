@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.4] - 2026-10-17
+
+### Added
+- Update from the tray: click the new-version notice, **Update to X** in the tray menu, or
+  Settings → Update now in the editor. Secretarybird downloads the installer, checks it carries
+  the release signature, installs it quietly and starts again with your settings. A download
+  without a valid signature is never run. The unzipped (portable) copy still opens the release
+  page instead.
+- Key remaps have Ctrl, Shift, Alt and Win toggles next to the key field. Windows keeps some
+  shortcuts for itself (Win+D, Win+L) and the editor never sees them: press the key, then click
+  the modifier (#25).
+- `secbird report` reads a laptop's keyboard backlight brightness three ways (#24).
+
+### Fixed
+- Naga V3 Pro: the scroll wheel light can be coloured (#26).
+
 ## [0.4.3] - 2026-10-17
 
 ### Added

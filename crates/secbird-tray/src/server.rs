@@ -553,9 +553,21 @@ fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, E
             Ok(settings_json(engine))
         }
         "/api/update-check" => secbird_core::update::check().map(|r| match r {
-            Some(r) => json!({ "latest": r.version, "url": r.url }),
+            Some(r) => json!({ "latest": r.version, "url": r.url, "installed": secbird_core::update::installed() }),
             None => json!({ "latest": null }),
         }),
+        // The tray downloads, checks and installs it, and shows how it went; this tray and
+        // this editor page close when the installer starts.
+        "/api/update-install" => (|| {
+            if !secbird_core::update::installed() {
+                return Err(Error::Unsupported("this copy was unzipped, not installed, so it can't update itself; download the new version from the release page".into()));
+            }
+            let r = secbird_core::update::check()?.ok_or_else(|| Error::InvalidArg("you already have the latest version".into()))?;
+            if !crate::win::request_update(r.clone()) {
+                return Err(Error::Unsupported("the tray isn't running, so it can't update; start Secretarybird and try again".into()));
+            }
+            Ok(json!({ "version": r.version }))
+        })(),
         "/api/import" => (|| {
             let incoming: Store = serde_json::from_value(b.data.clone())
                 .map_err(|e| Error::InvalidArg(format!("not a Secretarybird export: {e}")))?;

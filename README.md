@@ -88,8 +88,9 @@ and run `secbird-tray.exe`.
 - **Firmware check:** asks Razer's public product page whether newer firmware is out and links to
   Razer's updater (on request, or weekly if you turn it on in the tray). Nothing is installed.
 - **New versions:** once a day the tray asks GitHub whether a newer Secretarybird is out and tells
-  you once per version; click the notice for the download. It sends nothing but that request and
-  installs nothing. Turn it off with "Tell me when a new version is out" in the tray menu.
+  you once per version. Click the notice or **Update to X** in the tray menu and it downloads the
+  installer, checks its signature and installs it quietly; nothing is installed without that click.
+  Turn the check off with "Tell me when a new version is out" in the tray menu.
 - **Popups:** a small popup above the clock when you change DPI with the mouse's button, switch
   its on-board profile, or when a per-app profile kicks in. The editor follows DPI changes too.
 - **Profiles** are saved per physical device, so two identical mice keep their own settings.

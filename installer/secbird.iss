@@ -62,7 +62,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#TrayExe}"; Tasks: desktopic
 
 [Registry]
 ; Same value the tray's "Start with Windows" menu item reads and writes.
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\{#TrayExe}"""; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; ValueData: """{app}\{#TrayExe}"""; Tasks: autostart; Check: not IsAppUpdate
 
 [Run]
 Filename: "{app}\{#TrayExe}"; Description: "Launch {#AppName}"; Flags: postinstall nowait skipifsilent
@@ -78,6 +78,13 @@ const
 
 var
   TrayWasRunning: Boolean;
+
+{ The tray's own updater passes /UPDATE=yes. Start with Windows is then left as the user set it
+  in the tray, instead of following the remembered install task. }
+function IsAppUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:update|no}') = 'yes';
+end;
 
 procedure CloseTray;
 var

@@ -1501,6 +1501,7 @@ const keyLabel = k => k.length === 1 ? k.toUpperCase()
   : /^num-/.test(k) ? 'Num ' + NUM_SIGNS[k.slice(4)]
   : k.charAt(0).toUpperCase() + k.slice(1);
 const combo = c => c.split('+').map(keyLabel).join('+');
+const MODIFIER_ORDER = ['ctrl', 'shift', 'alt', 'win', 'rctrl', 'rshift', 'ralt', 'rwin'];
 
 // Action text -> [choice, combo, number] for the controls, and back.
 function splitAction(a) {
@@ -1576,6 +1577,24 @@ function buttonEditor(box, name) {
     const a = sel.value === 'macro' ? joinAction('macro', ...macroArgs()) : joinAction(sel.value, keyIn.dataset.keys, numIn.value);
     if (a) assign(b.name, a);
   };
+  // Modifier toggles: Windows keeps some shortcuts (Win+D, Win+L, Alt+Tab) and the page never
+  // sees the key, so press the key and then click the modifier (#25).
+  const modBox = el('div', { className: 'seg mods', role: 'group', ariaLabel: 'Modifiers' });
+  const setKeys = keys => {
+    keyIn.dataset.keys = keys; keyIn.value = combo(keys);
+    const parts = keys.split('+');
+    modBox.querySelectorAll('button').forEach(t => t.ariaPressed = parts.includes(t.dataset.m));
+  };
+  ['ctrl', 'shift', 'alt', 'win'].forEach(m => modBox.append(el('button', { textContent: keyLabel(m), ariaPressed: false, dataset: { m },
+    title: 'Add or remove ' + keyLabel(m) + '. For shortcuts Windows keeps for itself, like Win+D: press the key, then click this.',
+    onclick: () => {
+      const parts = keyIn.dataset.keys ? keyIn.dataset.keys.split('+') : [];
+      const on = new Set(parts.filter(p => MODIFIER_ORDER.includes(p)));
+      on.has(m) ? on.delete(m) : on.add(m);
+      const key = parts.find(p => !MODIFIER_ORDER.includes(p));
+      setKeys([...MODIFIER_ORDER.filter(x => on.has(x)), key].filter(Boolean).join('+')); send(); keyIn.focus();
+    } })));
+  if (keys) setKeys(keys);
   let lone = null;
   keyIn.onkeydown = e => {
     if (e.key === 'Tab') return;
@@ -1584,13 +1603,13 @@ function buttonEditor(box, name) {
     const k = keyName(e.code); if (!k) return;
     lone = null;
     const mods = [e.ctrlKey && 'ctrl', e.shiftKey && 'shift', e.altKey && 'alt', e.metaKey && 'win'].filter(Boolean);
-    keyIn.dataset.keys = [...mods, k].join('+'); keyIn.value = combo(keyIn.dataset.keys); send();
+    setKeys([...mods, k].join('+')); send();
   };
-  keyIn.onkeyup = e => { if (lone && MOD_CODES[e.code] === lone) { keyIn.dataset.keys = lone; keyIn.value = combo(lone); lone = null; send(); } };
+  keyIn.onkeyup = e => { if (lone && MOD_CODES[e.code] === lone) { setKeys(lone); lone = null; send(); } };
   const extras = () => {
     const v = sel.value, clutch = v === 'dpi-clutch', turbo = v === 'turbo-left' || v === 'turbo-right' || v === 'turbo-key';
     const mac = v === 'macro', times = mac && playSel.value === 'times';
-    keyIn.hidden = !(v === 'key' || v === 'turbo-key');
+    keyIn.hidden = modBox.hidden = !(v === 'key' || v === 'turbo-key');
     macroSel.hidden = playSel.hidden = !mac;
     numIn.hidden = numLabel.hidden = !(turbo || clutch || times);
     Object.assign(numIn, clutch ? { min: 100, max: dev.dpi ? dev.dpi.max : 30000, step: 50, ariaLabel: 'DPI while held' }
@@ -1601,7 +1620,7 @@ function buttonEditor(box, name) {
   };
   sel.onchange = () => {
     extras();
-    if (sel.value === 'key' || sel.value === 'turbo-key') { keyIn.value = ''; keyIn.dataset.keys = ''; keyIn.focus(); return toast('Now press the key or shortcut'); }
+    if (sel.value === 'key' || sel.value === 'turbo-key') { setKeys(''); keyIn.focus(); return toast('Now press the key or shortcut'); }
     if (sel.value === 'macro' && !macros.length) return toast('Make a macro first, in the Macros section', true);
     send();
   };
@@ -1612,7 +1631,7 @@ function buttonEditor(box, name) {
   const saved = b.saved && b.saved[btnLayer];
   box.append(el('div', { className: 'edgroup' },
     el('h3', { textContent: 'What it does' + (btnLayer === 'hypershift' ? ' while HyperShift is held' : '') }),
-    el('div', { className: 'row' }, sel, keyIn, macroSel, playSel, numIn, numLabel)));
+    el('div', { className: 'row' }, sel, keyIn, modBox, macroSel, playSel, numIn, numLabel)));
   if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Stored on the mouse' }),
     el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'ghost', textContent: 'Restore', title: 'Put back what the mouse stores', onclick: () => assign(b.name, '') }))));
 }
@@ -1896,7 +1915,18 @@ function renderSettings() {
     checkBtn.disabled = true; checkOut.textContent = 'Checking…';
     try {
       const r = await api('/api/update-check', {});
-      checkOut.replaceChildren(r.latest ? el('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', textContent: 'Secretarybird ' + r.latest + ' is out' }) : 'You’re up to date');
+      if (!r.latest) checkOut.replaceChildren('You’re up to date');
+      else {
+        const link = el('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', textContent: 'Secretarybird ' + r.latest + ' is out' });
+        const go = el('button', { className: 'ghost', textContent: 'Update now', onclick: async () => {
+          go.disabled = true;
+          try {
+            await api('/api/update-install', {});
+            checkOut.replaceChildren('Updating to ' + r.latest + '. Secretarybird restarts in a few seconds; open the editor again from the tray.');
+          } catch (e) { go.disabled = false; toast(e.message, true); }
+        } });
+        checkOut.replaceChildren(link, ...(r.installed ? [' ', go] : []));
+      }
     } catch (e) { checkOut.textContent = ''; toast(e.message, true); }
     checkBtn.disabled = false;
   } });
