@@ -529,6 +529,7 @@ fn settings_json(engine: &Engine) -> Value {
         "firmware_weekly": s.firmware_weekly,
         "popups": !s.popups_off,
         "battery_warning": !s.battery_warning_off,
+        "battery_warning_at": s.low_battery(),
         "auto_switch": !s.auto_switch_off,
         "synapse": engine.synapse(),
     })
@@ -546,6 +547,17 @@ fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, E
                 "firmware_weekly" => s.firmware_weekly = b.on,
                 "popups" => s.popups_off = !b.on,
                 "battery_warning" => s.battery_warning_off = !b.on,
+                "battery_warning_at" => {
+                    let range = crate::settings::BATTERY_RANGE;
+                    if !range.contains(&b.value) {
+                        return Some(Err(Error::InvalidArg(format!(
+                            "pick a battery warning level from {}% to {}%",
+                            range.start(),
+                            range.end()
+                        ))));
+                    }
+                    s.battery_warning_at = Some(b.value);
+                }
                 "auto_switch" => s.auto_switch_off = !b.on,
                 other => return Some(Err(Error::InvalidArg(format!("unknown setting '{other}'")))),
             }
