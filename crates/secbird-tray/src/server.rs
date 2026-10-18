@@ -172,7 +172,8 @@ impl Server {
         let head = format!(
             "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\
              X-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\n\
-             Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:\r\n\
+              Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; media-src 'self' blob:\r\n\
+              Permissions-Policy: camera=(self), microphone=()\r\n\
              Connection: close\r\n\r\n",
             resp.status,
             resp.content_type,
@@ -198,7 +199,7 @@ impl Server {
         if req.method == "GET" && req.path == "/" {
             return if req.query_param("t") == Some(self.token.as_str()) {
                 let logo = format!("data:image/png;base64,{}", base64(LOGO_PNG));
-                let page = PAGE.replace("{{LOGO}}", &logo);
+                let page = PAGE.replace("{{LOGO}}", &logo).replace("{{CAMERA_PREVIEW_JS}}", include_str!("camera-preview.js"));
                 Response { status: "200 OK", content_type: "text/html; charset=utf-8", body: page.into_bytes() }
             } else {
                 Response::text("403 Forbidden", "Open the editor from the Secretarybird tray menu.")

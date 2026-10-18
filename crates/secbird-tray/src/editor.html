@@ -113,6 +113,10 @@
   .dot.off { background: none; border: 1.5px dashed var(--line-strong); }
 
   .tiles { overflow-y: auto; padding: 16px 20px 20px; min-width: 0; }
+  .camera-preview { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .camera-preview video { width: 100%; max-height: 38vh; aspect-ratio: 16 / 9; object-fit: contain; background: #111; display: block; margin: 10px 0; }
+  .camera-preview .row { flex-wrap: wrap; }
+  .camera-preview select { max-width: 100%; min-height: 36px; }
   .sechead { display: flex; align-items: center; gap: 14px; margin: 0 0 12px; min-height: 30px; flex-wrap: wrap; }
   .sechead h2 { margin: 0; font-size: 17px; font-weight: 650; }
   .sechead .tools { display: flex; align-items: center; gap: 12px; margin-left: auto; }
@@ -445,6 +449,7 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script>{{CAMERA_PREVIEW_JS}}</script>
 <script>
 const T = new URLSearchParams(location.search).get('t');
 const $ = id => document.getElementById(id);
@@ -606,6 +611,7 @@ const keyCount = () => dev.matrix.rows * dev.matrix.cols;
 // ---------- Rendering ----------
 
 function render() {
+  if (previewWidget && (showAll || showSettings || view === 'compare' || dev?.id !== previewWidget.ownerId)) discardCameraPreview();
   const has = devices.length > 0;
   if (!has) showAll = unsupported.length > 0;
   $('empty').hidden = has || unsupported.length > 0 || showSettings;
@@ -798,6 +804,7 @@ function renderWork(keepPanel) {
     entering = true;
   }
   const cur = secs.find(s => s.id === section);
+  if (section !== 'camera') discardCameraPreview();
   if (entering && !sel) sel = autoOpen(cur);
   // Slow reads happen only when their section is open, once per device.
   if (section === 'buttons') loadButtons(dev);
@@ -842,6 +849,7 @@ function renderTiles(cur) {
   const g = el('div', { className: 'tgrid' });
   plain.forEach(r => g.append(tile(r)));
   t.append(g);
+  if (cur.id === 'camera') mountCameraPreview(t);
   if (grid.length) {
     t.append(el('p', { className: 'subhead', textContent: 'Side grid' }));
     const k = el('div', { className: 'keypad' });
@@ -1147,6 +1155,10 @@ function cameraEditor(box, control) {
     try {
       const response = await api('/api/camera', { id: target.id, profile: name, control, value: input.value });
       Object.assign(target, response.device);
+      if (previewWidget?.ownerId === target.id) {
+        previewWidget.controller.refresh();
+        setTimeout(() => { if (previewWidget?.ownerId === target.id) previewWidget.controller.refresh(); }, 300);
+      }
       if (dev === target) { adopt(response.device); render(); }
       toast('Sent and saved. Current hardware values cannot be read back.');
     } catch (error) { toast(error.message, true); if (dev === target) render(); }
@@ -1156,6 +1168,85 @@ function cameraEditor(box, control) {
   if (control === 'af-mode') box.append(el('p', { className: 'note', textContent: 'Responsive/passive changes the focusing strategy; this is not manual focus or an autofocus on/off switch.' }));
   if (target.camera?.error) box.append(el('p', { className: 'note', textContent: target.camera.error }));
 }
+
+// The browser owns video frames. Backend identities and browser source IDs are not
+// interchangeable: users explicitly select/confirm the source, including twins.
+let previewWidget = null;
+function discardCameraPreview() {
+  if (!previewWidget) return;
+  previewWidget.controller.stop();
+  previewWidget.root.remove();
+  previewWidget = null;
+}
+function mountCameraPreview(host) {
+  if (previewWidget && previewWidget.ownerId !== dev.id) discardCameraPreview();
+  if (!previewWidget) {
+    const ownerId = dev.id, root = el('div', { className: 'camera-preview' });
+    const video = el('video', { autoplay: true, muted: true, playsInline: true, ariaLabel: 'Live camera preview' });
+    const status = el('p', { className: 'note', role: 'status', ariaLive: 'polite', textContent: 'Preview stopped. Camera controls work without preview.' });
+    const source = el('select', { ariaLabel: 'Preview camera source' });
+    source.append(new Option('Choose the matching camera explicitly', ''));
+    const format = el('select', { ariaLabel: 'Preview resolution and FPS combination', disabled: true });
+    const start = el('button', { className: 'ghost', textContent: 'Start preview', disabled: true });
+    const stop = el('button', { className: 'ghost', textContent: 'Stop preview', disabled: true });
+    const permission = el('button', { className: 'ghost', textContent: 'Enable preview / list cameras' });
+    let lastFormat = '', changing = false;
+    const controller = SecbirdPreview.createPreview({mediaDevices: navigator.mediaDevices, video, onState(state) {
+      const active = state.state === 'playing', pending = state.state === 'starting';
+      start.disabled = !source.value || active || pending;
+      stop.disabled = !active && !pending;
+      format.disabled = !active || changing;
+      permission.disabled = active || pending;
+      source.disabled = active || pending;
+      status.textContent = state.error || (active ? `Actual preview: ${state.actual.width ?? '?'} × ${state.actual.height ?? '?'} at ${state.actual.frameRate ?? '?'} FPS` : pending ? 'Waiting for camera access…' : 'Preview stopped.');
+    }});
+    const fillFormats = () => {
+      format.replaceChildren(new Option('Browser default / actual shown below', ''));
+      for (const candidate of controller.formats()) {
+        const value = JSON.stringify(candidate);
+        format.append(new Option(`${candidate.width} × ${candidate.height} · ${candidate.frameRate} FPS (try combination)`, value));
+      }
+      if ([...format.options].some(option => option.value === lastFormat)) format.value = lastFormat;
+    };
+    permission.onclick = async () => {
+      permission.disabled = true;
+      status.textContent = 'Allow video camera permission, then explicitly select the source matching this device. No microphone is requested.';
+      try {
+        const devices = await controller.sources(true);
+        if (previewWidget?.ownerId !== ownerId) return;
+        source.replaceChildren(new Option('Choose the matching camera explicitly', ''));
+        devices.forEach((device, index) => source.append(new Option(`${device.label || 'Camera'} (${index + 1})`, device.deviceId)));
+        status.textContent = 'Select the Kiyo Pro you are configuring. Identical model names do not identify a physical unit.';
+      } catch (error) { status.textContent = error.message; }
+      finally { permission.disabled = false; }
+    };
+    source.onchange = () => { controller.stop(); start.disabled = !source.value; lastFormat = ''; fillFormats(); };
+    start.onclick = async () => {
+      try { await controller.start(source.value, null); fillFormats(); }
+      catch { /* controller publishes an actionable camera error */ }
+    };
+    stop.onclick = () => controller.stop();
+    format.onchange = async () => {
+      const requested = format.value;
+      changing = true; format.disabled = true;
+      try {
+        await controller.setFormat(requested ? JSON.parse(requested) : null);
+        lastFormat = requested;
+      } catch (error) { format.value = lastFormat; toast(error.message, true); }
+      finally { changing = false; format.disabled = controller.snapshot().state !== 'playing'; }
+    };
+    root.append(el('h3', { textContent: 'Live video preview' }),
+      el('p', { className: 'note', textContent: 'Optional video-only preview. It may conflict with OBS, Teams, or other camera apps. Resolution/FPS apply only here, not to those apps.' }),
+      el('div', { className: 'row' }, permission, source), video,
+      el('div', { className: 'row' }, start, stop, format), status);
+    previewWidget = {ownerId, root, controller};
+  }
+  host.append(previewWidget.root);
+  const video = previewWidget.root.querySelector('video');
+  if (previewWidget.controller.snapshot().state === 'playing') video.play().catch(() => previewWidget?.controller.stop());
+}
+window.addEventListener('pagehide', discardCameraPreview);
+document.addEventListener('visibilitychange', () => { if (document.hidden) discardCameraPreview(); });
 
 // The live profile's games and apps: while one is in front, this profile comes up.
 function appsEditor(box) {
