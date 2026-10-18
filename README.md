@@ -122,6 +122,32 @@ one at a time. Bug reports from Linux are very welcome, with `secbird report` ou
   back when you leave it, button remaps included. Windows tells the tray when the window in front
   changes, so nothing polls.
 
+## Kiyo Pro webcam (experimental, Windows)
+
+Kiyo Pro RZ1900364 (`1532:0E05`) support is implemented but **not yet verified on
+physical hardware**. The Camera section provides HDR, HDR mode, field of view,
+and responsive/passive autofocus strategy. Settings are saved in profiles;
+displayed values are saved requests, not live hardware readbacks.
+
+Optional live preview lets you inspect the image while changing controls. Enable
+preview, allow browser camera access, and explicitly select the matching camera
+source. Preview resolution/FPS choices apply only to this session, not OBS,
+Teams, or other apps. Untested combinations are labeled as candidates; the actual
+negotiated format is shown. Stop preview to release camera access for other apps.
+No microphone, photo recording, video recording, or webcam firmware updates are
+included. Camera control is Windows-only; the existing Linux CLI is unchanged.
+
+```text
+secbird list
+secbird -d 0E05 camera fov wide
+secbird -d 0E05 camera hdr on
+secbird -d 0E05 camera af-mode passive
+```
+
+With multiple Kiyo Pros, use the full camera identity from `list`, quoted in your
+shell. Identities are tied to the Windows device path and can change when USB
+ports change. See [setup and hardware verification](docs/kiyo-pro-verification.md).
+
 ## Moving from Synapse
 
 1. Close Synapse (tray icon → Exit). If both run, Synapse overwrites your settings, and
