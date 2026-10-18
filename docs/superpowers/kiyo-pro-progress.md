@@ -88,3 +88,30 @@ Deferred minor review findings:
 
 Physical control effects, firmware compatibility, concurrent browser/native
 access, and Windows runtime behavior remain unverified rather than waived.
+
+## Execution rulings and remaining risks
+
+1. The harness worktree tool failed, so an explicitly approved Git worktree was
+   used and the session moved to it. Risk: the harness may not list that worktree;
+   Git still tracks branch `feat/kiyo-pro` and main remains unchanged.
+2. The user authorized global Rust installation. Official rustup was installed
+   without modifying shell profiles. Risk: the installation remains on the Mac
+   until explicitly uninstalled.
+3. On macOS, native Windows tests were replaced locally by cross-compilation and
+   clippy, not treated as runtime evidence. Risk: Windows/driver failures may still
+   surface; native CI and hardware testing remain required.
+4. Camera JSON/dispatch receives Store and foreground context explicitly. Risk:
+   this is an internal interface adjustment from the written plan; it avoids
+   global-read coupling and targets the effective profile.
+5. Portable engine/API tests run on the host; native server/KS tests remain
+   Windows-only. Risk: those tests are compiled here but still need CI execution.
+6. Preview presets are honestly labeled candidates because the browser does not
+   enumerate all valid tuples. Risk: formats outside the preset list may only be
+   available via browser defaults or another application. The final review
+   accepted this trade-off without treating it as exhaustive format support.
+7. Existing upstream formatting was not swept. Risk: whole-repository rustfmt
+   remains red; new modules pass. The final review kept this baseline issue
+   separate from feature defects.
+8. The final review could not validate physical image effects, firmware
+   compatibility, concurrent control/capture access, or Windows runtime behavior.
+   These remain unverified, not waived; native testing may require adjustments.
