@@ -655,6 +655,7 @@ fn device_json(dev: &Device) -> Value {
         Some(Kind::Keypad) => "keypad",
         Some(Kind::Laptop) => "laptop",
         Some(Kind::Accessory) => "accessory",
+        Some(Kind::Webcam) => "webcam",
         None => "unknown",
     };
     json!({
