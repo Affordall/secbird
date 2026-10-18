@@ -7,7 +7,7 @@ Secretarybird Rust core, CLI, and tray/editor, suitable for an upstream PR.
 - [x] Confirm Windows target and upstream architecture requirement.
 - [x] Agree on approach and feature scope in chat.
 - [x] Write and self-review architectural design specification.
-- [ ] Obtain user approval of the written specification.
+- [x] Obtain user approval of the written specification.
 - [ ] Write implementation plan and agree on execution method.
 - [ ] Implement with regression tests.
 - [ ] Verify builds/tests and document required Windows hardware checks.
@@ -23,3 +23,13 @@ No product code has been changed.
 
 Design: `specs/2026-10-18-kiyo-pro-design.md`. Firmware work is explicitly
 excluded at the user's request. Awaiting review of the written specification.
+
+Scope amendment: include opt-in editor video preview and resolution/FPS choices
+for that preview session only. Photo capture/video recording remain excluded.
+The specification includes camera-access conflicts, resource cleanup, and
+preview-specific acceptance checks.
+
+User approved the amended specification. Implementation plan written and
+self-reviewed at `plans/2026-10-18-kiyo-pro.md`; awaiting plan review and execution
+method selection. Product code is unchanged. Preview implementation is planned
+through browser-native capture inside the existing local editor.

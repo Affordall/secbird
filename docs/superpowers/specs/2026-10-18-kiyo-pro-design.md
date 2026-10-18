@@ -9,11 +9,13 @@ backend, adding a background service, installing a driver, or requiring Synapse.
 
 The first version supports discovery, HDR on/off, HDR dark/bright mode,
 wide/medium/narrow field of view, responsive/passive autofocus mode, and saved
-profiles. Autofocus mode is the vendor's focusing strategy, not a manual-focus
-slider or an autofocus enable switch.
+profiles. The editor also provides an optional live video preview with supported
+resolution and frame-rate selection for that preview session. Autofocus mode is
+the vendor's focusing strategy, not a manual-focus slider or an autofocus enable
+switch.
 
-Out of scope: firmware checking or flashing, video preview/capture, resolution
-and frame-rate selection, generic UVC image controls, other webcam models,
+Out of scope: firmware checking or flashing, photo capture and video recording,
+forcing resolution or frame rate on other applications, generic UVC image controls, other webcam models,
 Linux/macOS camera implementations, and a general rewrite of device transport.
 Existing non-Windows functionality must continue to build and work unchanged.
 
@@ -140,6 +142,41 @@ invalidate stale camera handles; rescan reopens the currently connected device.
 Profile replay must not prevent other devices from being applied if a camera
 fails. No firmware features are added for cameras.
 
+### Live video preview and preview formats
+
+Provide an opt-in live preview so users can immediately see the effects of HDR,
+field-of-view, and focus changes. This requires a capture/streaming path that
+delivers camera frames to the browser editor, with explicit camera-access and
+session-lifecycle management. Preview is not photo capture or video recording;
+do not store frames or request microphone access.
+
+Start streaming only when the user requests preview. Discovery, device reports,
+profile application, and merely opening the editor must not start a stream.
+Ensure the preview source matches the camera being configured; if that mapping
+is ambiguous, require explicit source selection rather than showing another
+camera silently. Stop and release capture resources when preview is stopped,
+the selected camera changes, the editor closes, or the camera disconnects. Clean
+up abandoned sessions as well; do not rely solely on browser unload events.
+
+Camera access can conflict with OBS, Teams, or other applications. Show clear
+busy/access-denied errors and allow configuration without preview. Reuse the
+existing authenticated local-server boundary for any backend preview endpoints;
+do not introduce an unauthenticated video feed. Keep frame buffering bounded so
+a slow or disconnected browser cannot accumulate frames indefinitely.
+
+Offer resolution/FPS combinations supported by the selected camera and capture
+path, rather than independent choices that may form an unsupported combination.
+Show the actual negotiated format, report unsupported combinations, and account
+for format restrictions when HDR changes. Release and reconfigure the preview
+session when needed without silently claiming a requested format was accepted.
+
+Resolution and FPS are normally selected by the recording application for its
+own capture session. Secretarybird's choices apply only to its preview; they do
+not force OBS, Teams, or other applications to use the same format. Label these
+as preview settings, separate from camera-control profiles, and do not replay
+them as device-wide settings on startup or reconnect. Reconnect must not restart
+preview automatically.
+
 ## Verification and acceptance
 
 Write failing tests before production changes for protocol payloads, ordered
@@ -147,6 +184,9 @@ field-of-view sequences, early failure handling, input validation, identity and
 selection, backwards-compatible profiles, and unset-settings/no-write behavior.
 Use a fake camera control boundary rather than COM or physical hardware in unit
 tests. Cover editor/API rejection of settings that do not apply to the device.
+Add preview tests for opt-in startup, source selection, supported format
+validation, negotiated-format reporting, bounded buffering, session cleanup,
+and camera-access failures. Ensure profile application never starts preview.
 
 Run existing regression tests, formatting, and appropriate lint checks. Compile
 the Windows core, CLI, and tray paths; keep Linux core/CLI checks green. Verify
@@ -162,6 +202,12 @@ Pro and Synapse closed:
 3. Profile switching and restart/reconnect/wake reapplication.
 4. Errors and recovery with the camera unplugged or in use by a video app.
 5. No regressions for an existing HID device used alongside the camera.
+6. Preview shows the selected camera and live HDR/field-of-view/focus changes.
+7. Supported preview resolution/FPS combinations negotiate correctly, including
+   HDR-related restrictions; the UI reports the actual format.
+8. Stopping preview, switching devices, closing the editor, and unplugging the
+   camera release capture resources. Verify access conflicts and recovery with
+   a video app, and confirm reconnect does not restart preview automatically.
 
 Record tested Windows and camera firmware versions in the PR. Until physical
 checks pass, describe the feature as implemented but not hardware-verified. Do
