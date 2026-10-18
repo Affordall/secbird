@@ -1,6 +1,61 @@
 use super::*;
 use std::sync::Mutex;
 
+#[test]
+fn camera_second_fov_write_failure_is_not_saved() {
+    struct SecondWriteFailure(Mutex<usize>);
+    impl CameraBackend for SecondWriteFailure {
+        fn discover(&self) -> crate::Result<Vec<CameraInfo>> {
+            Ok(Vec::new())
+        }
+        fn set(&self, _: &str, setting: Setting) -> crate::Result<()> {
+            super::protocol::send_setting(setting, |_| {
+                let mut writes = self.0.lock().unwrap();
+                *writes += 1;
+                if *writes == 2 {
+                    Err(crate::Error::System("second FOV write failed".into()))
+                } else {
+                    Ok(())
+                }
+            })
+        }
+    }
+    let backend = SecondWriteFailure(Mutex::new(0));
+    let mut store = crate::Store::default();
+    let error = actions::set(
+        &backend,
+        "camera:test",
+        &mut store,
+        "Default",
+        Setting::FieldOfView(FieldOfView::Narrow),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("second FOV write failed"));
+    assert_eq!(*backend.0.lock().unwrap(), 2);
+    assert!(store.for_camera("camera:test").active().camera.is_none());
+}
+
+#[test]
+fn camera_and_hid_apply_only_their_own_fields_in_imported_profile() {
+    let profile: crate::Profile =
+        serde_json::from_str(r#"{"dpi":[1600,1600],"camera":{"hdr":true}}"#).unwrap();
+    let sim = crate::sim::Sim::mouse();
+    let device = sim
+        .open(
+            crate::sim::MOUSE_PID,
+            crate::sim::Sim::spec_for(crate::sim::MOUSE_PID),
+        )
+        .unwrap();
+    let applied = profile.apply(&device);
+    assert_eq!(applied.len(), 1);
+    assert!(applied[0].result.is_ok());
+    assert_eq!(device.dpi().unwrap(), (1600, 1600));
+    let camera = Fake::default();
+    let applied = actions::apply(&camera, "camera:test", &profile);
+    assert_eq!(applied.len(), 1);
+    assert_eq!(*camera.writes.lock().unwrap(), vec![Setting::Hdr(true)]);
+}
+
 #[derive(Default)]
 struct Fake {
     writes: Mutex<Vec<Setting>>,

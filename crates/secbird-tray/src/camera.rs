@@ -42,6 +42,46 @@ pub(crate) fn device_json(
     })
 }
 
+pub(crate) fn label(camera: &CameraInfo, cameras: &[CameraInfo]) -> String {
+    if cameras
+        .iter()
+        .filter(|other| other.pid == camera.pid)
+        .count()
+        > 1
+    {
+        let index = cameras
+            .iter()
+            .position(|other| other.id == camera.id)
+            .unwrap_or(0)
+            + 1;
+        format!("{} ({index})", camera.name)
+    } else {
+        camera.name.clone()
+    }
+}
+
+fn labeled_device_json(
+    camera: &CameraInfo,
+    cameras: &[CameraInfo],
+    store: &mut Store,
+    foreground: Option<&str>,
+) -> Value {
+    let mut value = device_json(camera, store, foreground);
+    value["label"] = label(camera, cameras).into();
+    value
+}
+
+pub(crate) fn device_list_json(
+    cameras: &[CameraInfo],
+    store: &mut Store,
+    foreground: Option<&str>,
+) -> Vec<Value> {
+    cameras
+        .iter()
+        .map(|camera| labeled_device_json(camera, cameras, store, foreground))
+        .collect()
+}
+
 fn dispatch(
     backend: &dyn CameraBackend,
     cameras: &[CameraInfo],
@@ -76,7 +116,9 @@ fn dispatch(
                 ));
             }
             actions::set(backend, &camera.id, store, &name, setting)?;
-            Ok(json!({ "device": device_json(camera, store, foreground), "failures": [] }))
+            Ok(
+                json!({ "device": labeled_device_json(camera, cameras, store, foreground), "failures": [] }),
+            )
         }
         "/api/camera-profile" => {
             let request: ProfileRequest = serde_json::from_slice(body).map_err(invalid)?;
@@ -100,7 +142,9 @@ fn dispatch(
             } else {
                 Vec::new()
             };
-            Ok(json!({ "device": device_json(camera, store, foreground), "failures": failures }))
+            Ok(
+                json!({ "device": labeled_device_json(camera, cameras, store, foreground), "failures": failures }),
+            )
         }
         _ => Err(Error::NotFound(path.into())),
     }
@@ -190,6 +234,18 @@ mod tests {
         assert_eq!(value["leds"], serde_json::json!([]));
         assert!(value["firmware"].is_null());
         assert_eq!(value["camera"]["state"], "saved");
+    }
+
+    #[test]
+    fn camera_twins_have_distinct_labels_and_inspectable_local_identity() {
+        let first = camera();
+        let mut second = camera();
+        second.id = "camera:second".into();
+        let values = device_list_json(&[first, second], &mut Store::default(), None);
+        assert_eq!(values[0]["label"], "Razer Kiyo Pro (1)");
+        assert_eq!(values[1]["label"], "Razer Kiyo Pro (2)");
+        assert_eq!(values[0]["id"], "camera:test");
+        assert_eq!(values[1]["id"], "camera:second");
     }
 
     #[test]

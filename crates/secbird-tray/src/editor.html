@@ -450,6 +450,7 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>{{CAMERA_PREVIEW_JS}}</script>
+<script>{{EDITOR_PROFILES_JS}}</script>
 <script>
 const T = new URLSearchParams(location.search).get('t');
 const $ = id => document.getElementById(id);
@@ -587,7 +588,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const label = name => NAMES[name] || name.charAt(0).toUpperCase() + name.slice(1);
 const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
 const hz = v => v + ' Hz';
-const devLabel = d => devices.filter(x => x.pid === d.pid).length > 1 && d.serial ? d.name + ' (' + d.serial.slice(-4) + ')' : d.name;
+const devLabel = d => SecbirdProfiles.deviceLabel(d, devices);
 
 // A device's profiles: the active one is `dev.profile`, the rest come from `profilesData`.
 function adopt(d) {
@@ -1295,6 +1296,7 @@ function lightingControlEditor(box) {
 function deviceEditor(box) {
   const facts = el('dl', { className: 'facts' });
   [['Kind', KINDS[dev.kind] || 'Device'], ['Firmware', dev.firmware], ['Serial', dev.serial], ['Battery', dev.battery != null && dev.battery + '%'],
+   ['Camera identity (local; may contain serial)', dev.kind === 'webcam' && dev.id],
    ['Product id', dev.pid], ['Device list', dev.known ? 'Known model' : 'Not in the device database yet']]
     .filter(([, v]) => v).forEach(([k, v]) => facts.append(el('dt', { textContent: k }), el('dd', { className: 'num', textContent: v })));
   box.append(el('div', { className: 'edgroup' }, el('p', { className: 'lead', textContent: devLabel(dev) }), facts));
@@ -1945,41 +1947,58 @@ window.addEventListener('pointerup', () => painting = false);
 
 // ---------- Profiles ----------
 
+const profileActions = SecbirdProfiles.createProfileActions({api, update(id, device) {
+  const target = devices.find(candidate => candidate.id === id);
+  if (!target) return;
+  Object.assign(target, device);
+  target.profilesData = target.profilesData || {};
+  target.profile = target.profile || {};
+  target.profilesData[target.active] = target.profile;
+  if (target.kind === 'mouse') btnData[id] = undefined;
+}});
+
 async function activate(name, quiet) {
+  const target = dev;
   try {
-    const r = await api('/api/profile', { action: 'use', name });
-    adopt(r.device);
-    if (dev.kind === 'mouse') btnData[dev.id] = undefined; // the new profile's remaps; read again when shown
+    const r = await profileActions.activate(target, name);
+    if (!r || dev?.id !== target.id) return false;
+    dev = devices.find(candidate => candidate.id === target.id) || target;
     if (!quiet) sel = null;
     render();
     toast(r.failures.length ? 'Some settings failed: ' + r.failures.join('; ') : (quiet ? 'Switched to ' + name + ' to edit it' : name + ' is active'), r.failures.length > 0);
     return true;
-  } catch (err) { toast(err.message, true); render(); return false; }
+  } catch (err) { if (dev?.id === target.id) { toast(err.message, true); render(); } return false; }
 }
 async function createProfile(name) {
+  const target = dev;
   try {
-    await api('/api/profile', { action: 'new', name });
-    await activate(name, true);
+    const r = await profileActions.create(target, name);
+    if (!r || dev?.id !== target.id) return;
+    dev = devices.find(candidate => candidate.id === target.id) || target;
+    sel = null; render();
     toast('Created ' + name + ' (a copy of the previous profile)');
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { if (dev?.id === target.id) toast(err.message, true); }
 }
 async function deleteProfile(name) {
+  const target = dev;
   const other = name === dev.active ? dev.profiles.find(p => p !== name) : null;
   if (!confirm(`Delete the profile "${name}"?` + (other ? ` "${other}" becomes active.` : ' Games tied to it go back to the active profile.'))) return;
   try {
-    if (other) await api('/api/profile', { action: 'use', name: other });
-    const r = await api('/api/profile', { action: 'delete', name }); adopt(r.device);
-    if (other && dev.kind === 'mouse') btnData[dev.id] = undefined;
+    const r = await profileActions.remove(target, name);
+    if (!r || dev?.id !== target.id) return;
+    dev = devices.find(candidate => candidate.id === target.id) || target;
     sel = null; render(); toast('Deleted ' + name);
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { if (dev?.id === target.id) toast(err.message, true); }
 }
 async function saveApps(name, apps, msg) {
+  const target = dev;
   try {
-    const r = await api('/api/profile', { action: 'apps', name, apps });
-    adopt(r.device);
+    const r = await profileActions.setApps(target, name, apps);
+    if (!r || dev?.id !== target.id) return;
+    dev = devices.find(candidate => candidate.id === target.id) || target;
     // The response carries every profile, so a game that moved between profiles shows everywhere.
     render(); toast(msg);
-  } catch (err) { toast(err.message, true); }
+  } catch (err) { if (dev?.id === target.id) toast(err.message, true); }
 }
 
 // ---------- Settings ----------

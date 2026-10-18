@@ -39,9 +39,9 @@ and physical-camera validation remain outstanding. See
 ## Verification so far
 
 - macOS release workspace build: passed.
-- macOS release workspace tests: 91 unit tests and 1 doctest passed; 2 existing
+- macOS release workspace tests: 94 unit tests and 1 doctest passed; 2 existing
   live-network tests ignored.
-- Preview lifecycle/negotiation tests: 14 passed using Node 22.
+- Browser lifecycle/profile-race tests: 20 passed using Node 22.
 - Release clippy with warnings denied: passed on macOS and cross-checked for
   Windows GNU (workspace/all targets) and Linux GNU (core/CLI/all targets).
 - Browser smoke test with a synthetic stream: preview played, a control edit
@@ -61,3 +61,30 @@ and physical-camera validation remain outstanding. See
   displayed values target the effective profile rather than its manual fallback.
 - Portable engine/API tests run on the host; native route/KS tests compile in the
   Windows target and still require Windows execution.
+
+## Final review
+
+A fresh-context reviewer identified two important issues. Both were fixed with
+regression tests: identical cameras now have consistent distinguishing labels
+and inspectable local identities; profile operations capture their target before
+awaiting, so late responses cannot overwrite a newly selected device. Multi-step
+create/delete requests retain the original target, and superseded responses are
+ignored. Browser smoke checks confirmed twin labels, About identity visibility,
+and a camera profile response arriving after selection moved to a mouse.
+
+Additional tests cover failure of the second FOV write without saving settings,
+and imported profiles containing both camera and HID settings. Release suites
+and cross-target clippy were rerun after these changes.
+
+Deferred minor review findings:
+
+- Native extension-node discovery reports a generic failure instead of preserving
+  every candidate node's HRESULT and malformed-metadata details.
+- After Stop/Start, the preview format dropdown may retain the previous selection
+  while capture starts with browser defaults. The **Actual preview** label reports
+  the newly negotiated format; use it rather than the dropdown as readback.
+- Direct setting-write errors retain native HRESULTs but omit the requested
+  setting/FOV-stage context (profile replay already adds setting context).
+
+Physical control effects, firmware compatibility, concurrent browser/native
+access, and Windows runtime behavior remain unverified rather than waived.

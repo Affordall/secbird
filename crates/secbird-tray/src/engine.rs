@@ -188,10 +188,9 @@ impl Engine {
             ProfileDevice { id: device.key(), label: self.label(device), profiles, active }
         }).collect();
         let mut store = self.store().unwrap_or_default();
-        for (index, camera) in self.cameras.iter().enumerate() {
+        for camera in &self.cameras {
             let profiles = store.for_camera(&camera.id);
-            let twins = self.cameras.iter().filter(|other| other.pid == camera.pid).count();
-            let label = if twins > 1 { format!("{} ({})", camera.name, index + 1) } else { camera.name.clone() };
+            let label = crate::camera::label(camera, &self.cameras);
             out.push(ProfileDevice { id: camera.id.clone(), label,
                 profiles: profiles.profiles.keys().cloned().collect(), active: profiles.active.clone() });
         }

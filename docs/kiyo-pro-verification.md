@@ -72,7 +72,7 @@ publicly without checking it: camera identities can contain serial information.
 ```text
 cargo test --release
 cargo clippy --release --all-targets -- -D warnings
-node --test crates/secbird-tray/src/camera-preview.test.cjs
+node --test crates/secbird-tray/src/*.test.cjs
 ```
 
 Windows CI must execute the native-path tests, including the KS metadata and

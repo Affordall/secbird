@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test crates/secbird-tray/src/camera-preview.test.cjs
+      - run: node --test crates/secbird-tray/src/*.test.cjs
 
   check:
     runs-on: windows-latest

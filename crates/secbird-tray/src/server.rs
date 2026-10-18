@@ -199,7 +199,9 @@ impl Server {
         if req.method == "GET" && req.path == "/" {
             return if req.query_param("t") == Some(self.token.as_str()) {
                 let logo = format!("data:image/png;base64,{}", base64(LOGO_PNG));
-                let page = PAGE.replace("{{LOGO}}", &logo).replace("{{CAMERA_PREVIEW_JS}}", include_str!("camera-preview.js"));
+                let page = PAGE.replace("{{LOGO}}", &logo)
+                    .replace("{{CAMERA_PREVIEW_JS}}", include_str!("camera-preview.js"))
+                    .replace("{{EDITOR_PROFILES_JS}}", include_str!("editor-profiles.js"));
                 Response { status: "200 OK", content_type: "text/html; charset=utf-8", body: page.into_bytes() }
             } else {
                 Response::text("403 Forbidden", "Open the editor from the Secretarybird tray menu.")
@@ -222,7 +224,7 @@ impl Server {
                 let (seq, dpi) = engine.live_dpi();
                 let mut store = Store::load(&config_dir().join("profiles.json")).unwrap_or_default();
                 Ok(json!({ "seq": seq, "dpi": dpi.iter().map(|(k, (x, y))| (k.clone(), json!([x, y]))).collect::<serde_json::Map<_, _>>(),
-                    "cameras": engine.cameras().iter().map(|camera| crate::camera::device_json(camera, &mut store, engine.foreground())).collect::<Vec<_>>() }))
+                    "cameras": crate::camera::device_list_json(engine.cameras(), &mut store, engine.foreground()) }))
             }
             ("POST", "/api/rescan") => {
                 engine.rescan();
@@ -598,7 +600,7 @@ fn state(engine: &Engine) -> Value {
     json!({
         "version": env!("CARGO_PKG_VERSION"),
         "devices": engine.devices().iter().map(device_json)
-            .chain(engine.cameras().iter().map(|camera| crate::camera::device_json(camera, &mut store, engine.foreground()))).collect::<Vec<_>>(),
+            .chain(crate::camera::device_list_json(engine.cameras(), &mut store, engine.foreground())).collect::<Vec<_>>(),
         "camera_error": engine.camera_error(),
         "unsupported": engine.unsupported().iter().map(|u| json!({
             "pid": format!("{:04X}", u.pid), "name": u.name, "reason": u.reason,
