@@ -5,8 +5,62 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(any(windows, test))]
 mod protocol;
+#[cfg(windows)]
+mod windows;
+#[cfg(any(windows, test))]
+mod worker;
 
 pub const KIYO_PRO_PID: u16 = 0x0E05;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CameraInfo {
+    pub id: String,
+    pub pid: u16,
+    pub name: String,
+    pub control_error: Option<String>,
+}
+
+pub trait CameraBackend: Send {
+    fn discover(&self) -> Result<Vec<CameraInfo>>;
+    fn set(&self, id: &str, setting: Setting) -> Result<()>;
+}
+
+pub fn backend() -> Result<Box<dyn CameraBackend>> {
+    #[cfg(windows)]
+    {
+        windows::start()
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(Box::new(Unsupported))
+    }
+}
+
+#[cfg(not(windows))]
+struct Unsupported;
+#[cfg(not(windows))]
+impl CameraBackend for Unsupported {
+    fn discover(&self) -> Result<Vec<CameraInfo>> {
+        Ok(Vec::new())
+    }
+    fn set(&self, _: &str, _: Setting) -> Result<()> {
+        Err(Error::Unsupported(
+            "camera controls require Windows 10/11".into(),
+        ))
+    }
+}
+
+#[cfg(any(windows, test))]
+fn camera_id(path: &str) -> String {
+    format!("camera:{}", path.to_ascii_lowercase())
+}
+
+#[cfg(any(windows, test))]
+fn is_kiyo_pro_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let parts: Vec<_> = lower.split(['#', '&', '\\', '?']).collect();
+    parts.contains(&"vid_1532") && parts.contains(&"pid_0e05")
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
