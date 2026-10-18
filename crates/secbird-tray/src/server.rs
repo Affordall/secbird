@@ -219,7 +219,9 @@ impl Server {
             ("GET", "/api/apps") => Ok(json!({ "apps": crate::apps::running() })),
             ("GET", "/api/live") => {
                 let (seq, dpi) = engine.live_dpi();
-                Ok(json!({ "seq": seq, "dpi": dpi.iter().map(|(k, (x, y))| (k.clone(), json!([x, y]))).collect::<serde_json::Map<_, _>>() }))
+                let mut store = Store::load(&config_dir().join("profiles.json")).unwrap_or_default();
+                Ok(json!({ "seq": seq, "dpi": dpi.iter().map(|(k, (x, y))| (k.clone(), json!([x, y]))).collect::<serde_json::Map<_, _>>(),
+                    "cameras": engine.cameras().iter().map(|camera| crate::camera::device_json(camera, &mut store, engine.foreground())).collect::<Vec<_>>() }))
             }
             ("POST", "/api/rescan") => {
                 engine.rescan();
@@ -339,6 +341,7 @@ fn buttons_json(dev: &Device, store: &mut Store) -> Value {
 }
 
 fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
+    if let Some(result) = crate::camera::post(engine, path, body) { return result; }
     let b: Body = serde_json::from_slice(body).map_err(|e| Error::InvalidArg(e.to_string()))?;
     if path == "/api/sync" {
         return sync(engine, &b.color, &b.effect);
@@ -590,9 +593,12 @@ fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, E
 }
 
 fn state(engine: &Engine) -> Value {
+    let mut store = Store::load(&config_dir().join("profiles.json")).unwrap_or_default();
     json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "devices": engine.devices().iter().map(device_json).collect::<Vec<_>>(),
+        "devices": engine.devices().iter().map(device_json)
+            .chain(engine.cameras().iter().map(|camera| crate::camera::device_json(camera, &mut store, engine.foreground()))).collect::<Vec<_>>(),
+        "camera_error": engine.camera_error(),
         "unsupported": engine.unsupported().iter().map(|u| json!({
             "pid": format!("{:04X}", u.pid), "name": u.name, "reason": u.reason,
         })).collect::<Vec<_>>(),
@@ -710,5 +716,20 @@ mod tests {
         assert_eq!(base64(b"fo"), "Zm8=");
         assert_eq!(base64(b"foo"), "Zm9v");
         assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn camera_routes_require_token_and_same_origin_host() {
+        use super::*;
+        let server = Server { port: 12345, token: "secret".into(), engine: Arc::new(Mutex::new(Engine::new().unwrap())) };
+        for (host, origin, token) in [
+            ("127.0.0.1:12345", "http://127.0.0.1:12345", "wrong"),
+            ("evil.example:12345", "http://127.0.0.1:12345", "secret"),
+            ("127.0.0.1:12345", "http://evil.example", "secret"),
+        ] {
+            let request = Request { method: "POST".into(), path: "/api/camera".into(), query: String::new(),
+                headers: vec![("host".into(), host.into()), ("origin".into(), origin.into()), ("x-secbird-token".into(), token.into())], body: b"{}".to_vec() };
+            assert_eq!(server.route(&request).status, "403 Forbidden");
+        }
     }
 }

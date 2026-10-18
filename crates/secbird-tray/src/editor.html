@@ -455,7 +455,7 @@ const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF
                  ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
 const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight' };
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
-  headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
+  headset: 'Headset', accessory: 'Accessory', webcam: 'Webcam', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
 let sel = null, section = null, view = 'work'; // selected tile, rail section, 'work' or 'compare'
 let btnFailed = {}, btnData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
@@ -502,6 +502,7 @@ function layout(m, kind) {
 }
 
 async function api(path, body) {
+  if (path === '/api/profile' && (body?.id || dev?.id || '').startsWith('camera:')) path = '/api/camera-profile';
   const r = await fetch(path, {
     method: body ? 'POST' : 'GET',
     headers: { 'X-Secbird-Token': T, 'Content-Type': 'application/json' },
@@ -704,6 +705,10 @@ function paintPreview() {
 // Sections of this device, each with its tiles. Only what the device has.
 function sections() {
   const s = [];
+  if (dev.kind === 'webcam') s.push({ id: 'camera', name: 'Camera', rows: [
+    { key: 'camera:hdr', label: 'HDR' }, { key: 'camera:hdr-mode', label: 'HDR mode' },
+    { key: 'camera:fov', label: 'Field of view' }, { key: 'camera:af-mode', label: 'Autofocus strategy' },
+  ] });
   const light = dev.leds.map(l => ({ key: 'zone:' + l.name, label: label(l.name) }));
   if (dev.matrix) light.push({ key: 'keys', label: 'Per-key colors' });
   if (light.length) s.push({ id: 'light', name: 'Lighting',
@@ -988,6 +993,7 @@ $('compareBtn').onclick = () => { view = view === 'compare' ? 'work' : 'compare'
 // Comparable value of a cell, to mark where another profile differs from the active one.
 function cellValue(key, name) {
   const p = prof(name), active = name === dev.active;
+  if (key.startsWith('camera:')) return String(p.camera?.[key.slice(7).replaceAll('-', '_')] ?? '');
   if (key.startsWith('zone:')) { const z = zoneOf(p, key.slice(5)); return p.keys && p.keys.length && dev.matrix ? 'keys' : z.off ? 'off' : (z.effect || z.color || '') + '/' + (z.brightness ?? 100); }
   if (key === 'keys') return (p.keys || []).join();
   if (key === 'dpi') return String(active && dev.dpi ? [dev.dpi.x, dev.dpi.y] : p.dpi || '');
@@ -1009,6 +1015,10 @@ const differs = (key, name) => name !== dev.active && cellValue(key, name) !== c
 // mouse saved. Other columns get their mark from differs().
 function cellView(key, name) {
   const p = prof(name), active = name === dev.active;
+  if (key.startsWith('camera:')) {
+    const value = p.camera?.[key.slice(7).replaceAll('-', '_')];
+    return [value == null ? '<span class="unset">Unchanged · current unknown</span>' : esc(typeof value === 'boolean' ? (value ? 'On' : 'Off') : label(value)) + ' <small>saved</small>'];
+  }
   if (key === 'lighting-control') return [dev.lighting_control ? 'Secretarybird' : '<span class="unset">Not controlled</span>'];
   if (key.startsWith('zone:')) {
     const z = zoneOf(p, key.slice(5));
@@ -1109,7 +1119,8 @@ function profileHeader(n) {
 function buildEditor(host, r) {
   const box = el('div', { className: 'edbox' });
   host.append(box);
-  if (r.key === 'lighting-control') lightingControlEditor(box);
+  if (r.key.startsWith('camera:')) cameraEditor(box, r.key.slice(7));
+  else if (r.key === 'lighting-control') lightingControlEditor(box);
   else if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
   else if (r.key === 'keys') keysEditor(box);
   else if (r.key === 'dpi') dpiEditor(box);
@@ -1121,6 +1132,29 @@ function buildEditor(host, r) {
   else if (r.key === 'apps') appsEditor(box);
   else if (r.key === 'device') deviceEditor(box);
   else if (r.key.startsWith('btn:')) buttonEditor(box, r.key.slice(4));
+}
+
+function cameraEditor(box, control) {
+  const target = dev, name = target.active;
+  const values = { hdr: ['off', 'on'], 'hdr-mode': ['dark', 'bright'], fov: ['wide', 'medium', 'narrow'], 'af-mode': ['responsive', 'passive'] }[control];
+  const field = control.replaceAll('-', '_'), saved = target.profile.camera?.[field];
+  const input = el('select', { ariaLabel: control });
+  input.append(new Option('Unchanged · current unknown', '', saved == null, saved == null));
+  for (const value of values) input.append(new Option(label(value), value, false, saved === (control === 'hdr' ? value === 'on' : value)));
+  input.onchange = async () => {
+    if (!input.value) return;
+    input.disabled = true;
+    try {
+      const response = await api('/api/camera', { id: target.id, profile: name, control, value: input.value });
+      Object.assign(target, response.device);
+      if (dev === target) { adopt(response.device); render(); }
+      toast('Sent and saved. Current hardware values cannot be read back.');
+    } catch (error) { toast(error.message, true); if (dev === target) render(); }
+    finally { input.disabled = false; }
+  };
+  box.append(input, el('p', { className: 'note', textContent: 'Saved/requested settings, not live hardware readback. Unset controls are left unchanged.' }));
+  if (control === 'af-mode') box.append(el('p', { className: 'note', textContent: 'Responsive/passive changes the focusing strategy; this is not manual focus or an autofocus on/off switch.' }));
+  if (target.camera?.error) box.append(el('p', { className: 'note', textContent: target.camera.error }));
 }
 
 // The live profile's games and apps: while one is in front, this profile comes up.
@@ -2030,6 +2064,16 @@ async function pollLive() {
   if (document.hidden) return;
   try {
     const r = await api('/api/live');
+    const cameras = r.cameras || [], oldCameras = devices.filter(d => d.kind === 'webcam');
+    if (JSON.stringify(cameras.map(d => d.id)) !== JSON.stringify(oldCameras.map(d => d.id))) {
+      await load();
+    } else for (const camera of cameras) {
+      const target = devices.find(d => d.id === camera.id);
+      if (target && JSON.stringify(target.profilesData) !== JSON.stringify(camera.profilesData) || target && target.active !== camera.active) {
+        Object.assign(target, camera);
+        if (dev?.id === target.id) { dev = target; render(); }
+      }
+    }
     if (liveSeq !== null && r.seq !== liveSeq) {
       for (const d of devices) {
         const v = r.dpi[d.id];
@@ -2049,6 +2093,7 @@ async function load(path = '/api/state', body) {
   try {
     const s = body ? await api(path, body) : await api(path);
     devices = s.devices; unsupported = s.unsupported || []; synapse = s.synapse || [];
+    if (s.camera_error) toast('Camera discovery: ' + s.camera_error, true);
     devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
     if (s.version) $('home').title = 'Secretarybird ' + s.version + ': all devices';
     const want = new URLSearchParams(location.search).get('d');
