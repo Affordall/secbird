@@ -4,11 +4,14 @@ use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 pub mod actions;
+pub mod formats;
 
 #[cfg(any(windows, test))]
 mod protocol;
 #[cfg(windows)]
 mod windows;
+#[cfg(windows)]
+mod windows_formats;
 #[cfg(any(windows, test))]
 mod worker;
 
@@ -25,6 +28,12 @@ pub struct CameraInfo {
 pub trait CameraBackend: Send {
     fn discover(&self) -> Result<Vec<CameraInfo>>;
     fn set(&self, id: &str, setting: Setting) -> Result<()>;
+    /// Enumerate native advertised formats without applying settings or starting capture.
+    fn formats(&self, _id: &str) -> Result<Vec<formats::CameraFormat>> {
+        Err(Error::Unsupported(
+            "native camera format diagnostics require Windows and a compatible driver".into(),
+        ))
+    }
 }
 
 pub fn backend() -> Result<Box<dyn CameraBackend>> {

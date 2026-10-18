@@ -59,6 +59,29 @@ available without video preview, subject to the driver's access rules.
 
 ## Multiple cameras and diagnostics
 
+To inspect native video formats without changing settings or starting a stream:
+
+```powershell
+.\target\release\secbird.exe -d 0E05 camera formats
+```
+
+Close other camera applications and the Windows camera-settings preview first
+if the driver reports that the camera is busy. The diagnostic works independently
+of Kiyo Pro extension-unit control support; an unavailable vendor control does
+not by itself prevent format enumeration.
+
+Each row identifies a filter output pin, resolution, and pixel format (FourCC
+such as MJPG/YUY2, or a subtype GUID). **Listed FPS** comes from that advertised
+media type, not the currently running camera. **Advertised range** comes from
+the driver's interval bounds; it does not guarantee every intermediate rate.
+**Discrete FPS** appears only when the driver supplies an explicit rate list.
+If no discrete list appears, no discrete rates were inferred from the range.
+
+This command does not call SetFormat, save profiles, enable Windows multi-app
+mode, or apply a preferred camera format. Native advertised formats can differ
+from the formats Windows exposes in its shared-camera settings. The output
+cannot establish what format Discord currently captures or transmits.
+
 Use `secbird list` to find full camera identities and quote them when passing
 `-d`. A bare `0E05` is rejected when more than one camera matches. Profiles are
 separate per device path; changing USB ports can change that identity.

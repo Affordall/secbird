@@ -44,6 +44,24 @@ pub(crate) fn run(
     store: &mut Store,
 ) -> Result<()> {
     match command {
+        "camera" if args.first().is_some_and(|arg| arg == "formats") => {
+            if args.len() != 1 {
+                return Err(Error::InvalidArg("usage: camera formats".into()));
+            }
+            let formats = backend.formats(&camera.id)?;
+            println!(
+                "Native driver formats for {} (advertised, not current stream or saved defaults):",
+                camera.name
+            );
+            if formats.is_empty() {
+                println!("  No native video output formats were reported.");
+            }
+            for format in formats {
+                println!("  {format}");
+            }
+            println!("Ranges do not imply that every intermediate FPS is supported. No settings changed; no stream started.");
+            Ok(())
+        }
         "info" | "camera" if args.is_empty() => {
             println!("{} [{}]", camera.name, camera.id);
             println!("Saved settings (current hardware values unknown):");
@@ -137,6 +155,50 @@ fn profile_cmd(
 mod tests {
     use super::*;
     use secbird_core::camera::{CameraInfo, FieldOfView, Setting};
+
+    #[test]
+    fn camera_formats_command_never_writes_controls_or_profiles() {
+        struct FormatsOnly;
+        impl CameraBackend for FormatsOnly {
+            fn discover(&self) -> Result<Vec<CameraInfo>> {
+                panic!("command must not rediscover")
+            }
+            fn set(&self, _: &str, _: Setting) -> Result<()> {
+                panic!("formats must not write")
+            }
+            fn formats(
+                &self,
+                id: &str,
+            ) -> Result<Vec<secbird_core::camera::formats::CameraFormat>> {
+                assert_eq!(id, "camera:test");
+                Ok(Vec::new())
+            }
+        }
+        let camera = CameraInfo {
+            id: "camera:test".into(),
+            pid: 0x0e05,
+            name: "Kiyo Pro".into(),
+            control_error: Some("vendor controls unavailable".into()),
+        };
+        let mut store = Store::default();
+        run(
+            &FormatsOnly,
+            &camera,
+            "camera",
+            &["formats".into()],
+            &mut store,
+        )
+        .unwrap();
+        assert!(store.devices.is_empty());
+        assert!(run(
+            &FormatsOnly,
+            &camera,
+            "camera",
+            &["formats".into(), "extra".into()],
+            &mut store
+        )
+        .is_err());
+    }
 
     #[test]
     fn camera_select_never_chooses_first_of_twins() {

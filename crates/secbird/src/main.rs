@@ -18,6 +18,7 @@ DEVICE:
                             (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
+  camera formats            Read-only native driver resolution/FPS/pixel-format list
 
 SETTINGS (saved to the active profile):
   camera [<control> <value>] Kiyo Pro (Windows): hdr on|off, hdr-mode dark|bright,

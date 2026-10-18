@@ -115,3 +115,31 @@ access, and Windows runtime behavior remain unverified rather than waived.
 8. The final review could not validate physical image effects, firmware
    compatibility, concurrent control/capture access, or Windows runtime behavior.
    These remain unverified, not waived; native testing may require adjustments.
+
+## Native-format diagnostic follow-up
+
+Approved bounded addition: `secbird -d 0E05 camera formats` lists native
+driver-advertised output formats without selecting formats or starting capture.
+It reports pixel subtypes, resolutions, nominal intervals, advertised interval
+bounds, and explicit discrete rates when available. Capability bounds are not
+expanded into invented supported combinations. Enumeration runs on the existing
+COM worker and does not require vendor extension-unit control support.
+
+- [x] Failing parser/CLI tests written and observed before implementation.
+- [x] Implement read-only native enumeration and bounded driver-data parsing.
+- [x] Run full regression tests and cross-target checks; review changes.
+- [ ] Obtain Windows diagnostic output from the physical camera.
+
+Follow-up verification: 101 host unit tests and 1 doctest pass, with 2 existing
+live-network tests ignored; 20 JavaScript tests pass. Release clippy with warnings
+denied passes on macOS and for Windows GNU workspace/all targets and Linux GNU
+core/CLI/all targets. Windows ABI/subtype tests compile in the native target but
+cannot execute on this Mac.
+
+The read-only review found that checking the video capability layout before the
+media major type would reject a legitimate audio pin. Fixed with bounded generic
+buffer allocation followed by media classification and video-specific layout
+validation; mixed video/audio and malformed buffer regression tests pass. The
+diagnostic is also documented outside the CLI's saved-settings help category.
+Physical enumeration, busy/privacy behavior, hot-unplug, and driver-specific
+runtime behavior remain unverified until the Windows diagnostic is run.
