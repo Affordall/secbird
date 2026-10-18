@@ -3,6 +3,8 @@
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+pub mod actions;
+
 #[cfg(any(windows, test))]
 mod protocol;
 #[cfg(windows)]
