@@ -45,12 +45,24 @@ pub struct TraySettings {
     /// No notification when a wireless device runs low.
     #[serde(default)]
     pub battery_warning_off: bool,
+    /// Battery percent at or below which that notification shows; `None` is the default.
+    #[serde(default)]
+    pub battery_warning_at: Option<u8>,
     /// Don't switch profiles when a program tied to one comes to the front.
     #[serde(default)]
     pub auto_switch_off: bool,
 }
 
+/// Low battery levels a person can pick, and the default.
+pub const BATTERY_RANGE: std::ops::RangeInclusive<u8> = 1..=95;
+pub const BATTERY_DEFAULT: u8 = 15;
+
 impl TraySettings {
+    /// The low battery level, falling back to the default for a missing or hand-edited value.
+    pub fn low_battery(&self) -> u8 {
+        self.battery_warning_at.filter(|v| BATTERY_RANGE.contains(v)).unwrap_or(BATTERY_DEFAULT)
+    }
+
     pub fn path() -> std::path::PathBuf {
         config_dir().join("tray.json")
     }

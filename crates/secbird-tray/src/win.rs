@@ -44,7 +44,6 @@ const RETRY_DELAYS_MS: [u32; 3] = [4_000, 15_000, 45_000];
 /// Battery check for wireless devices (cheap: two short USB requests per device).
 const TIMER_BATTERY: usize = 3;
 const BATTERY_MS: u32 = 5 * 60 * 1000;
-const LOW_BATTERY: u8 = 15;
 /// Devices need a moment after arrival or resume before they answer reliably.
 const SETTLE_MS: u32 = 1500;
 /// Wait for the window in front to settle, so Alt+Tab through several windows sends
@@ -573,12 +572,14 @@ impl App {
 
     fn check_battery(&mut self) {
         let batteries = self.engine().batteries();
+        let settings = TraySettings::load();
+        let low = settings.low_battery();
         for b in &batteries {
-            if b.charging || b.percent >= LOW_BATTERY + 10 {
+            if b.charging || b.percent >= low.saturating_add(10) {
                 self.low_battery.remove(&b.key);
-            } else if b.percent <= LOW_BATTERY && self.low_battery.insert(b.key.clone()) {
+            } else if b.percent <= low && self.low_battery.insert(b.key.clone()) {
                 log::append(&format!("low battery: {} {}%", b.name, b.percent));
-                if !TraySettings::load().battery_warning_off {
+                if !settings.battery_warning_off {
                     self.balloon("Battery low", &format!("{}: {}%", b.name, b.percent));
                 }
             }

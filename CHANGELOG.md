@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.7] - 2026-10-19
+
+### Added
+- BlackWidow V4 Low-Profile HyperSpeed on the cable (#31, thanks lukethehawk). The wireless one
+  is now named "(Wireless)" so the two read apart when both are connected.
+
+### Fixed
+- Keyboards no longer show a "0 DPI" control (#32, thanks lukethehawk). Only mice have DPI.
+
+## [0.4.6] - 2026-10-18
+
+### Added
+- Pick your own low battery warning level: Settings → Low battery warning takes any level from
+  1% to 95% (it was always 15%). Type it, or use − and +.
+- All devices is easier to read: bigger cards grouped by kind (mice, keyboards and keypads,
+  headsets, everything else), each with an icon for its kind, and DPI, polling rate and battery
+  at a glance. Long device names no longer get cut off.
+- BlackWidow V4 Low-Profile HyperSpeed (#28, thanks lukethehawk). Verified over 2.4 GHz.
+
 ## [0.4.5] - 2026-10-17
 
 ### Added

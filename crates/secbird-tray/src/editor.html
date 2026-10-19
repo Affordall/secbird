@@ -28,6 +28,16 @@
   html { scrollbar-color: var(--line-strong) transparent; accent-color: var(--accent); }
   [hidden] { display: none !important; }
   .num { font-variant-numeric: tabular-nums; }
+  .pct-box { display: inline-flex; align-items: center; height: 36px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .pct-box:hover { border-color: var(--line-strong); }
+  .pct-box:focus-within { border-color: var(--accent); }
+  .pct-box input.pct { width: 3ch; padding: 0 !important; border: 0 !important; background: none !important; text-align: right; font-weight: 650; appearance: textfield; }
+  .pct-box input.pct::-webkit-inner-spin-button, .pct-box input.pct::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  .pct-box input.pct:focus-visible { outline: none; }
+  .pct-box .unit { color: var(--muted); font-weight: 600; padding: 0 4px 0 1px; }
+  .pct-box button { width: 32px; height: 100%; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 0; }
+  .pct-box button:hover:not(:disabled) { color: var(--text); background: var(--panel); }
+  .pct-box button:disabled { opacity: .35; cursor: default; }
   .ico { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; flex: none; }
 
   /* Top bar: brand, devices, actions for every device. */
@@ -284,18 +294,35 @@
   .ov-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; }
   .ov-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
   .ov-head span { color: var(--muted); font-size: 13px; }
-  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
-  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 9px; transition: border-color .15s, transform .15s; }
+  .ov-group { display: flex; align-items: center; gap: 8px; margin: 26px 0 12px; color: var(--muted); font-size: 14px; font-weight: 600; }
+  .ov-group:first-child { margin-top: 0; }
+  .ov-group .dart { width: 20px; height: 20px; }
+  .ov-group span { color: var(--faint); font-weight: 400; }
+  .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 14px; }
+  .dcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; cursor: pointer; display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 16px; row-gap: 16px; color: var(--text); transition: border-color .15s, transform .15s; }
   .dcard:hover { border-color: var(--line-strong); transform: translateY(-2px); }
   .dcard.muted { cursor: default; opacity: .6; }
   .dcard.muted:hover { transform: none; border-color: var(--line); }
-  .dtop { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
-  .dcard h3 { margin: 0; font-size: 15px; font-weight: 650; min-width: 0; line-height: 1.3; overflow-wrap: anywhere;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dtile { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); transition: color .15s, border-color .15s; }
+  .dtile .dart { width: 28px; height: 28px; }
+  .dcard:hover .dtile { color: var(--accent); border-color: var(--line-strong); }
+  .did { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .dsub { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; min-width: 0; }
+  .dfoot { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); min-width: 0; }
+  .dstats { display: flex; gap: 26px; min-width: 0; }
+  .dstats div { display: flex; flex-direction: column; min-width: 0; }
+  .dstats small { color: var(--muted); font-size: 12px; }
+  .dstats b { color: var(--value); font-size: 17px; font-weight: 650; white-space: nowrap; }
+  .dstats b.quiet { color: var(--muted); font-weight: 400; font-size: 14px; white-space: normal; }
+  .dsub .ell { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dcard h3 { margin: 0; color: var(--text); font-size: 16.5px; font-weight: 650; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dcard .dots { flex-wrap: nowrap; gap: 6px; min-height: 0; }
+  .dcard .dots i { width: 14px; height: 14px; }
+  .dart { width: 26px; height: 26px; stroke: currentColor; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .dart .f { fill: currentColor; stroke: none; }
   .dots { display: flex; gap: 7px; min-height: 16px; flex-wrap: wrap; }
   .dots i { width: 16px; height: 16px; border-radius: 50%; background: currentColor; border: 1px solid #00000066; }
   .dots i.off { background: none; border: 1.5px dashed var(--line-strong); }
-  .dmeta { color: var(--muted); font-size: 12.5px; }
   .batt { display: flex; align-items: center; gap: 6px; }
   .batt b { width: 22px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; }
   .batt b::after { content: ""; position: absolute; left: 1px; top: 1px; bottom: 1px; width: calc((100% - 2px) * var(--lvl)); background: currentColor; border-radius: 1px; }
@@ -409,7 +436,7 @@
 
   <section class="overview" id="overview" hidden>
     <div class="ov-head"><h1>All devices</h1><span id="ovSummary"></span></div>
-    <div class="ov-grid" id="ovGrid"></div>
+    <div id="ovGroups"></div>
   </section>
 
   <div class="devbar" id="devbar" hidden>
@@ -588,6 +615,50 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const label = name => NAMES[name] || name.charAt(0).toUpperCase() + name.slice(1);
 const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
 const hz = v => v + ' Hz';
+// Line drawings for the home cards, picked by kind and shape rather than model, so a new
+// devices.json entry gets one without a drawing of its own. `.f` parts are filled.
+// A keyboard `w` wide from `x`: two rows of keys and a space bar, plus a number pad column.
+const kbd = (x, w, numpad) => {
+  const dot = (cx, cy) => `<circle class="f" cx="${cx.toFixed(1)}" cy="${cy}" r=".8"/>`;
+  const first = x + 2.6, last = x + w - 2.6 - (numpad ? 3.4 : 0), n = Math.round((last - first) / 2.4);
+  let s = `<rect x="${x}" y="6" width="${w}" height="12" rx="2"/>`;
+  for (let i = 0; i <= n; i++) s += dot(first + i * (last - first) / n, 9.3) + dot(first + i * (last - first) / n, 12);
+  s += dot(first, 14.7) + dot(last, 14.7) + `<path d="M${first + 2.6} 14.7H${last - 2.6}"/>`;
+  if (numpad) [9.3, 12, 14.7].forEach(y => { s += dot(x + w - 2.6, y); });
+  return s;
+};
+const ART = {
+  mouse: '<rect x="6.5" y="2.5" width="11" height="19" rx="5.5"/><path d="M12 2.5v6"/>',
+  naga: '<rect x="5.5" y="2.5" width="13" height="19" rx="6"/><path d="M12 2.5v6"/>' +
+    [12, 14.6, 17.2].map(y => `<circle class="f" cx="8.6" cy="${y}" r=".9"/><circle class="f" cx="11" cy="${y}" r=".9"/>`).join(''),
+  'keyboard-full': kbd(1, 22, true),
+  'keyboard-tkl': kbd(2.5, 19, false),
+  'keyboard-compact': kbd(4.5, 15, false),
+  keypad: '<path d="M5 3h9a2 2 0 0 1 2 2v7l3.5 3.5V19a2 2 0 0 1-2 2H7a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2z"/>' +
+    [6.5, 9.5, 12.5].map(y => [6.5, 9.5, 12.5].map(x => `<circle class="f" cx="${x}" cy="${y}" r=".9"/>`).join('')).join(''),
+  headset: '<path d="M4.5 15v-3a7.5 7.5 0 0 1 15 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.5"/>',
+  mousepad: '<path d="M6.5 6.5h14a1 1 0 0 1 1 1.2l-1.8 9.6a1.5 1.5 0 0 1-1.5 1.2h-14a1 1 0 0 1-1-1.2l1.8-9.6a1.5 1.5 0 0 1 1.5-1.2z"/><path d="M6 15.5h7" stroke-dasharray="1.6 1.6"/>',
+  laptop: '<rect x="4.5" y="4.5" width="15" height="10.5" rx="1.5"/><path d="M2 19h20"/>',
+  dongle: '<rect x="8" y="9" width="8" height="12.5" rx="2"/><path d="M10 9V3.5h4V9"/>',
+  dock: '<rect x="8" y="2.5" width="8" height="12.5" rx="4"/><path d="M12 2.5v4"/><path d="M4.5 20.5h15a2.5 2.5 0 0 0-2.5-2.5H7a2.5 2.5 0 0 0-2.5 2.5z"/>',
+  speaker: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><circle cx="12" cy="14.5" r="3.5"/><circle cx="12" cy="7" r="1.2"/>',
+  device: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="12" cy="12" r="3"/>',
+};
+function deviceArt(d) {
+  const n = d.name || '';
+  if (/receiver|dongle/i.test(n)) return 'dongle';
+  if (/dock|charging pad|base station|bungee/i.test(n)) return 'dock';
+  if (/speaker|nommo|leviathan/i.test(n)) return 'speaker';
+  if (d.kind === 'mouse') return /naga/i.test(n) ? 'naga' : 'mouse';
+  if (d.kind === 'keyboard') {
+    const cols = d.matrix && d.matrix.cols;
+    if (cols > 2) return 'keyboard-' + (cols >= 20 ? 'full' : cols >= 17 ? 'tkl' : 'compact');
+    return 'keyboard-' + (/mini|compact|60|65|75/i.test(n) ? 'compact' : /tenkeyless|tkl/i.test(n) ? 'tkl' : 'full');
+  }
+  return ART[d.kind] ? d.kind : 'device';
+}
+const artTile = d => el('span', { className: 'dtile', innerHTML: `<svg class="dart" viewBox="0 0 24 24" aria-hidden="true">${ART[deviceArt(d)]}</svg>` });
+
 const devLabel = d => SecbirdProfiles.deviceLabel(d, devices);
 
 // A device's profiles: the active one is `dev.profile`, the rest come from `profilesData`.
@@ -2054,6 +2125,34 @@ function renderSettings() {
     row('Switch profiles with games', 'A profile tied to a program comes up while that program is in front, and goes back after.', ...traySwitch('auto_switch', 'Switch profiles with games')));
 
   // Notifications and checks
+  // Any whole percent: typed (saved on Enter or leaving the box) or stepped with - and +
+  // (saved once the clicking stops). Out of range goes back to the saved level.
+  const batteryLevel = () => {
+    const input = el('input', { type: 'number', className: 'num pct', min: 1, max: 95, step: 1, value: a.battery_warning_at, ariaLabel: 'Warn at percent' });
+    const minus = el('button', { type: 'button', textContent: '−', ariaLabel: 'Lower' });
+    const plus = el('button', { type: 'button', textContent: '+', ariaLabel: 'Higher' });
+    const ends = () => { minus.disabled = Number(input.value) <= 1; plus.disabled = Number(input.value) >= 95; };
+    let timer = 0;
+    const save = async () => {
+      clearTimeout(timer);
+      const v = Number(input.value);
+      if (v === a.battery_warning_at) return;
+      if (!Number.isInteger(v) || v < 1 || v > 95) { input.value = a.battery_warning_at; ends(); return toast('Pick a level from 1% to 95%', true); }
+      try { appSettings = await api('/api/settings', { key: 'battery_warning_at', value: v }); toast('Low battery warning at ' + v + '%'); renderSettings(); }
+      catch (e) { input.value = a.battery_warning_at; ends(); toast(e.message, true); }
+    };
+    const step = by => {
+      input.value = Math.min(95, Math.max(1, (Number(input.value) || a.battery_warning_at) + by));
+      ends(); clearTimeout(timer); timer = setTimeout(save, 600);
+    };
+    minus.onclick = () => step(-1);
+    plus.onclick = () => step(1);
+    input.onchange = save;
+    input.oninput = ends;
+    input.onkeydown = e => { if (e.key === 'Enter') input.blur(); };
+    ends();
+    return el('span', { className: 'pct-box' }, minus, input, el('span', { className: 'unit', textContent: '%' }), plus);
+  };
   const checkOut = el('span', { className: 'out' });
   const checkBtn = el('button', { className: 'ghost', textContent: 'Check now', onclick: async () => {
     checkBtn.disabled = true; checkOut.textContent = 'Checking…';
@@ -2076,7 +2175,9 @@ function renderSettings() {
   } });
   const notes = group('Notifications and checks',
     row('DPI and profile popups', 'A small popup above the clock when DPI, the on-board profile or a game profile changes.', ...traySwitch('popups', 'DPI and profile popups')),
-    row('Low battery warning', 'A notification when a wireless device drops to 15%.', ...traySwitch('battery_warning', 'Low battery warning')),
+    row('Low battery warning', 'A notification when a wireless device drops to ' + a.battery_warning_at + '%.',
+      batteryLevel(),
+      ...traySwitch('battery_warning', 'Low battery warning')),
     row('New version notices', 'Once a day, asks GitHub whether a newer Secretarybird is out. Nothing else is sent.', checkOut, checkBtn, ...traySwitch('updates', 'New version notices')),
     row('Weekly firmware check', 'Once a week, asks Razer’s website whether newer firmware is out for your devices. It never installs anything.', ...traySwitch('firmware_weekly', 'Weekly firmware check')));
 
@@ -2144,24 +2245,42 @@ function renderOverview() {
   const zones = devices.reduce((n, d) => n + d.leds.length, 0);
   $('ovSummary').textContent = [plural(devices.length, 'device'), zones && plural(zones, 'lighting zone'),
     unsupported.length && unsupported.length + ' not controllable yet'].filter(Boolean).join(' · ');
-  const grid = $('ovGrid');
-  grid.innerHTML = '';
-  devices.forEach(d => {
-    const top = el('div', { className: 'dtop' }, el('h3', { textContent: devLabel(d) }));
+  // One card per device, under a heading per kind; groups with no devices are left out.
+  const card = d => {
+    const sub = el('div', { className: 'dsub' }, el('span', { className: 'ell', textContent: (KINDS[d.kind] || 'Device') + ' · ' + d.active }));
     if (d.battery != null) {
       const b = el('span', { className: 'batt num' + (d.battery < 20 ? ' low' : ''), innerHTML: '<b></b>' });
-      b.firstChild.style.setProperty('--lvl', d.battery / 100); b.append(d.battery + '%'); top.append(b);
+      b.firstChild.style.setProperty('--lvl', d.battery / 100); b.append(d.battery + '%'); sub.append(b);
     }
     const dots = el('div', { className: 'dots' });
-    const p = d.profile || {}, keys = p.keys;
-    const colors = keys && keys.length ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
+    const p = d.profile || {}, keys = p.keys, perKey = keys && keys.length;
+    const colors = perKey ? [...new Set(keys.filter(k => k !== '000000'))].slice(0, 8).map(k => ({ color: k })) : d.leds.map(l => zoneOf(p, l.name));
     if (d.lighting_control) colors.forEach(z => { const i = el('i'), paint = zonePaint(z); if (paint) i.style.background = paint; else i.className = 'off'; dots.append(i); });
-    else if (d.leds.length || d.matrix) dots.append(el('span', { className: 'hint', textContent: 'Lighting not controlled' }));
-    const meta = el('div', { className: 'dmeta num', textContent: [KINDS[d.kind] || 'Device', d.active, d.dpi && d.dpi.x + ' DPI', d.polling && hz(d.polling.hz), keys && keys.length && 'per-key'].filter(Boolean).join(' · ') });
-    grid.append(el('button', { className: 'dcard', onclick: () => openDevice(d) }, top, dots, meta));
-  });
-  unsupported.forEach(u => grid.append(el('div', { className: 'dcard muted' },
-    el('div', { className: 'dtop' }, el('h3', { textContent: u.name })), el('div', { className: 'dmeta', textContent: u.pid + ' · Connected · ' + u.reason }))));
+    const stats = [d.dpi && ['DPI', d.dpi.x], d.polling && ['Polling', hz(d.polling.hz)], perKey && ['Lighting', 'Per-key']].filter(Boolean);
+    if (!stats.length) stats.push(['Lighting', d.lighting_control ? plural(d.leds.length, 'zone') : (d.leds.length || d.matrix ? 'Not controlled' : 'None'), 'quiet']);
+    const foot = el('div', { className: 'dfoot' },
+      el('div', { className: 'dstats num' }, ...stats.map(([label, value, quiet]) => el('div', {}, el('small', { textContent: label }), el('b', { className: quiet || '', textContent: value })))),
+      dots);
+    return el('button', { className: 'dcard', onclick: () => openDevice(d) }, artTile(d),
+      el('div', { className: 'did' }, el('h3', { textContent: devLabel(d), title: devLabel(d) }), sub), foot);
+  };
+  const groups = [
+    ['Mice', 'mouse', d => d.kind === 'mouse'],
+    ['Keyboards and keypads', 'keyboard-tkl', d => d.kind === 'keyboard' || d.kind === 'keypad'],
+    ['Headsets', 'headset', d => d.kind === 'headset'],
+    ['Everything else', 'device', d => !['mouse', 'keyboard', 'keypad', 'headset'].includes(d.kind)],
+  ];
+  const box = $('ovGroups');
+  box.innerHTML = '';
+  const group = (title, art, cards) => {
+    if (!cards.length) return;
+    box.append(el('h2', { className: 'ov-group', innerHTML: `<svg class="dart" viewBox="0 0 24 24" aria-hidden="true">${ART[art]}</svg>` }, title, el('span', { textContent: '· ' + cards.length })),
+      el('div', { className: 'ov-grid' }, ...cards));
+  };
+  groups.forEach(([title, art, match]) => group(title, art, devices.filter(match).map(card)));
+  group('Connected, not controllable yet', 'device', unsupported.map(u => el('div', { className: 'dcard muted' }, artTile(u),
+    el('div', { className: 'did' }, el('h3', { textContent: u.name, title: u.name }), el('div', { className: 'dsub' }, el('span', { textContent: u.pid + ' · Connected' }))),
+    el('div', { className: 'dfoot' }, el('div', { className: 'dstats' }, el('div', {}, el('small', { textContent: 'Why' }), el('b', { className: 'quiet', textContent: u.reason })))))));
 }
 
 // ---------- Live updates, loading, global actions ----------
