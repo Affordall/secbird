@@ -679,12 +679,18 @@ fn device_json(dev: &Device) -> Value {
         "firmware": dev.firmware_version().ok(),
         // Read once at discovery; asking the device again costs a USB round trip per page load.
         "serial": (!dev.serial.is_empty()).then(|| dev.serial.clone()),
-        "dpi": dev.dpi().ok().map(|(x, y)| json!({
-            "x": x, "y": y,
-            "min": dpi_range.map_or(100, |r| r.min),
-            "max": dpi_range.map_or(20000, |r| r.max),
-            "step": dpi_range.map_or(50, |r| r.step),
-        })),
+        // Some keyboards acknowledge DPI reads but return zero; only mice have DPI.
+        // Keep probing unknown devices, as with polling and DPI stages.
+        "dpi": spec
+            .is_none_or(|s| s.kind == Kind::Mouse)
+            .then(|| dev.dpi().ok())
+            .flatten()
+            .map(|(x, y)| json!({
+                "x": x, "y": y,
+                "min": dpi_range.map_or(100, |r| r.min),
+                "max": dpi_range.map_or(20000, |r| r.max),
+                "step": dpi_range.map_or(50, |r| r.step),
+            })),
         // Mousepads and docks answer the polling question too, but have no polling rate to
         // set: only show it where the device list says there is one (or the model is unknown).
         "polling": spec
