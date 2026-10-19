@@ -128,7 +128,7 @@ COM worker and does not require vendor extension-unit control support.
 - [x] Failing parser/CLI tests written and observed before implementation.
 - [x] Implement read-only native enumeration and bounded driver-data parsing.
 - [x] Run full regression tests and cross-target checks; review changes.
-- [ ] Obtain Windows diagnostic output from the physical camera.
+- [x] Obtain Windows diagnostic output from the physical camera.
 
 Follow-up verification: 101 host unit tests and 1 doctest pass, with 2 existing
 live-network tests ignored; 20 JavaScript tests pass. Release clippy with warnings
@@ -141,5 +141,40 @@ media major type would reject a legitimate audio pin. Fixed with bounded generic
 buffer allocation followed by media classification and video-specific layout
 validation; mixed video/audio and malformed buffer regression tests pass. The
 diagnostic is also documented outside the CLI's saved-settings help category.
-Physical enumeration, busy/privacy behavior, hot-unplug, and driver-specific
-runtime behavior remain unverified until the Windows diagnostic is run.
+At implementation time, physical enumeration and driver runtime behavior were
+unverified. Busy/privacy behavior and hot-unplug still need physical testing.
+
+User-supplied Windows output now confirms native format enumeration reports
+1920x1080 at discrete 60 FPS for H264, MJPG, NV12, and YUY2. This verifies the
+reported enumeration result, not actual capture, saved defaults, or persistence.
+
+## Experimental native-format read/set follow-up
+
+Approved bounded addition: `camera format [--pin N]` reads the opened handle;
+`camera format WIDTHxHEIGHT FPS FOURCC [--pin N]` explicitly requests an
+advertised mode using SetFormat and checks same-handle readback. No graph is
+connected or run, and neither profiles nor Windows shared-camera defaults are
+written. Failed writes/readbacks attempt a verified rollback; failures are
+reported rather than silently retried.
+
+Persistence must be checked in a new process after the setter exits and all other
+camera apps/tray processes are closed. An unconnected pin may retain a format
+only in its own memory; success does not prove a global effect, and resetting on
+reopen does not disprove other device/driver persistence mechanisms.
+
+- [x] Request validation, discrete/range selection, CLI dispatch, and rollback tests
+  written first and observed failing before implementation.
+- [x] Run regression/cross-target checks and review changes.
+- [ ] Test native read/set and separate-process retention on the user's camera.
+
+Verification: 110 host unit tests plus 1 doctest pass, with 2 existing live-network
+tests ignored; 20 JavaScript tests pass. The host release build, host/Windows GNU
+release workspace all-targets clippy, Linux GNU release core/CLI all-targets
+clippy, new-module formatting, and whitespace checks pass.
+
+The read-only review found no critical or important issues. Its minor restoration
+precision finding was fixed with a failing-then-passing regression test: handle
+readback now includes an exact FPS ratio, so restoration need not use the rounded
+three-decimal display. Native acceptance, physical capture effects, busy/privacy
+and hot-unplug behavior, and cross-process retention still require Windows and
+hardware testing; same-handle success is not treated as evidence of persistence.

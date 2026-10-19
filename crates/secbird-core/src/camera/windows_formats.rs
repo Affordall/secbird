@@ -1,5 +1,5 @@
-//! Read-only DirectShow capability enumeration. Never connects/runs a graph or
-//! calls SetFormat; all interfaces and allocations stay on the COM worker.
+//! DirectShow capability enumeration and explicitly requested handle-format tests.
+//! No operation connects or runs a graph. SetFormat is confined to control::set.
 use super::{
     camera_id,
     formats::{
@@ -32,7 +32,16 @@ use windows::{
     },
 };
 
+pub(super) mod control;
+
 pub(super) fn for_camera(id: &str) -> Result<Vec<CameraFormat>> {
+    with_camera(id, enumerate)
+}
+
+pub(super) fn with_camera<T>(
+    id: &str,
+    operation: impl FnOnce(&IBaseFilter) -> Result<T>,
+) -> Result<T> {
     // SAFETY: invoked exclusively by the already COM-initialized camera worker.
     unsafe {
         let devices: ICreateDevEnum = CoCreateInstance(&DEVICE_ENUM, None, CLSCTX_INPROC_SERVER)
@@ -63,7 +72,7 @@ pub(super) fn for_camera(id: &str) -> Result<Vec<CameraFormat>> {
                 let filter: IBaseFilter = moniker
                     .BindToObject(None, None)
                     .map_err(|error| system("open camera for formats", error))?;
-                return enumerate(&filter);
+                return operation(&filter);
             }
         }
     }
@@ -113,6 +122,84 @@ fn pixel_format(subtype: GUID) -> String {
         }
     }
     format!("{subtype:?}")
+}
+
+/// Caller guarantees the media type and its format allocation came from a
+/// successful COM call and remain alive for the duration of this function.
+unsafe fn describe(media: &AM_MEDIA_TYPE, pin: u32) -> Result<Option<CameraFormat>> {
+    if media.majortype != MEDIATYPE_Video {
+        return Ok(None);
+    }
+    let header = if media.formattype == FORMAT_VideoInfo {
+        Header::VideoInfo
+    } else if media.formattype == FORMAT_VideoInfo2 {
+        Header::VideoInfo2
+    } else {
+        return Err(Error::Unsupported(format!(
+            "camera returned an unsupported native video header {:?}",
+            media.formattype
+        )));
+    };
+    if media.pbFormat.is_null() || media.cbFormat > 1024 * 1024 {
+        return Err(Error::System(
+            "camera returned a missing or oversized media format".into(),
+        ));
+    }
+    // SAFETY: pointer lifetime/allocation is the caller's contract; size is bounded,
+    // and parse_header checks minimum lengths and dimensions without aligned casts.
+    let dimensions = parse_header(header, unsafe {
+        std::slice::from_raw_parts(media.pbFormat, media.cbFormat as usize)
+    })?;
+    Ok(Some(CameraFormat {
+        pin,
+        width: dimensions.width,
+        height: dimensions.height,
+        pixel_format: pixel_format(media.subtype),
+        frame_interval_100ns: dimensions.frame_interval,
+        min_frame_interval_100ns: None,
+        max_frame_interval_100ns: None,
+        frame_intervals_100ns: Vec::new(),
+    }))
+}
+
+fn read_capability(
+    filter: &IBaseFilter,
+    pin: &IPin,
+    config: &IAMStreamConfig,
+    pin_index: u32,
+    index: i32,
+    buffer_size: usize,
+) -> Result<Option<(MediaType, CameraFormat)>> {
+    let mut buffer = vec![0u8; buffer_size];
+    let mut raw = ptr::null_mut();
+    // SAFETY: buffer has the exact size requested by the bounded capabilities query.
+    let result = unsafe { config.GetStreamCaps(index, &mut raw, buffer.as_mut_ptr()) };
+    let allocation = MediaType(raw);
+    result.map_err(|error| system("read native camera format", error))?;
+    if allocation.0.is_null() {
+        return Err(Error::System("camera returned a null media type".into()));
+    }
+    // SAFETY: successful GetStreamCaps provides the media type and its allocation.
+    let media = unsafe { &*allocation.0 };
+    if !check_video_capabilities(
+        media.majortype == MEDIATYPE_Video,
+        1,
+        buffer_size as i32,
+        size_of::<VIDEO_STREAM_CONFIG_CAPS>(),
+    )? {
+        return Ok(None);
+    }
+    // SAFETY: allocation guard outlives parsing, and layout was validated above.
+    let mut format =
+        unsafe { describe(media, pin_index) }?.expect("video media type checked above");
+    // SAFETY: the buffer has the checked ABI size, but may be unaligned.
+    let caps = unsafe { ptr::read_unaligned(buffer.as_ptr().cast::<VIDEO_STREAM_CONFIG_CAPS>()) };
+    if caps.MinFrameInterval > 0 && caps.MaxFrameInterval >= caps.MinFrameInterval {
+        format.min_frame_interval_100ns = Some(caps.MinFrameInterval as u64);
+        format.max_frame_interval_100ns = Some(caps.MaxFrameInterval as u64);
+    }
+    format.frame_intervals_100ns = frame_rates(filter, pin, index, format.width, format.height)?;
+    Ok(Some((allocation, format)))
 }
 
 fn frame_rates(
@@ -204,70 +291,11 @@ pub(super) fn enumerate(filter: &IBaseFilter) -> Result<Vec<CameraFormat>> {
                 .map_err(|error| system("read camera capabilities", error))?;
             let buffer_size = capability_buffer_size(count, bytes)?;
             for index in 0..count {
-                let mut buffer = vec![0u8; buffer_size];
-                let mut raw = ptr::null_mut();
-                let result = config.GetStreamCaps(index, &mut raw, buffer.as_mut_ptr());
-                let allocation = MediaType(raw);
-                result.map_err(|error| system("read native camera format", error))?;
-                if allocation.0.is_null() {
-                    return Err(Error::System("camera returned a null media type".into()));
-                }
-                let media = &*allocation.0;
-                if !check_video_capabilities(
-                    media.majortype == MEDIATYPE_Video,
-                    count,
-                    bytes,
-                    size_of::<VIDEO_STREAM_CONFIG_CAPS>(),
-                )? {
-                    continue;
-                }
-                let header = if media.formattype == FORMAT_VideoInfo {
-                    Header::VideoInfo
-                } else if media.formattype == FORMAT_VideoInfo2 {
-                    Header::VideoInfo2
-                } else {
-                    return Err(Error::Unsupported(format!(
-                        "camera returned an unsupported native video header {:?}",
-                        media.formattype
-                    )));
-                };
-                if media.pbFormat.is_null() || media.cbFormat > 1024 * 1024 {
-                    return Err(Error::System(
-                        "camera returned a missing or oversized media format".into(),
-                    ));
-                }
-                let dimensions = parse_header(
-                    header,
-                    std::slice::from_raw_parts(media.pbFormat, media.cbFormat as usize),
-                )?;
-                // The output buffer has exactly the checked ABI size, but may be unaligned.
-                let caps = ptr::read_unaligned(buffer.as_ptr().cast::<VIDEO_STREAM_CONFIG_CAPS>());
-                let (min, max) = if caps.MinFrameInterval > 0
-                    && caps.MaxFrameInterval >= caps.MinFrameInterval
+                if let Some((_allocation, format)) =
+                    read_capability(filter, &pin, &config, output_index, index, buffer_size)?
                 {
-                    (
-                        Some(caps.MinFrameInterval as u64),
-                        Some(caps.MaxFrameInterval as u64),
-                    )
-                } else {
-                    (None, None)
-                };
-                formats.push(CameraFormat {
-                    pin: output_index,
-                    width: dimensions.width,
-                    height: dimensions.height,
-                    pixel_format: pixel_format(media.subtype),
-                    frame_interval_100ns: dimensions.frame_interval,
-                    min_frame_interval_100ns: min,
-                    max_frame_interval_100ns: max,
-                    frame_intervals_100ns: frame_rates(
-                        filter,
-                        &pin,
-                        index,
-                        dimensions.width,
-                        dimensions.height,
-                    )?,
-                });
+                    formats.push(format);
+                }
             }
         }
     }

@@ -153,6 +153,13 @@ ports change. See [setup and hardware verification](docs/kiyo-pro-verification.m
 frame rates without changing settings or starting capture. It is a diagnostic,
 not a persistent resolution/FPS setting or a readback of Discord's capture mode.
 
+For an experimental native-handle read/set test, use `camera format` to read the
+newly opened handle, or `camera format 1280x720 30 MJPG` to request a mode and
+verify the same handle's readback. These commands never start a stream or save
+profiles, and do not promise a global default. See the
+[separate-process test procedure](docs/kiyo-pro-verification.md#experimental-native-format-retention-test)
+before changing a format.
+
 ## Moving from Synapse
 
 1. Close Synapse (tray icon → Exit). If both run, Synapse overwrites your settings, and

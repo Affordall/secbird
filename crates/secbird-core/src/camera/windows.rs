@@ -31,6 +31,12 @@ enum Request {
     Discover(Sender<Result<Vec<CameraInfo>>>),
     Set(String, Setting, Sender<Result<()>>),
     Formats(String, Sender<Result<Vec<super::formats::CameraFormat>>>),
+    Format(String, u32, Sender<Result<super::formats::CameraFormat>>),
+    SetFormat(
+        String,
+        super::formats::FormatRequest,
+        Sender<Result<super::formats::FormatChange>>,
+    ),
 }
 struct Worker {
     sender: Option<SyncSender<Request>>,
@@ -52,6 +58,21 @@ impl CameraBackend for Worker {
     fn formats(&self, id: &str) -> Result<Vec<super::formats::CameraFormat>> {
         worker::call(self.sender.as_ref().expect("live worker"), |reply| {
             Request::Formats(id.into(), reply)
+        })
+    }
+    fn format(&self, id: &str, pin: u32) -> Result<super::formats::CameraFormat> {
+        worker::call(self.sender.as_ref().expect("live worker"), |reply| {
+            Request::Format(id.into(), pin, reply)
+        })
+    }
+    fn set_format(
+        &self,
+        id: &str,
+        request: &super::formats::FormatRequest,
+    ) -> Result<super::formats::FormatChange> {
+        request.validate()?;
+        worker::call(self.sender.as_ref().expect("live worker"), |reply| {
+            Request::SetFormat(id.into(), request.clone(), reply)
         })
     }
 }
@@ -110,6 +131,28 @@ pub(super) fn start() -> Result<Box<dyn CameraBackend>> {
                             let result = match cameras.get(&id) {
                                 Some(camera) => super::windows_formats::enumerate(&camera._filter),
                                 None => super::windows_formats::for_camera(&id),
+                            };
+                            let _ = reply.send(result);
+                        }
+                        Request::Format(id, pin, reply) => {
+                            let result = match cameras.get(&id) {
+                                Some(camera) => {
+                                    super::windows_formats::control::read(&camera._filter, pin)
+                                }
+                                None => super::windows_formats::with_camera(&id, |filter| {
+                                    super::windows_formats::control::read(filter, pin)
+                                }),
+                            };
+                            let _ = reply.send(result);
+                        }
+                        Request::SetFormat(id, request, reply) => {
+                            let result = match cameras.get(&id) {
+                                Some(camera) => {
+                                    super::windows_formats::control::set(&camera._filter, &request)
+                                }
+                                None => super::windows_formats::with_camera(&id, |filter| {
+                                    super::windows_formats::control::set(filter, &request)
+                                }),
                             };
                             let _ = reply.send(result);
                         }

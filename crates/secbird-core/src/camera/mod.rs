@@ -34,6 +34,22 @@ pub trait CameraBackend: Send {
             "native camera format diagnostics require Windows and a compatible driver".into(),
         ))
     }
+    /// The newly opened handle's format, not another app's live capture format.
+    fn format(&self, _id: &str, _pin: u32) -> Result<formats::CameraFormat> {
+        Err(Error::Unsupported(
+            "native camera format readback requires Windows and a compatible driver".into(),
+        ))
+    }
+    /// Experimental handle-local SetFormat; no global persistence is promised.
+    fn set_format(
+        &self,
+        _id: &str,
+        _request: &formats::FormatRequest,
+    ) -> Result<formats::FormatChange> {
+        Err(Error::Unsupported(
+            "native camera format changes require Windows and a compatible driver".into(),
+        ))
+    }
 }
 
 pub fn backend() -> Result<Box<dyn CameraBackend>> {

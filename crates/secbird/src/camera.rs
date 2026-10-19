@@ -1,5 +1,9 @@
 use secbird_core::{
-    camera::{actions, parse_setting, CameraBackend, CameraInfo, Setting},
+    camera::{
+        actions,
+        formats::{CameraFormat, FormatRequest},
+        parse_setting, CameraBackend, CameraInfo, Setting,
+    },
     Error, Result, Store,
 };
 
@@ -36,6 +40,56 @@ fn parse_command(args: &[String]) -> Result<Setting> {
     parse_setting(control, value)
 }
 
+enum NativeFormatCommand {
+    Read(u32),
+    Set(FormatRequest),
+}
+
+fn parse_native_format(args: &[String]) -> Result<NativeFormatCommand> {
+    let usage =
+        || Error::InvalidArg("usage: camera format [WIDTHxHEIGHT FPS FOURCC] [--pin N]".into());
+    let (args, pin) = if args.len() >= 2 && args[args.len() - 2] == "--pin" {
+        let pin = args[args.len() - 1].parse::<u32>().map_err(|_| usage())?;
+        (&args[..args.len() - 2], pin)
+    } else {
+        (args, 0)
+    };
+    if pin >= 64 {
+        return Err(usage());
+    }
+    match args {
+        [] => Ok(NativeFormatCommand::Read(pin)),
+        [dimensions, fps, pixel] => {
+            let (width, height) = dimensions.split_once(['x', 'X']).ok_or_else(usage)?;
+            Ok(NativeFormatCommand::Set(FormatRequest::new(
+                pin,
+                width.parse().map_err(|_| usage())?,
+                height.parse().map_err(|_| usage())?,
+                fps,
+                pixel,
+            )?))
+        }
+        _ => Err(usage()),
+    }
+}
+
+fn handle_format(format: &CameraFormat) -> String {
+    let fps = format
+        .frame_interval_100ns
+        .filter(|interval| *interval > 0)
+        .map(|interval| {
+            format!(
+                "{:.3} (exact FPS 10000000/{interval})",
+                10_000_000.0 / interval as f64
+            )
+        })
+        .unwrap_or_else(|| "unknown".into());
+    format!(
+        "pin {}  {}x{}  {}  handle FPS {fps}",
+        format.pin, format.width, format.height, format.pixel_format
+    )
+}
+
 pub(crate) fn run(
     backend: &dyn CameraBackend,
     camera: &CameraInfo,
@@ -44,6 +98,32 @@ pub(crate) fn run(
     store: &mut Store,
 ) -> Result<()> {
     match command {
+        "camera" if args.first().is_some_and(|arg| arg == "format") => {
+            match parse_native_format(&args[1..])? {
+                NativeFormatCommand::Read(pin) => {
+                    let format = backend.format(&camera.id, pin)?;
+                    println!("Opened-handle format (not another app's stream or a proven global default):\n  {}", handle_format(&format));
+                }
+                NativeFormatCommand::Set(request) => {
+                    println!("Experimental native-handle change; no persistent or cross-application effect is promised.");
+                    let change = backend.set_format(&camera.id, &request)?;
+                    if !request.matches(&change.current) {
+                        return Err(Error::System(
+                            "native format readback does not match the request".into(),
+                        ));
+                    }
+                    println!(
+                        "Before: {}\nAfter:  {}",
+                        handle_format(&change.previous),
+                        handle_format(&change.current)
+                    );
+                    println!("SetFormat and same-handle readback succeeded. After this process exits, run camera format in a NEW invocation to test retention.");
+                    println!("An unconnected pin may store this only in memory. Losing it on reopen does not rule out other device-specific persistence mechanisms.");
+                }
+            }
+            println!("No profiles saved; no stream started. Close other camera apps and the tray for a clean persistence test.");
+            Ok(())
+        }
         "camera" if args.first().is_some_and(|arg| arg == "formats") => {
             if args.len() != 1 {
                 return Err(Error::InvalidArg("usage: camera formats".into()));
@@ -155,6 +235,127 @@ fn profile_cmd(
 mod tests {
     use super::*;
     use secbird_core::camera::{CameraInfo, FieldOfView, Setting};
+
+    #[test]
+    fn camera_native_format_readback_keeps_exact_rate_for_manual_restore() {
+        let value = CameraFormat {
+            pin: 0,
+            width: 1920,
+            height: 1080,
+            pixel_format: "MJPG".into(),
+            frame_interval_100ns: Some(1_334_667),
+            min_frame_interval_100ns: None,
+            max_frame_interval_100ns: None,
+            frame_intervals_100ns: vec![],
+        };
+        let text = handle_format(&value);
+        assert!(text.contains("10000000/1334667"));
+        assert_eq!(
+            FormatRequest::new(0, 1920, 1080, "10000000/1334667", "MJPG")
+                .unwrap()
+                .frame_interval_100ns,
+            1_334_667
+        );
+    }
+
+    #[test]
+    fn camera_native_format_command_parses_read_set_and_pin_without_profile_writes() {
+        use secbird_core::camera::formats::{CameraFormat, FormatChange, FormatRequest};
+        use std::sync::Mutex;
+        struct Native {
+            calls: Mutex<Vec<String>>,
+        }
+        fn mode() -> CameraFormat {
+            CameraFormat {
+                pin: 0,
+                width: 1280,
+                height: 720,
+                pixel_format: "MJPG".into(),
+                frame_interval_100ns: Some(333_333),
+                min_frame_interval_100ns: None,
+                max_frame_interval_100ns: None,
+                frame_intervals_100ns: vec![],
+            }
+        }
+        impl CameraBackend for Native {
+            fn discover(&self) -> Result<Vec<CameraInfo>> {
+                panic!("unexpected rediscovery")
+            }
+            fn set(&self, _: &str, _: Setting) -> Result<()> {
+                panic!("unexpected vendor-control write")
+            }
+            fn format(&self, id: &str, pin: u32) -> Result<CameraFormat> {
+                self.calls.lock().unwrap().push(format!("get {id} {pin}"));
+                let mut value = mode();
+                value.pin = pin;
+                Ok(value)
+            }
+            fn set_format(&self, id: &str, request: &FormatRequest) -> Result<FormatChange> {
+                self.calls.lock().unwrap().push(format!(
+                    "set {id} {} {}x{} {}",
+                    request.pin, request.width, request.height, request.pixel_format
+                ));
+                assert_eq!(request.frame_interval_100ns, 333_333);
+                let mut value = mode();
+                value.pin = request.pin;
+                Ok(FormatChange {
+                    previous: value.clone(),
+                    current: value,
+                })
+            }
+        }
+        let backend = Native {
+            calls: Mutex::new(vec![]),
+        };
+        let camera = CameraInfo {
+            id: "camera:test".into(),
+            pid: 0x0e05,
+            name: "Kiyo Pro".into(),
+            control_error: None,
+        };
+        let mut store = Store::default();
+        for args in [
+            vec!["format"],
+            vec!["format", "--pin", "1"],
+            vec!["format", "1280x720", "30", "MJPG"],
+            vec!["format", "1280x720", "30", "MJPG", "--pin", "1"],
+        ] {
+            run(
+                &backend,
+                &camera,
+                "camera",
+                &args.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+                &mut store,
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            *backend.calls.lock().unwrap(),
+            vec![
+                "get camera:test 0",
+                "get camera:test 1",
+                "set camera:test 0 1280x720 MJPG",
+                "set camera:test 1 1280x720 MJPG"
+            ]
+        );
+        assert!(store.devices.is_empty());
+        for args in [
+            vec!["format", "1280x720"],
+            vec!["format", "1280x720", "NaN", "MJPG"],
+            vec!["format", "1280x720", "30", "MJPG", "extra"],
+            vec!["format", "--pin", "64"],
+        ] {
+            assert!(run(
+                &backend,
+                &camera,
+                "camera",
+                &args.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+                &mut store
+            )
+            .is_err());
+        }
+        assert_eq!(backend.calls.lock().unwrap().len(), 4);
+    }
 
     #[test]
     fn camera_formats_command_never_writes_controls_or_profiles() {
