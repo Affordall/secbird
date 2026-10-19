@@ -39,7 +39,8 @@ and physical-camera validation remain outstanding. See
 ## Verification so far
 
 - macOS release workspace build: passed.
-- macOS release workspace tests: 94 unit tests and 1 doctest passed; 2 existing
+- macOS release workspace tests: 95 unit tests, 1 CLI integration test, and 1
+  doctest passed; 2 existing
   live-network tests ignored.
 - Browser lifecycle/profile-race tests: 20 passed using Node 22.
 - Release clippy with warnings denied: passed on macOS and cross-checked for
@@ -116,65 +117,21 @@ access, and Windows runtime behavior remain unverified rather than waived.
    compatibility, concurrent control/capture access, or Windows runtime behavior.
    These remain unverified, not waived; native testing may require adjustments.
 
-## Native-format diagnostic follow-up
+## Native resolution/FPS experiment removed
 
-Approved bounded addition: `secbird -d 0E05 camera formats` lists native
-driver-advertised output formats without selecting formats or starting capture.
-It reports pixel subtypes, resolutions, nominal intervals, advertised interval
-bounds, and explicit discrete rates when available. Capability bounds are not
-expanded into invented supported combinations. Enumeration runs on the existing
-COM worker and does not require vendor extension-unit control support.
+Removed the experimental device-format read/set commands and investigation-only
+format enumeration at the user's request. The associated COM requests, parser,
+media-type allocations, format-specific Windows binding features, and active
+documentation were removed as well. The experiment did not retain the selected
+mode across the user's separate-process test; it was not a global camera setting.
 
-- [x] Failing parser/CLI tests written and observed before implementation.
-- [x] Implement read-only native enumeration and bounded driver-data parsing.
-- [x] Run full regression tests and cross-target checks; review changes.
-- [x] Obtain Windows diagnostic output from the physical camera.
+HDR, HDR mode, field of view, autofocus strategy, profiles, and browser live
+preview remain unchanged. Preview-only format choices remain local to the browser
+session; they do not configure a device-wide capture mode.
 
-Follow-up verification: 101 host unit tests and 1 doctest pass, with 2 existing
-live-network tests ignored; 20 JavaScript tests pass. Release clippy with warnings
-denied passes on macOS and for Windows GNU workspace/all targets and Linux GNU
-core/CLI/all targets. Windows ABI/subtype tests compile in the native target but
-cannot execute on this Mac.
-
-The read-only review found that checking the video capability layout before the
-media major type would reject a legitimate audio pin. Fixed with bounded generic
-buffer allocation followed by media classification and video-specific layout
-validation; mixed video/audio and malformed buffer regression tests pass. The
-diagnostic is also documented outside the CLI's saved-settings help category.
-At implementation time, physical enumeration and driver runtime behavior were
-unverified. Busy/privacy behavior and hot-unplug still need physical testing.
-
-User-supplied Windows output now confirms native format enumeration reports
-1920x1080 at discrete 60 FPS for H264, MJPG, NV12, and YUY2. This verifies the
-reported enumeration result, not actual capture, saved defaults, or persistence.
-
-## Experimental native-format read/set follow-up
-
-Approved bounded addition: `camera format [--pin N]` reads the opened handle;
-`camera format WIDTHxHEIGHT FPS FOURCC [--pin N]` explicitly requests an
-advertised mode using SetFormat and checks same-handle readback. No graph is
-connected or run, and neither profiles nor Windows shared-camera defaults are
-written. Failed writes/readbacks attempt a verified rollback; failures are
-reported rather than silently retried.
-
-Persistence must be checked in a new process after the setter exits and all other
-camera apps/tray processes are closed. An unconnected pin may retain a format
-only in its own memory; success does not prove a global effect, and resetting on
-reopen does not disprove other device/driver persistence mechanisms.
-
-- [x] Request validation, discrete/range selection, CLI dispatch, and rollback tests
-  written first and observed failing before implementation.
-- [x] Run regression/cross-target checks and review changes.
-- [ ] Test native read/set and separate-process retention on the user's camera.
-
-Verification: 110 host unit tests plus 1 doctest pass, with 2 existing live-network
-tests ignored; 20 JavaScript tests pass. The host release build, host/Windows GNU
-release workspace all-targets clippy, Linux GNU release core/CLI all-targets
-clippy, new-module formatting, and whitespace checks pass.
-
-The read-only review found no critical or important issues. Its minor restoration
-precision finding was fixed with a failing-then-passing regression test: handle
-readback now includes an exact FPS ratio, so restoration need not use the rounded
-three-decimal display. Native acceptance, physical capture effects, busy/privacy
-and hot-unplug behavior, and cross-process retention still require Windows and
-hardware testing; same-handle success is not treated as evidence of persistence.
+Regression tests reject the removed commands without device/profile writes and
+check that CLI help exposes the supported controls rather than the experiment.
+Both regression tests failed before removal and pass afterward. The release
+build, host/Windows/Linux cross-target clippy checks, and all 20 JavaScript tests
+pass. The removal review found no actionable issues; native driver runtime
+behavior remains outside the local macOS verification.

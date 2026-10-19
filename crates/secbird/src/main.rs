@@ -18,13 +18,6 @@ DEVICE:
                             (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
-  camera formats            Read-only native driver resolution/FPS/pixel-format list
-  camera format [--pin N]    Read the newly opened handle's format (not Discord's stream)
-
-EXPERIMENTAL CAMERA FORMAT (Windows; not saved to profiles):
-  camera format WIDTHxHEIGHT FPS FOURCC [--pin N]
-                            Set and verify this handle's format; no stream started.
-                            Global or cross-process persistence is not guaranteed.
 
 SETTINGS (saved to the active profile):
   camera [<control> <value>] Kiyo Pro (Windows): hdr on|off, hdr-mode dark|bright,

@@ -23,20 +23,13 @@ use windows::{
     },
 };
 
-pub(super) const DEVICE_ENUM: GUID = GUID::from_u128(0x62be5d10_60eb_11d0_bd3b_00a0c911ce86);
-pub(super) const VIDEO_CATEGORY: GUID = GUID::from_u128(0x860bb310_5d01_11d0_bd3b_00a0c911ce86);
+const DEVICE_ENUM: GUID = GUID::from_u128(0x62be5d10_60eb_11d0_bd3b_00a0c911ce86);
+const VIDEO_CATEGORY: GUID = GUID::from_u128(0x860bb310_5d01_11d0_bd3b_00a0c911ce86);
 const EXTENSION: GUID = GUID::from_u128(0x23e49ed0_1178_4f31_ae52_d2fb8a8d3b48);
 
 enum Request {
     Discover(Sender<Result<Vec<CameraInfo>>>),
     Set(String, Setting, Sender<Result<()>>),
-    Formats(String, Sender<Result<Vec<super::formats::CameraFormat>>>),
-    Format(String, u32, Sender<Result<super::formats::CameraFormat>>),
-    SetFormat(
-        String,
-        super::formats::FormatRequest,
-        Sender<Result<super::formats::FormatChange>>,
-    ),
 }
 struct Worker {
     sender: Option<SyncSender<Request>>,
@@ -55,26 +48,6 @@ impl CameraBackend for Worker {
             Request::Set(id.into(), setting, reply)
         })
     }
-    fn formats(&self, id: &str) -> Result<Vec<super::formats::CameraFormat>> {
-        worker::call(self.sender.as_ref().expect("live worker"), |reply| {
-            Request::Formats(id.into(), reply)
-        })
-    }
-    fn format(&self, id: &str, pin: u32) -> Result<super::formats::CameraFormat> {
-        worker::call(self.sender.as_ref().expect("live worker"), |reply| {
-            Request::Format(id.into(), pin, reply)
-        })
-    }
-    fn set_format(
-        &self,
-        id: &str,
-        request: &super::formats::FormatRequest,
-    ) -> Result<super::formats::FormatChange> {
-        request.validate()?;
-        worker::call(self.sender.as_ref().expect("live worker"), |reply| {
-            Request::SetFormat(id.into(), request.clone(), reply)
-        })
-    }
 }
 impl Drop for Worker {
     fn drop(&mut self) {
@@ -85,7 +58,7 @@ impl Drop for Worker {
     }
 }
 
-pub(super) fn system(context: &str, error: windows::core::Error) -> Error {
+fn system(context: &str, error: windows::core::Error) -> Error {
     Error::System(format!("camera {context}: {error} (HRESULT {:08X}); check camera access or close other camera apps", error.code().0 as u32))
 }
 
@@ -125,37 +98,6 @@ pub(super) fn start() -> Result<Box<dyn CameraBackend>> {
                             }
                             let _ = reply.send(result);
                         }
-                        Request::Formats(id, reply) => {
-                            // Independent of vendor-control support: even cameras whose
-                            // extension node could not open can expose native video formats.
-                            let result = match cameras.get(&id) {
-                                Some(camera) => super::windows_formats::enumerate(&camera._filter),
-                                None => super::windows_formats::for_camera(&id),
-                            };
-                            let _ = reply.send(result);
-                        }
-                        Request::Format(id, pin, reply) => {
-                            let result = match cameras.get(&id) {
-                                Some(camera) => {
-                                    super::windows_formats::control::read(&camera._filter, pin)
-                                }
-                                None => super::windows_formats::with_camera(&id, |filter| {
-                                    super::windows_formats::control::read(filter, pin)
-                                }),
-                            };
-                            let _ = reply.send(result);
-                        }
-                        Request::SetFormat(id, request, reply) => {
-                            let result = match cameras.get(&id) {
-                                Some(camera) => {
-                                    super::windows_formats::control::set(&camera._filter, &request)
-                                }
-                                None => super::windows_formats::with_camera(&id, |filter| {
-                                    super::windows_formats::control::set(filter, &request)
-                                }),
-                            };
-                            let _ = reply.send(result);
-                        }
                     }
                 }
             } // Release filters and node interfaces before CoUninitialize.
@@ -180,7 +122,7 @@ pub(super) fn start() -> Result<Box<dyn CameraBackend>> {
     }
 }
 
-pub(super) fn property(bag: &IPropertyBag, key: PCWSTR) -> windows::core::Result<String> {
+fn property(bag: &IPropertyBag, key: PCWSTR) -> windows::core::Result<String> {
     let mut value = VARIANT::default();
     unsafe {
         bag.Read(key, &mut value, None)?;

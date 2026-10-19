@@ -59,29 +59,6 @@ available without video preview, subject to the driver's access rules.
 
 ## Multiple cameras and diagnostics
 
-To inspect native video formats without changing settings or starting a stream:
-
-```powershell
-.\target\release\secbird.exe -d 0E05 camera formats
-```
-
-Close other camera applications and the Windows camera-settings preview first
-if the driver reports that the camera is busy. The diagnostic works independently
-of Kiyo Pro extension-unit control support; an unavailable vendor control does
-not by itself prevent format enumeration.
-
-Each row identifies a filter output pin, resolution, and pixel format (FourCC
-such as MJPG/YUY2, or a subtype GUID). **Listed FPS** comes from that advertised
-media type, not the currently running camera. **Advertised range** comes from
-the driver's interval bounds; it does not guarantee every intermediate rate.
-**Discrete FPS** appears only when the driver supplies an explicit rate list.
-If no discrete list appears, no discrete rates were inferred from the range.
-
-This command does not call SetFormat, save profiles, enable Windows multi-app
-mode, or apply a preferred camera format. Native advertised formats can differ
-from the formats Windows exposes in its shared-camera settings. The output
-cannot establish what format Discord currently captures or transmits.
-
 Use `secbird list` to find full camera identities and quote them when passing
 `-d`. A bare `0E05` is rejected when more than one camera matches. Profiles are
 separate per device path; changing USB ports can change that identity.
@@ -89,64 +66,6 @@ separate per device path; changing USB ports can change that identity.
 `secbird report` and `secbird report --json` include read-only camera diagnostics
 with anonymous IDs, not full device paths. Avoid pasting the full `list` output
 publicly without checking it: camera identities can contain serial information.
-
-## Experimental native-format retention test
-
-This tests DirectShow's native handle configuration, not a documented global
-Kiyo Pro setting. On an unconnected pin, `SetFormat` can store a choice only in
-the filter's memory. A matching immediate readback does not prove the physical
-camera is capturing at that rate. A reset after reopening does not rule out
-other persistence mechanisms used by Synapse.
-
-1. Exit Secretarybird's tray app completely. Close Discord, other camera apps,
-   browser previews, and Windows' camera settings page so they do not retain
-   capture handles during the test.
-2. Read and save the initial handle format:
-
-   ```powershell
-   .\target\release\secbird.exe -d 0E05 camera format
-   ```
-
-   Save the **exact FPS** ratio printed alongside the rounded FPS. If FPS is
-   unknown, stop and share that output rather than changing the format yet.
-
-3. Explicitly request a different advertised mode, for example:
-
-   ```powershell
-   .\target\release\secbird.exe -d 0E05 camera format 1280x720 30 MJPG
-   ```
-
-   The command prints the previous format and the same-handle readback. It
-   rejects unadvertised resolution/subtype combinations and unlisted discrete
-   rates. If only interval bounds are available, the driver decides whether the
-   requested in-range rate is valid. A write or verification failure triggers
-   an attempt to restore the original handle format; rollback failure is
-   explicitly reported. No command retries writes automatically.
-
-4. Wait until that command exits, then run a **separate invocation**:
-
-   ```powershell
-   .\target\release\secbird.exe -d 0E05 camera format
-   ```
-
-   Each invocation opens a handle; the prior process closes its COM objects on
-   exit. Report all three outputs. Do not infer persistence from the setter's
-   immediate readback or from another app's output resolution.
-
-5. Restore the initial mode explicitly using the original dimensions, FPS, and
-   pixel format from step 2. Prefer its exact FPS ratio for restoration rather
-   than a rounded decimal. For example, **only if these match the initial values**:
-
-   ```powershell
-   .\target\release\secbird.exe -d 0E05 camera format 1920x1080 10000000/166667 MJPG
-   ```
-
-Pin 0 is used by default. Append `--pin N` to either read or set another filter
-output pin shown by `camera formats`. FPS can be a positive decimal or a ratio,
-such as `60000/1001`; pixel format accepts the reported FourCC or subtype GUID.
-Nothing is stored in Secretarybird profiles or Windows' preferred-media-type
-configuration, and no stream is started. Actual driver behavior and cross-process
-retention remain experimental until tested on the physical camera.
 
 ## Automated verification
 

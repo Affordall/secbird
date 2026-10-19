@@ -146,23 +146,11 @@ secbird list
 secbird -d 0E05 camera fov wide
 secbird -d 0E05 camera hdr on
 secbird -d 0E05 camera af-mode passive
-secbird -d 0E05 camera formats
 ```
 
 With multiple Kiyo Pros, use the full camera identity from `list`, quoted in your
 shell. Identities are tied to the Windows device path and can change when USB
 ports change. See [setup and hardware verification](docs/kiyo-pro-verification.md).
-
-`camera formats` lists native driver-advertised resolutions, pixel formats, and
-frame rates without changing settings or starting capture. It is a diagnostic,
-not a persistent resolution/FPS setting or a readback of Discord's capture mode.
-
-For an experimental native-handle read/set test, use `camera format` to read the
-newly opened handle, or `camera format 1280x720 30 MJPG` to request a mode and
-verify the same handle's readback. These commands never start a stream or save
-profiles, and do not promise a global default. See the
-[separate-process test procedure](docs/kiyo-pro-verification.md#experimental-native-format-retention-test)
-before changing a format.
 
 ## Moving from Synapse
 
