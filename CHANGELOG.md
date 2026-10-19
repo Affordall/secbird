@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.7] - 2026-10-19
+
+### Added
+- BlackWidow V4 Low-Profile HyperSpeed on the cable (#31, thanks lukethehawk). The wireless one
+  is now named "(Wireless)" so the two read apart when both are connected.
+
+### Fixed
+- Keyboards no longer show a "0 DPI" control (#32, thanks lukethehawk). Only mice have DPI.
+
 ## [0.4.6] - 2026-10-18
 
 ### Added

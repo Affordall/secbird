@@ -187,6 +187,9 @@ run `secbird report` and [open a device report](https://github.com/infinityInfin
 saying what works and what doesn't. The report only reads from your devices and shortens serial
 numbers. Reports are how devices move from "listed" to "verified".
 
+Please send a report rather than a pull request that edits `devices.json`: the report shows every
+value the device answers with, so each entry can be checked against it before it ships.
+
 ### Verified on real hardware
 
 **Mice**
@@ -199,6 +202,7 @@ numbers. Reports are how devices move from "listed" to "verified".
 
 **Keyboards and keypads**
 - BlackWidow 2019 ([#12](https://github.com/infinityInfinite/secbird/issues/12))
+- BlackWidow V4 Low-Profile HyperSpeed, wireless and wired ([#28](https://github.com/infinityInfinite/secbird/pull/28), [#31](https://github.com/infinityInfinite/secbird/pull/31))
 - Cynosa V2
 - Tartarus V2 ([#14](https://github.com/infinityInfinite/secbird/issues/14))
 
