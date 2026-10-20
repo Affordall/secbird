@@ -10,6 +10,8 @@ pub mod controls;
 mod protocol;
 #[cfg(windows)]
 mod windows;
+#[cfg(windows)]
+mod windows_controls;
 #[cfg(any(windows, test))]
 mod worker;
 

@@ -1,5 +1,6 @@
 //! Windows UVC controls through the inbox driver, owned by a single COM thread.
 use super::{
+    controls::{Control, ControlInfo, ControlState, ControlValue},
     camera_id, is_kiyo_pro_path, protocol, worker, CameraBackend, CameraInfo, Setting, KIYO_PRO_PID,
 };
 use crate::{Error, Result};
@@ -30,6 +31,8 @@ const EXTENSION: GUID = GUID::from_u128(0x23e49ed0_1178_4f31_ae52_d2fb8a8d3b48);
 enum Request {
     Discover(Sender<Result<Vec<CameraInfo>>>),
     Set(String, Setting, Sender<Result<()>>),
+    Controls(String, Sender<Result<Vec<ControlInfo>>>),
+    SetControl(String, Control, ControlValue, Sender<Result<ControlState>>),
 }
 struct Worker {
     sender: Option<SyncSender<Request>>,
@@ -48,6 +51,12 @@ impl CameraBackend for Worker {
             Request::Set(id.into(), setting, reply)
         })
     }
+    fn controls(&self, id: &str) -> Result<Vec<ControlInfo>> {
+        worker::call(self.sender.as_ref().expect("live worker"), |reply| Request::Controls(id.into(), reply))
+    }
+    fn set_control(&self, id: &str, control: Control, value: ControlValue) -> Result<ControlState> {
+        worker::call(self.sender.as_ref().expect("live worker"), |reply| Request::SetControl(id.into(), control, value, reply))
+    }
 }
 impl Drop for Worker {
     fn drop(&mut self) {
@@ -58,7 +67,7 @@ impl Drop for Worker {
     }
 }
 
-fn system(context: &str, error: windows::core::Error) -> Error {
+pub(super) fn system(context: &str, error: windows::core::Error) -> Error {
     Error::System(format!("camera {context}: {error} (HRESULT {:08X}); check camera access or close other camera apps", error.code().0 as u32))
 }
 
@@ -91,11 +100,22 @@ pub(super) fn start() -> Result<Box<dyn CameraBackend>> {
                                     Error::NotFound("camera disconnected; rescan devices".into())
                                 })
                                 .and_then(|camera| {
-                                    protocol::send_setting(setting, |payload| camera.write(payload))
+                                    let vendor = camera.vendor.as_ref().map_err(|error| Error::Unsupported(error.clone()))?;
+                                    protocol::send_setting(setting, |payload| vendor.write(payload))
                                 });
-                            if result.is_err() {
-                                cameras.remove(&id);
+                            if let Err(error) = &result {
+                                if let Some(camera) = cameras.get_mut(&id) { camera.vendor = Err(error.to_string()); }
                             }
+                            let _ = reply.send(result);
+                        }
+                        Request::Controls(id, reply) => {
+                            let result = cameras.get(&id).map(|camera| super::windows_controls::list(&camera.filter))
+                                .ok_or_else(|| Error::NotFound("camera disconnected; rescan devices".into()));
+                            let _ = reply.send(result);
+                        }
+                        Request::SetControl(id, control, value, reply) => {
+                            let result = cameras.get(&id).ok_or_else(|| Error::NotFound("camera disconnected; rescan devices".into()))
+                                .and_then(|camera| super::windows_controls::set(&camera.filter, control, value));
                             let _ = reply.send(result);
                         }
                     }
@@ -170,12 +190,13 @@ fn enumerate(cameras: &mut BTreeMap<String, NativeCamera>) -> Result<Vec<CameraI
             }
             let native = moniker
                 .BindToObject::<_, _, IBaseFilter>(None, None)
-                .map_err(|e| system("open Kiyo Pro", e))
-                .and_then(NativeCamera::open);
+                .map_err(|e| system("open Kiyo Pro", e));
             let control_error = match native {
-                Ok(camera) => {
-                    cameras.insert(id.clone(), camera);
-                    None
+                Ok(filter) => {
+                    let vendor = VendorControl::open(filter.clone()).map_err(|error| error.to_string());
+                    let error = vendor.as_ref().err().cloned();
+                    cameras.insert(id.clone(), NativeCamera { filter, vendor });
+                    error
                 }
                 Err(e) => Some(e.to_string()),
             };
@@ -194,7 +215,11 @@ fn enumerate(cameras: &mut BTreeMap<String, NativeCamera>) -> Result<Vec<CameraI
 }
 
 struct NativeCamera {
-    _filter: IBaseFilter,
+    filter: IBaseFilter,
+    vendor: std::result::Result<VendorControl, String>,
+}
+
+struct VendorControl {
     control: IKsControl,
     node: u32,
 }
@@ -222,7 +247,7 @@ fn validate_metadata(access: u32, returned: u32, length: u32) -> Result<()> {
     Ok(())
 }
 
-impl NativeCamera {
+impl VendorControl {
     fn open(filter: IBaseFilter) -> Result<Self> {
         unsafe {
             let topology: IKsTopologyInfo = filter
@@ -254,7 +279,6 @@ impl NativeCamera {
                 }
                 let control = IKsControl::from_raw(raw);
                 let camera = Self {
-                    _filter: filter.clone(),
                     control,
                     node,
                 };
