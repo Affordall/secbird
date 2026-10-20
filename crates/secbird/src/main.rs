@@ -16,6 +16,8 @@ DEVICE:
                             (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
+  dock-test <red|spectrum|battery|off>
+                            Test: set a Mouse Dock Pro's own light once (#39)
 
 SETTINGS (saved to the active profile):
   dpi [X[xY]]               Show or set DPI (e.g. 1600 or 1600x800)
@@ -183,6 +185,10 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
             print!("{report}");
         }
         return Ok(());
+    }
+
+    if command == "dock-test" {
+        return dock_test(&devices, args.get(1).map(String::as_str));
     }
 
     if command == "list" {
@@ -614,6 +620,26 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
         }
         _ => Err(Error::InvalidArg("usage: button [list] | button <button> <action|reset> [--hypershift]".into())),
     }
+}
+
+/// One write to a mouse dock's own light, to check what Synapse's dock code says: effect
+/// 0F:02 on LED 15, sent with the dock's transaction id (#39).
+fn dock_test(devices: &[Device], what: Option<&str>) -> Result<(), Error> {
+    use secbird_core::device::{DOCK_LED, DOCK_TXID};
+    let args: &[u8] = match what {
+        Some("red") => &[1, DOCK_LED, 0x01, 0, 0, 1, 0xFF, 0, 0],
+        Some("spectrum") => &[1, DOCK_LED, 0x03, 0, 0, 0],
+        Some("battery") => &[1, DOCK_LED, 0x0E, 0, 0, 0],
+        Some("off") => &[1, DOCK_LED, 0x00, 0, 0, 0],
+        _ => return Err(Error::InvalidArg("usage: dock-test red|spectrum|battery|off".into())),
+    };
+    let dock = devices.iter().find(|d| d.is_mouse_dock()).ok_or_else(|| Error::NotFound("a Mouse Dock Pro".into()))?;
+    let command = secbird_core::commands::MATRIX_EFFECT;
+    match dock.transact_as(DOCK_TXID, command, args.len() as u8, args) {
+        Ok(_) => println!("The dock accepted {command} with txid {DOCK_TXID:02X}. Did its light change?"),
+        Err(e) => println!("The dock didn't take it: {e}"),
+    }
+    Ok(())
 }
 
 fn report_apply(results: Vec<secbird_core::profile::Applied>) -> Result<(), Error> {

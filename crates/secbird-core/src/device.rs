@@ -84,12 +84,22 @@ impl Device {
     /// Send one command and wait for its reply. `size` is the argument length the
     /// device expects for this command.
     pub fn transact(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
-        transact(self.transport.as_ref(), self.txid, command, size, args, READ_RETRIES)
+        transact(self.transport.as_ref(), self.txid, command, size, args, READ_RETRIES, false)
     }
 
     /// [`Device::transact`] for commands that write flash and answer slowly.
     pub(crate) fn transact_slow(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
-        transact(self.transport.as_ref(), self.txid, command, size, args, FLASH_RETRIES)
+        transact(self.transport.as_ref(), self.txid, command, size, args, FLASH_RETRIES, false)
+    }
+
+    /// [`Device::transact`] with another transaction id (see [`DOCK_TXID`]).
+    pub fn transact_as(&self, txid: u8, command: Command, size: u8, args: &[u8]) -> Result<Report> {
+        transact(self.transport.as_ref(), txid, command, size, args, READ_RETRIES, true)
+    }
+
+    /// Whether this is a mouse dock, whose own settings take [`DOCK_TXID`].
+    pub fn is_mouse_dock(&self) -> bool {
+        matches!(self.pid, MOUSE_DOCK_PRO | MOUSE_DOCK_V2_PRO)
     }
 
     pub fn get(&self, command: Command, size: u8, args: &[u8]) -> Result<Report> {
@@ -119,7 +129,15 @@ fn parse_serial(args: &[u8]) -> String {
     if usable { s } else { String::new() }
 }
 
-const MOUSE_DOCK_PRO: u16 = 0x00A4;
+pub(crate) const MOUSE_DOCK_PRO: u16 = 0x00A4;
+/// Mouse Dock V2 Pro. Not in the database yet; assumed to work like the Mouse Dock Pro.
+pub(crate) const MOUSE_DOCK_V2_PRO: u16 = 0x00F1;
+
+/// Transaction id that reaches a mouse dock itself rather than the docked mouse.
+/// Synapse's dock class (`rzDevice25Linker`) sends `0xE0 | n`; not yet seen on hardware.
+pub const DOCK_TXID: u8 = 0xFF;
+/// The dock's own light (Synapse `DockedLED`, the dock's brightness region).
+pub const DOCK_LED: u8 = 0x0F;
 
 /// The HyperPolling wireless dongle. It answers for the mouse paired to it.
 pub(crate) const HYPERPOLLING_DONGLE: u16 = 0x00B3;
@@ -140,7 +158,9 @@ fn connected_mouse_pid(args: &[u8]) -> Option<u16> {
     connected.next().is_none().then_some(pid)
 }
 
-fn transact(hid: &dyn Transport, txid: u8, command: Command, size: u8, args: &[u8], retries: u32) -> Result<Report> {
+/// `exact`: only accept a reply carrying our txid. A dock forwards the docked mouse's
+/// replies, which would otherwise pass for the dock's own.
+fn transact(hid: &dyn Transport, txid: u8, command: Command, size: u8, args: &[u8], retries: u32, exact: bool) -> Result<Report> {
     let req = Report::request(txid, command, size, args);
     let mut buf = [0u8; REPORT_LEN + 1]; // byte 0 is the HID report id (0)
     buf[1..].copy_from_slice(&req.0);
@@ -156,7 +176,7 @@ fn transact(hid: &dyn Transport, txid: u8, command: Command, size: u8, args: &[u
         let mut body = [0u8; REPORT_LEN];
         body.copy_from_slice(&reply[n - REPORT_LEN..n]);
         let rep = Report(body);
-        if rep.command() != command {
+        if rep.command() != command || (exact && rep.txid() != txid) {
             continue;
         }
         match rep.status() {
@@ -255,7 +275,7 @@ impl Device {
         spec: Option<DeviceSpec>,
     ) -> Option<Device> {
         let (txid, reply) = txids.iter().copied().find_map(|t| {
-            transact(transport.as_ref(), t, cmd::SERIAL.get(), cmd::SERIAL_SIZE, &[], READ_RETRIES).ok().map(|r| (t, r))
+            transact(transport.as_ref(), t, cmd::SERIAL.get(), cmd::SERIAL_SIZE, &[], READ_RETRIES, false).ok().map(|r| (t, r))
         })?;
         let serial = parse_serial(reply.args());
         Some(Device { transport, pid, serial, interface, path, txid, spec })

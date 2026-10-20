@@ -1155,6 +1155,17 @@ mod tests {
     }
 
     #[test]
+    fn report_asks_the_dock_itself_with_its_own_txid() {
+        let (_sim, mut dev, db) = docked_basilisk();
+        dev.identify_docked_mouse(&db);
+        let r = crate::report::probe(&dev, true);
+        assert_eq!(r.leds, [1, 4, 10], "the docked mouse, on the usual txid");
+        // The simulator only answers txid 1F, like a dock that ignores 0xFF would.
+        assert!(!r.dock.is_empty() && r.dock.iter().all(|p| p.status == "no reply"));
+        assert!(r.dock_leds.is_empty());
+    }
+
+    #[test]
     fn laptop_keyboard_dimming_reads_sets_and_reads_back() {
         use crate::Dimming;
         let (sim, pid) = preset("blade").unwrap();

@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Mouse Dock Pro test (#39): `secbird report` also asks the dock itself for its firmware,
+  lighting and pairing settings, and `secbird dock-test red|spectrum|battery|off` tries setting
+  the dock's own light once. Both follow Synapse's dock code and haven't been tried on a dock yet.
+
 ## [0.4.8] - 2026-10-20
 
 ### Added
