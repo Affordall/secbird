@@ -4,6 +4,7 @@ use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 pub mod actions;
+pub mod controls;
 
 #[cfg(any(windows, test))]
 mod protocol;
@@ -25,6 +26,21 @@ pub struct CameraInfo {
 pub trait CameraBackend: Send {
     fn discover(&self) -> Result<Vec<CameraInfo>>;
     fn set(&self, id: &str, setting: Setting) -> Result<()>;
+    fn controls(&self, _id: &str) -> Result<Vec<controls::ControlInfo>> {
+        Err(Error::Unsupported(
+            "standard controls require Windows".into(),
+        ))
+    }
+    fn set_control(
+        &self,
+        _id: &str,
+        _control: controls::Control,
+        _value: controls::ControlValue,
+    ) -> Result<controls::ControlState> {
+        Err(Error::Unsupported(
+            "standard controls require Windows".into(),
+        ))
+    }
 }
 
 pub fn backend() -> Result<Box<dyn CameraBackend>> {
@@ -96,6 +112,8 @@ pub enum Setting {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CameraSettings {
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub controls: std::collections::BTreeMap<controls::Control, controls::ControlValue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hdr: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
