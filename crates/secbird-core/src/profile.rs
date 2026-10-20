@@ -240,6 +240,23 @@ impl Store {
         added
     }
 
+    /// [`Store::import`] for a backup made on another PC. Devices are keyed by serial, so
+    /// profiles saved for a unit that isn't connected here go to a connected device of the
+    /// same model that the backup has nothing for (#40). `connected` are device keys.
+    pub fn import_for(&mut self, mut other: Store, connected: &[String]) -> usize {
+        let pid = |key: &str| key.split(':').next().unwrap_or(key).to_string();
+        let keys: Vec<String> = other.devices.keys().cloned().collect();
+        for key in keys.into_iter().filter(|k| !connected.contains(k)) {
+            let Some(target) = connected.iter().find(|c| pid(c) == pid(&key) && !other.devices.contains_key(*c)) else {
+                continue;
+            };
+            if let Some(profiles) = other.devices.remove(&key) {
+                other.devices.insert(target.clone(), profiles);
+            }
+        }
+        self.import(other)
+    }
+
     /// Profiles of one physical device (see [`Device::key`](crate::Device::key)).
     /// Profiles saved before devices were told apart by serial live under the bare
     /// product id; the first device of that model to ask takes them over.
@@ -473,5 +490,20 @@ mod tests {
         assert_eq!(d.profiles["Default (imported)"].dpi, Some((3200, 3200)));
         assert!(d.profiles.contains_key("Gaming"));
         assert_eq!(mine.device(0x0084).active().polling, Some(500));
+    }
+
+    #[test]
+    fn import_from_another_pc_goes_to_the_connected_mouse() {
+        let mut theirs = Store::default();
+        theirs.profiles_for("0096:OTHERPC01", 0x0096).create("Gaming").unwrap();
+        theirs.profiles_for("0084:UNPLUGGED", 0x0084).active_mut().polling = Some(500);
+        let mut mine = Store::default();
+        let connected = ["0096:THISPC001".to_string()];
+
+        assert_eq!(mine.import_for(theirs, &connected), 3);
+        assert!(mine.devices["0096:THISPC001"].profiles.contains_key("Gaming"));
+        assert!(!mine.devices.contains_key("0096:OTHERPC01"));
+        // Nothing connected of that model: kept as it was, for when it's plugged in.
+        assert!(mine.devices.contains_key("0084:UNPLUGGED"));
     }
 }

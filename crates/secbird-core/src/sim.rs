@@ -68,6 +68,11 @@ pub struct SimState {
     /// Laptops: Smart Dimming as (enabled, level), level 0 half, 1 quarter, 2 dark.
     pub smart_dimming: Option<(u8, u8)>,
     pub auto_sleep: Option<bool>,
+    /// The auto-sleep switch saved in the on-board slot, which the live one starts from.
+    pub auto_sleep_saved: Option<bool>,
+    /// Active on-board slot (`05:84`), when set. Lighting written to another slot is kept
+    /// but not shown, like the DeathStalker V2 Pro in #37.
+    pub active_slot: Option<u8>,
     /// On-device macro memory (`None` = no macros): id -> (header, steps). Sized like a Basilisk V3.
     pub macros: Option<BTreeMap<u16, SimMacro>>,
     /// Bytes freed by deleted macros, not reusable until the memory is compacted.
@@ -115,6 +120,8 @@ impl SimState {
             idle_seconds: None,
             smart_dimming: None,
             auto_sleep: None,
+            auto_sleep_saved: None,
+            active_slot: None,
             paired: Vec::new(),
             battery: None,
             charging: false,
@@ -132,6 +139,11 @@ impl SimState {
             log: Vec::new(),
             reply: None,
         }
+    }
+
+    /// A write to a saved slot that isn't the active one: accepted, but not what shows.
+    fn hidden_slot(&self, store: u8) -> bool {
+        store != 0 && self.active_slot.is_some_and(|slot| slot != store)
     }
 
     /// Macro memory commands, like the Basilisk V3: ids 1-100, 90 KB.
@@ -271,9 +283,10 @@ impl SimState {
                 self.buttons.insert((a[0], a[1], a[2]), (a[3], [a[5], a[6], a[7], a[8], a[9]]));
                 ok(a[..10].to_vec())
             }
-            c if c == cmd::ACTIVE_SLOT.get() => match self.buttons.is_empty() {
-                true => (NotSupported, vec![]),
-                false => ok(vec![1]),
+            c if c == cmd::ACTIVE_SLOT.get() => match (self.active_slot, self.buttons.is_empty()) {
+                (Some(slot), _) => ok(vec![slot]),
+                (None, true) => (NotSupported, vec![]),
+                (None, false) => ok(vec![1]),
             },
             c if c == cmd::POLLING.get() => ok(vec![self.polling_code]),
             cmd::POLLING => {
@@ -348,6 +361,10 @@ impl SimState {
                 None => (NotSupported, vec![]),
             },
             cmd::AUTO_SLEEP => match self.auto_sleep {
+                Some(_) if a[0] != 0 => {
+                    self.auto_sleep_saved = Some(a[1] == 1);
+                    ok(a[..2].to_vec())
+                }
                 Some(_) => {
                     self.auto_sleep = Some(a[1] == 1);
                     ok(a[..2].to_vec())
@@ -395,6 +412,9 @@ impl SimState {
                 if !self.leds.contains(&a[1]) {
                     return (Failed, vec![]);
                 }
+                if self.hidden_slot(a[0]) {
+                    return ok(a[..3].to_vec());
+                }
                 self.brightness.insert(a[1], a[2]);
                 ok(a[..3].to_vec())
             }
@@ -406,6 +426,9 @@ impl SimState {
                 }
                 if a[2] == cmd::EFFECT_CUSTOM_FRAME && self.matrix.is_none() {
                     return (NotSupported, vec![]);
+                }
+                if self.hidden_slot(a[0]) {
+                    return ok(a[..size as usize].to_vec());
                 }
                 self.effects.insert(led, a[2..size as usize].to_vec());
                 ok(a[..size as usize].to_vec())
@@ -1298,6 +1321,29 @@ mod tests {
         assert_eq!(s.polling_code, 0x08);
         assert_eq!(s.effects[&4][4..7], [255, 0, 0]);
         assert_eq!(s.effects[&10][0], cmd::EFFECT_OFF);
+    }
+
+    #[test]
+    fn lighting_goes_to_the_active_slot() {
+        let sim = Sim::keyboard();
+        sim.state().active_slot = Some(2);
+        let dev = open(&sim, KEYBOARD_PID);
+        let led = dev.led_id("backlight").unwrap();
+        dev.set_static_color(led, Rgb(0, 255, 0)).unwrap();
+        dev.set_brightness(led, 100).unwrap();
+        let s = sim.state();
+        assert_eq!(s.effects[&5][4..7], [0, 255, 0]);
+        assert_eq!(s.brightness[&5], 255);
+    }
+
+    #[test]
+    fn auto_sleep_off_is_saved_too() {
+        let sim = Sim::naga();
+        sim.state().auto_sleep_saved = Some(true);
+        let dev = open(&sim, NAGA_PID);
+        dev.set_auto_sleep(false).unwrap();
+        let s = sim.state();
+        assert_eq!((s.auto_sleep, s.auto_sleep_saved), (Some(false), Some(false)));
     }
 
     #[test]

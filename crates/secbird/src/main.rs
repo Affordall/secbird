@@ -150,7 +150,11 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
                 return Err(Error::NotFound(file.clone()));
             }
             let incoming = Store::load(path)?;
-            let added = store.import(incoming);
+            let connected: Vec<String> = match (HidApi::new(), Db::load(Some(&config_dir().join("devices.json")))) {
+                (Ok(api), Ok(db)) => discover(&api, &db).iter().map(Device::key).collect(),
+                _ => Vec::new(),
+            };
+            let added = store.import_for(incoming, &connected);
             store.save()?;
             println!("Imported {added} profile(s). Existing profiles were kept; clashing names got \"(imported)\".");
         }

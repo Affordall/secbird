@@ -480,7 +480,7 @@ const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assi
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
 const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
                  ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
-const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight' };
+const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate' };
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
@@ -2044,7 +2044,7 @@ function renderSettings() {
       const r = await api('/api/import', { data: JSON.parse(await f.text()) });
       devices = r.state.devices; devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
       dev = devices.find(d => dev && d.id === dev.id) || devices[0] || null;
-      toast(r.added ? 'Added ' + plural(r.added, 'profile') + '; yours were kept' : 'Nothing new in that file');
+      toast(r.added ? 'Added ' + plural(r.added, 'profile') + '; yours were kept. Pick one in the profile list.' : 'Nothing new in that file');
     } catch (err) { toast(err instanceof SyntaxError ? 'That file isn’t a Secretarybird backup' : err.message, true); }
     e.target.value = '';
   } });

@@ -61,6 +61,7 @@ const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("firmware", cmd::FIRMWARE.get(), cmd::FIRMWARE_SIZE, &[]),
     ("firmware (full)", cmd::FIRMWARE_EXT.get(), cmd::FIRMWARE_EXT_SIZE, &[]),
     ("device mode", cmd::DEVICE_MODE.get(), cmd::DEVICE_MODE_SIZE, &[]),
+    ("active on-board slot", cmd::ACTIVE_SLOT.get(), 1, &[]),
     ("polling rate", cmd::POLLING.get(), cmd::POLLING_SIZE, &[]),
     ("polling rate (high speed)", cmd::POLLING_HS.get(), cmd::POLLING_HS_SIZE, &[]),
     ("dpi", cmd::DPI.get(), cmd::DPI_SIZE, &[cmd::NOSTORE]),
@@ -174,7 +175,12 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
         simulated,
         interface: dev.interface,
         txid: format!("{:02X}", dev.txid),
-        serial: dev.serial().map(|s| shorten(&s)).unwrap_or_default(),
+        // Some Blades answer 0xFF bytes (#34), which printed as replacement characters.
+        serial: match dev.serial() {
+            Ok(s) if s.chars().all(|c| c.is_ascii_graphic()) => shorten(&s),
+            Ok(_) => "none".into(),
+            Err(_) => String::new(),
+        },
         probes,
         leds,
     }
