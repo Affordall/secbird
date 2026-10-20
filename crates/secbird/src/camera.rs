@@ -1,5 +1,9 @@
 use secbird_core::{
-    camera::{actions, parse_setting, CameraBackend, CameraInfo, Setting},
+    camera::{
+        actions,
+        controls::{parse_control, Control},
+        parse_setting, CameraBackend, CameraInfo, Setting,
+    },
     Error, Result, Store,
 };
 
@@ -44,6 +48,43 @@ pub(crate) fn run(
     store: &mut Store,
 ) -> Result<()> {
     match command {
+        "camera" if args.first().is_some_and(|value| value == "controls") => {
+            if args.len() != 1 {
+                return Err(Error::InvalidArg("usage: camera controls".into()));
+            }
+            println!("Standard controls (driver units; current camera readback):");
+            for info in backend.controls(&camera.id)? {
+                if let Some(range) = info.range {
+                    let current = info
+                        .current
+                        .map(|state| {
+                            format!(
+                                "{} ({})",
+                                state.value,
+                                if state.automatic { "Auto" } else { "Manual" }
+                            )
+                        })
+                        .unwrap_or_else(|| "unknown".into());
+                    println!(
+                        "  {}: {current}; {}..{} step {}; default {:?}; Auto {} / Manual {}",
+                        info.control.name(),
+                        range.min,
+                        range.max,
+                        range.step,
+                        range.default,
+                        range.automatic,
+                        range.manual
+                    );
+                } else {
+                    println!(
+                        "  {}: unavailable ({})",
+                        info.control.name(),
+                        info.error.as_deref().unwrap_or("unsupported")
+                    );
+                }
+            }
+            Ok(())
+        }
         "info" | "camera" if args.is_empty() => {
             println!("{} [{}]", camera.name, camera.id);
             println!("Saved settings (current hardware values unknown):");
@@ -58,6 +99,21 @@ pub(crate) fn run(
             Ok(())
         }
         "camera" => {
+            if let [name, value] = args {
+                if name.parse::<Control>().is_ok() {
+                    let (control, value) = parse_control(name, value)?;
+                    let profile = store.for_camera(&camera.id).active.clone();
+                    let state =
+                        actions::set_control(backend, &camera.id, store, &profile, control, value)?;
+                    println!(
+                        "{}: {} ({}) read back; saved to '{profile}'",
+                        control.name(),
+                        state.value,
+                        if state.automatic { "Auto" } else { "Manual" }
+                    );
+                    return Ok(());
+                }
+            }
             let setting = parse_command(args)?;
             let profile = store.for_camera(&camera.id).active.clone();
             actions::set(backend, &camera.id, store, &profile, setting)?;

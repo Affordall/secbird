@@ -1,6 +1,10 @@
-//! Camera-specific editor schema and dispatch; no HID requests or native readbacks.
+//! Camera editor schema and dispatch; standard controls have native readbacks.
 use secbird_core::{
-    camera::{actions, parse_setting, CameraBackend, CameraInfo},
+    camera::{
+        actions,
+        controls::{parse_control, Control as StandardControl},
+        parse_setting, CameraBackend, CameraInfo,
+    },
     Error, Result, Store,
 };
 use serde::Deserialize;
@@ -14,6 +18,12 @@ struct Control {
     value: String,
     #[serde(default)]
     profile: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReadControls {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -98,10 +108,14 @@ fn dispatch(
             .ok_or_else(|| Error::NotFound("camera identity not found; rescan devices".into()))
     };
     match path {
+        "/api/camera-controls" => {
+            let request: ReadControls = serde_json::from_slice(body).map_err(invalid)?;
+            let camera = find(&request.id)?;
+            Ok(json!({"controls":backend.controls(&camera.id)?}))
+        }
         "/api/camera" => {
             let request: Control = serde_json::from_slice(body).map_err(invalid)?;
             let camera = find(&request.id)?;
-            let setting = parse_setting(&request.control, &request.value)?;
             let name = store
                 .for_camera(&camera.id)
                 .effective(foreground)
@@ -115,6 +129,17 @@ fn dispatch(
                     "effective camera profile changed; refresh before editing".into(),
                 ));
             }
+            if request.control.parse::<StandardControl>().is_ok() {
+                let (control, value) = parse_control(&request.control, &request.value)?;
+                let state =
+                    actions::set_control(backend, &camera.id, store, &name, control, value)?;
+                let controls = backend.controls(&camera.id).ok();
+                return Ok(
+                    json!({"device":labeled_device_json(camera,cameras,store,foreground),"written_state":state,
+                    "controls":controls,"failures":[]}),
+                );
+            }
+            let setting = parse_setting(&request.control, &request.value)?;
             actions::set(backend, &camera.id, store, &name, setting)?;
             Ok(
                 json!({ "device": labeled_device_json(camera, cameras, store, foreground), "failures": [] }),
@@ -156,7 +181,10 @@ pub(crate) fn post(
     path: &str,
     body: &[u8],
 ) -> Option<Result<Value>> {
-    if !matches!(path, "/api/camera" | "/api/camera-profile") {
+    if !matches!(
+        path,
+        "/api/camera" | "/api/camera-profile" | "/api/camera-controls"
+    ) {
         return None;
     }
     Some((|| {

@@ -18,10 +18,16 @@ DEVICE:
                             (apps.razer.com); never installs anything
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
+  camera controls           Read current image/camera controls and supported ranges
 
 SETTINGS (saved to the active profile):
   camera [<control> <value>] Kiyo Pro (Windows): hdr on|off, hdr-mode dark|bright,
                             fov wide|medium|narrow, af-mode responsive|passive
+                            Standard controls: numeric driver value, auto, or default;
+                            e.g. camera brightness 128; camera exposure -6;
+                            camera focus auto; camera white-balance auto.
+                            Anti-flicker: off|50hz|60hz|auto. Low-light: on|off.
+                            Use camera controls to check driver support.
   dpi [X[xY]]               Show or set DPI (e.g. 1600 or 1600x800)
   poll [HZ]                 Show or set polling rate (125, 500, 1000, ...)
   stages [DPI ...] [--use N]
