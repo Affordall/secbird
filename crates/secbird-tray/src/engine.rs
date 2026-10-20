@@ -33,6 +33,9 @@ pub struct Battery {
 }
 
 /// A connected Razer product that can't be controlled (yet), shown so it isn't silently missing.
+/// Why a wireless device we know is quiet, most often: it sleeps until a keypress (#37).
+const ASLEEP: &str = "Not answering. Asleep? Press a key or move it";
+
 pub struct Unsupported {
     pub pid: u16,
     pub name: String,
@@ -236,6 +239,7 @@ impl Engine {
                 Some(spec) if spec.lighting == secbird_core::Lighting::Kraken => {
                     Unsupported { pid, name: spec.name.clone(), reason: "Headset protocol not supported yet" }
                 }
+                Some(spec) if spec.wireless => Unsupported { pid, name: spec.name.clone(), reason: ASLEEP },
                 Some(spec) => Unsupported { pid, name: spec.name.clone(), reason: "Not answering. Is Synapse running?" },
                 None => Unsupported { pid, name: format!("Razer device {pid:04X}"), reason: "Unknown model. Run secbird report" },
             })
@@ -243,6 +247,11 @@ impl Engine {
         #[cfg(windows)]
         { self.synapse = secbird_core::debloat::synapse_running(); }
         self.all_keys().into_iter().filter(|key| !before.contains(key)).collect()
+    }
+
+    /// A known wireless device is plugged in (its receiver is) but not answering yet.
+    pub fn has_sleeping(&self) -> bool {
+        self.unsupported.iter().any(|u| u.reason == ASLEEP)
     }
 
     /// Read profiles fresh from disk, so changes made with the CLI are picked up.

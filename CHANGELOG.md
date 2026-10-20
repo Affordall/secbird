@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Mouse Dock Pro test (#39): `secbird report` also asks the dock itself for its firmware,
+  lighting and pairing settings, and `secbird dock-test red|spectrum|battery|off` tries setting
+  the dock's own light once. Both follow Synapse's dock code and haven't been tried on a dock yet.
+
+## [0.4.8] - 2026-10-20
+
+### Added
+- Viper V4 Pro and Huntsman V3 HE (#36, thanks Toru1475).
+- Naga V3 Pro: the 12-button side plate's light is its own zone, "Side plate" (#26, thanks
+  Skillprofi10).
+- `secbird report` shows which on-board slot is active.
+
+### Fixed
+- Colours, effects and brightness now go to the device's active on-board slot. A keyboard or
+  mouse that Synapse left on slot 2 read the changes back but never showed them (#37, thanks
+  a3k7dotmd).
+- Turning sleep off now lasts past a power cycle: it is saved on the device too (#37).
+- A wireless device that sleeps until its first keypress after Windows starts still gets its
+  profile: the tray keeps looking for it once a minute for half an hour (#37). Until then it's
+  listed as "Asleep? Press a key or move it".
+- Restoring a backup on another PC puts the profiles on the mouse connected there. They went to
+  the other PC's mouse (matched by serial number) and never showed up (#40, thanks Rubyurek).
+- Laptops that answer a blank serial number show "none" in the report instead of garbage.
+
 ## [0.4.7] - 2026-10-19
 
 ### Added

@@ -590,7 +590,7 @@ fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, E
             let incoming: Store = serde_json::from_value(b.data.clone())
                 .map_err(|e| Error::InvalidArg(format!("not a Secretarybird export: {e}")))?;
             let mut store = Store::load(&config_dir().join("profiles.json"))?;
-            let added = store.import(incoming);
+            let added = store.import_for(incoming, &engine.all_keys());
             store.save()?;
             Ok(json!({ "added": added, "state": state(engine) }))
         })(),

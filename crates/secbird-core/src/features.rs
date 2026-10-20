@@ -236,9 +236,12 @@ impl Device {
         Ok(())
     }
 
-    /// Turn sleeping when idle on or off, on devices that have the switch.
+    /// Turn sleeping when idle on or off, on devices that have the switch. The live value
+    /// (store 0) is rebuilt from the saved slot at power-on, so the slot gets it too (#37).
     pub fn set_auto_sleep(&self, enabled: bool) -> Result<()> {
         self.transact(cmd::AUTO_SLEEP, cmd::AUTO_SLEEP_SIZE, &[0, enabled as u8])?;
+        // Best effort: a device without saved slots may refuse it, and the live value is set.
+        let _ = self.transact(cmd::AUTO_SLEEP, cmd::AUTO_SLEEP_SIZE, &[self.saved_slot(), enabled as u8]);
         Ok(())
     }
 
@@ -303,6 +306,17 @@ impl Device {
         zone.parse::<u8>().map_err(|_| Error::InvalidArg(format!("unknown lighting zone '{zone}'")))
     }
 
+    /// The on-board slot that settings are saved to: the active one (`05:84`). The device
+    /// shows the active slot, so a write to slot 1 while slot 2 is active reads back fine
+    /// but never lights up (#37: a keyboard left on slot 2 by Synapse). Devices without
+    /// slots don't answer and get slot 1.
+    pub(crate) fn saved_slot(&self) -> u8 {
+        match self.get(cmd::ACTIVE_SLOT, 1, &[]) {
+            Ok(r) if (1..=5).contains(&r.args()[0]) => r.args()[0],
+            _ => cmd::VARSTORE,
+        }
+    }
+
     fn lighting(&self) -> Lighting {
         self.spec.as_ref().map_or(Lighting::Extended, |s| s.lighting)
     }
@@ -319,19 +333,19 @@ impl Device {
     /// Brightness 0-100 %.
     pub fn set_brightness(&self, led: u8, percent: u8) -> Result<()> {
         let level = (percent.min(100) as u32 * 255 / 100) as u8;
-        let command = match self.lighting() {
-            Lighting::Extended => cmd::MATRIX_BRIGHTNESS,
-            Lighting::Standard | Lighting::MouseExtended => cmd::LED_BRIGHTNESS,
+        let (command, store) = match self.lighting() {
+            Lighting::Extended => (cmd::MATRIX_BRIGHTNESS, self.saved_slot()),
+            Lighting::Standard | Lighting::MouseExtended => (cmd::LED_BRIGHTNESS, cmd::VARSTORE),
             Lighting::Kraken => return Err(self.no_lighting()),
         };
-        self.transact(command, 3, &[cmd::VARSTORE, led, level])?;
+        self.transact(command, 3, &[store, led, level])?;
         Ok(())
     }
 
     pub fn set_static_color(&self, led: u8, Rgb(r, g, b): Rgb) -> Result<()> {
         match self.lighting() {
             Lighting::Extended => {
-                let args = [cmd::VARSTORE, led, cmd::EFFECT_STATIC, 0x00, 0x00, 0x01, r, g, b];
+                let args = [self.saved_slot(), led, cmd::EFFECT_STATIC, 0x00, 0x00, 0x01, r, g, b];
                 self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
             }
             Lighting::Standard if self.is_grid_backlight(led) => {
@@ -353,7 +367,7 @@ impl Device {
     pub fn lights_off(&self, led: u8) -> Result<()> {
         match self.lighting() {
             Lighting::Extended => {
-                let args = [cmd::VARSTORE, led, cmd::EFFECT_OFF, 0x00, 0x00, 0x00];
+                let args = [self.saved_slot(), led, cmd::EFFECT_OFF, 0x00, 0x00, 0x00];
                 self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
             }
             Lighting::Standard if self.is_grid_backlight(led) => {
