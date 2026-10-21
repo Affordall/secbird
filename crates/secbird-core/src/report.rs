@@ -79,6 +79,7 @@ const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("macro storage", cmd::MACRO_STORAGE.get(), cmd::MACRO_STORAGE_SIZE, &[]),
     ("macro count", cmd::MACRO_COUNT.get(), cmd::MACRO_COUNT_SIZE, &[]),
     ("button ids", cmd::BUTTON_IDS.get(), cmd::BUTTON_IDS_SIZE, &[]),
+    ("sensor rotation", cmd::SENSOR_ANGLE.get(), cmd::SENSOR_ANGLE_SIZE, &[cmd::VARSTORE]),
 ];
 
 /// Laptop fan and power reads (Synapse's thermal module, class 0D, and power class 07), for

@@ -66,6 +66,14 @@ pub struct Led {
 pub struct Matrix {
     pub rows: u8,
     pub cols: u8,
+    /// Matrix column of the leftmost key. 1 on most boards, where column 0 is the macro keys;
+    /// 0 on boards without them (DeathStalker V2, #41).
+    #[serde(default = "first_col")]
+    pub first: u8,
+}
+
+fn first_col() -> u8 {
+    1
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -201,7 +209,7 @@ mod tests {
             ids.dedup();
             assert_eq!(ids.len(), s.leds.len(), "{id}: duplicate LED ids");
             if let Some(m) = s.matrix {
-                assert!(m.rows > 0 && m.cols > 0, "{id}: matrix");
+                assert!(m.rows > 0 && m.cols > 0 && m.first <= 1, "{id}: matrix");
             }
             if s.lighting == Lighting::Kraken {
                 assert!(s.leds.is_empty() && s.matrix.is_none(), "{id}: kraken has no 2.5 lighting");

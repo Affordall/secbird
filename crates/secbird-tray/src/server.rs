@@ -707,7 +707,7 @@ fn device_json(dev: &Device) -> Value {
         "sleep": sleep_json(dev),
         "dimming": dev.dimming().ok().flatten().map(|d| d.to_string()),
         "macros": dev.macro_storage().is_ok(),
-        "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols })),
+        "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols, "first": m.first })),
         "leds": spec.map(|s| s.leds.iter().map(|l| json!({ "name": l.name, "id": l.id })).collect::<Vec<_>>()).unwrap_or_default(),
         "profiles": profile_names,
         "active": active,
