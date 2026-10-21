@@ -1308,7 +1308,7 @@ mod tests {
         s.matrix = Some((1, 30, vec![[0; 3]; 30]));
         let sim = Sim::new(s);
         let mut spec = Sim::spec_for(KEYBOARD_PID).unwrap();
-        spec.matrix = Some(crate::db::Matrix { rows: 1, cols: 30 });
+        spec.matrix = Some(crate::db::Matrix { rows: 1, cols: 30, first: 1 });
         let dev = sim.open(KEYBOARD_PID, Some(spec)).unwrap();
         let row: Vec<Rgb> = (0..30).map(|i| Rgb(i, i, i)).collect();
         dev.set_row(0, 0, &row).unwrap();

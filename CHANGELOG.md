@@ -1,11 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.9] - 2026-10-21
 
 ### Added
 - Mouse Dock Pro test (#39): `secbird report` also asks the dock itself for its firmware,
   lighting and pairing settings, and `secbird dock-test red|spectrum|battery|off` tries setting
   the dock's own light once. Both follow Synapse's dock code and haven't been tried on a dock yet.
+- `secbird report` shows whether a mouse has sensor rotation in its firmware.
+
+### Fixed
+- DeathStalker V2 (Pro, wired and wireless): per-key colours lit the key to the right of the one
+  painted, and the leftmost key of each row couldn't be coloured (#41, thanks a3k7dotmd). The
+  DeathStalker V2 Pro TKL gets the same correction and now shows a keyboard layout; not confirmed
+  on that board yet.
 
 ## [0.4.8] - 2026-10-20
 

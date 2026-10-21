@@ -149,6 +149,10 @@ pub const BUTTON_SIZE: u8 = 0x50;
 /// The button ids the mouse has (Synapse "Get Button ID list"): `[count, id...]`.
 pub const BUTTON_IDS: Command = Command::new(0x02, 0x04);
 pub const BUTTON_IDS_SIZE: u8 = 0x50;
+/// Sensor rotation in firmware (Synapse "Proximity Sensor Angle Tune"): `[store, enabled, angle]`.
+/// Only newer mice have it; Synapse rotates in software on the rest.
+pub const SENSOR_ANGLE: Command = Command::new(0x0B, 0x14);
+pub const SENSOR_ANGLE_SIZE: u8 = 0x03;
 /// Button slot 0 is live and unsaved, and wins over the saved profile slots 1-5.
 /// Verified (Basilisk V3): a remap in slot 0 took effect while slot 1 was active.
 pub const BUTTON_LIVE_SLOT: u8 = 0x00;
