@@ -201,6 +201,7 @@ impl Server {
                 let logo = format!("data:image/png;base64,{}", base64(LOGO_PNG));
                 let page = PAGE.replace("{{LOGO}}", &logo)
                     .replace("{{CAMERA_PREVIEW_JS}}", include_str!("camera-preview.js"))
+                    .replace("{{CAMERA_CONTROLS_JS}}", include_str!("camera-controls.js"))
                     .replace("{{EDITOR_PROFILES_JS}}", include_str!("editor-profiles.js"));
                 Response { status: "200 OK", content_type: "text/html; charset=utf-8", body: page.into_bytes() }
             } else {

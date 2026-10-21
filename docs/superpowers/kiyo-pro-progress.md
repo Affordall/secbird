@@ -135,3 +135,20 @@ Both regression tests failed before removal and pass afterward. The release
 build, host/Windows/Linux cross-target clippy checks, and all 20 JavaScript tests
 pass. The removal review found no actionable issues; native driver runtime
 behavior remains outside the local macOS verification.
+
+## Standard Windows controls follow-up
+
+The user approved adding the standard Image/Camera controls shown in their
+property dialog. The camera backend now queries native support and ranges on the
+existing COM worker; CLI, authenticated editor API, browser UI and camera
+profiles expose the supported values. Unsupported controls remain visible but
+disabled. Standard Auto focus is separate from responsive/passive focus strategy.
+Low-light compensation needs Auto exposure; anti-flicker Hz does not set video
+FPS. No device-wide resolution/FPS control was reintroduced.
+
+Portable validation, profile compatibility and browser rules are tested. A local
+browser smoke test with synthetic video kept preview playing while a brightness
+edit updated saved and readback values. That test used a fake camera API, not a
+physical Kiyo Pro or Windows driver. The new PR summary is in
+`docs/kiyo-pro-pr.md` and explicitly asks for the project's device report and
+physical verification before claiming hardware support.

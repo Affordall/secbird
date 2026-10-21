@@ -206,6 +206,56 @@ mod tests {
     use secbird_core::camera::{CameraBackend, CameraInfo, Setting};
     use std::sync::Mutex;
 
+    #[test]
+    fn standard_camera_api_does_not_write_for_wrong_target_or_stale_profile() {
+        use secbird_core::camera::controls::{Control, ControlInfo, ControlState, ControlValue};
+        struct Fake(Mutex<u32>);
+        impl CameraBackend for Fake {
+            fn discover(&self) -> Result<Vec<CameraInfo>> {
+                Ok(vec![])
+            }
+            fn set(&self, _: &str, _: Setting) -> Result<()> {
+                panic!("unexpected vendor write")
+            }
+            fn controls(&self, _: &str) -> Result<Vec<ControlInfo>> {
+                Ok(vec![ControlInfo::new(
+                    Control::Exposure,
+                    None,
+                    None,
+                    Some("unavailable".into()),
+                )])
+            }
+            fn set_control(&self, _: &str, _: Control, _: ControlValue) -> Result<ControlState> {
+                *self.0.lock().unwrap() += 1;
+                Err(Error::System("driver rejected".into()))
+            }
+        }
+        let backend = Fake(Mutex::new(0));
+        let mut store = Store::default();
+        let cameras = [camera()];
+        assert_eq!(
+            dispatch(
+                &backend,
+                &cameras,
+                None,
+                "/api/camera-controls",
+                br#"{"id":"camera:test"}"#,
+                &mut store
+            )
+            .unwrap()["controls"][0]["control"],
+            "exposure"
+        );
+        for json in [
+            br#"{"id":"0099","control":"exposure","value":"-6"}"#.as_slice(),
+            br#"{"id":"camera:test","control":"exposure","value":"-6","profile":"stale"}"#,
+            br#"{"id":"camera:test","control":"exposure","value":"nope"}"#,
+        ] {
+            assert!(dispatch(&backend, &cameras, None, "/api/camera", json, &mut store).is_err());
+        }
+        assert_eq!(*backend.0.lock().unwrap(), 0);
+        assert!(store.for_camera("camera:test").active().camera.is_none());
+    }
+
     #[derive(Default)]
     struct Fake(Mutex<Vec<Setting>>);
     impl CameraBackend for Fake {

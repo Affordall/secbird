@@ -2,6 +2,114 @@ use super::*;
 use std::sync::Mutex;
 
 #[test]
+fn standard_camera_controls_save_requested_mode_and_replay_only_recorded_settings() {
+    use super::controls::{Control, ControlState, ControlValue};
+    struct Fake(Mutex<Vec<(Control, ControlValue)>>);
+    impl CameraBackend for Fake {
+        fn discover(&self) -> crate::Result<Vec<CameraInfo>> {
+            Ok(Vec::new())
+        }
+        fn set(&self, _: &str, _: Setting) -> crate::Result<()> {
+            panic!("no vendor control in this profile")
+        }
+        fn set_control(
+            &self,
+            _: &str,
+            control: Control,
+            value: ControlValue,
+        ) -> crate::Result<ControlState> {
+            self.0.lock().unwrap().push((control, value));
+            Ok(match value {
+                ControlValue::Auto => ControlState {
+                    value: 5000,
+                    automatic: true,
+                },
+                ControlValue::Manual(value) => ControlState {
+                    value,
+                    automatic: false,
+                },
+                ControlValue::Default => ControlState {
+                    value: 128,
+                    automatic: false,
+                },
+            })
+        }
+    }
+    let fake = Fake(Mutex::new(Vec::new()));
+    let mut old: crate::Profile = serde_json::from_str(r#"{"camera":{"hdr":null}}"#).unwrap();
+    assert!(old.camera.as_ref().unwrap().controls.is_empty());
+    assert!(actions::apply(&fake, "camera:test", &old).is_empty());
+    old.camera
+        .as_mut()
+        .unwrap()
+        .controls
+        .insert(Control::WhiteBalance, ControlValue::Auto);
+    assert_eq!(actions::apply(&fake, "camera:test", &old).len(), 1);
+    assert_eq!(
+        fake.0.lock().unwrap().as_slice(),
+        &[(Control::WhiteBalance, ControlValue::Auto)]
+    );
+    assert_eq!(
+        serde_json::from_str::<crate::Profile>(&serde_json::to_string(&old).unwrap()).unwrap(),
+        old
+    );
+}
+
+#[test]
+fn standard_controls_save_auto_without_freezing_readback_and_replay_only_explicit_fields() {
+    use super::controls::{Control, ControlState, ControlValue};
+    struct FakeStandard(Mutex<Vec<(Control, ControlValue)>>);
+    impl CameraBackend for FakeStandard {
+        fn discover(&self) -> crate::Result<Vec<CameraInfo>> {
+            Ok(Vec::new())
+        }
+        fn set(&self, _: &str, _: Setting) -> crate::Result<()> {
+            panic!("no vendor control requested")
+        }
+        fn set_control(
+            &self,
+            _: &str,
+            control: Control,
+            value: ControlValue,
+        ) -> crate::Result<ControlState> {
+            self.0.lock().unwrap().push((control, value));
+            Ok(match value {
+                ControlValue::Auto => ControlState {
+                    value: 5000,
+                    automatic: true,
+                },
+                ControlValue::Manual(value) => ControlState {
+                    value,
+                    automatic: false,
+                },
+                ControlValue::Default => ControlState {
+                    value: 128,
+                    automatic: false,
+                },
+            })
+        }
+    }
+    let backend = FakeStandard(Mutex::new(Vec::new()));
+    let mut old: crate::Profile = serde_json::from_str(r#"{"camera":{"hdr":null}}"#).unwrap();
+    assert!(old.camera.as_ref().unwrap().controls.is_empty());
+    assert!(actions::apply(&backend, "camera:test", &old).is_empty());
+    old.camera
+        .as_mut()
+        .unwrap()
+        .controls
+        .insert(Control::WhiteBalance, ControlValue::Auto);
+    assert_eq!(actions::apply(&backend, "camera:test", &old).len(), 1);
+    assert_eq!(
+        backend.0.lock().unwrap().as_slice(),
+        &[(Control::WhiteBalance, ControlValue::Auto)]
+    );
+    assert_eq!(
+        serde_json::from_str::<crate::Profile>(&serde_json::to_string(&old).unwrap()).unwrap(),
+        old
+    );
+}
+
+#[test]
 fn camera_second_fov_write_failure_is_not_saved() {
     struct SecondWriteFailure(Mutex<usize>);
     impl CameraBackend for SecondWriteFailure {

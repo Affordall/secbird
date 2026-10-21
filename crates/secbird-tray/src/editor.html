@@ -477,6 +477,7 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>{{CAMERA_PREVIEW_JS}}</script>
+<script>{{CAMERA_CONTROLS_JS}}</script>
 <script>{{EDITOR_PROFILES_JS}}</script>
 <script>
 const T = new URLSearchParams(location.search).get('t');
@@ -783,10 +784,16 @@ function paintPreview() {
 // Sections of this device, each with its tiles. Only what the device has.
 function sections() {
   const s = [];
-  if (dev.kind === 'webcam') s.push({ id: 'camera', name: 'Camera', rows: [
-    { key: 'camera:hdr', label: 'HDR' }, { key: 'camera:hdr-mode', label: 'HDR mode' },
-    { key: 'camera:fov', label: 'Field of view' }, { key: 'camera:af-mode', label: 'Autofocus strategy' },
-  ] });
+  if (dev.kind === 'webcam') {
+    const controls=standardControls[dev.id]?.items||[];
+    const rows=group=>controls.filter(info=>info.group===group).map(info=>({key:'standard:'+info.control,label:info.control.replaceAll('-',' ')}));
+    s.push({id:'image',name:'Image',rows:rows('image')});
+    s.push({ id: 'camera', name: 'Camera', rows: [
+      { key: 'camera:hdr', label: 'HDR' }, { key: 'camera:hdr-mode', label: 'HDR mode' },
+      { key: 'camera:fov', label: 'Field of view' }, { key: 'camera:af-mode', label: 'Autofocus strategy' },
+      ...rows('camera'),
+    ] });
+  }
   const light = dev.leds.map(l => ({ key: 'zone:' + l.name, label: label(l.name) }));
   if (dev.matrix) light.push({ key: 'keys', label: 'Per-key colors' });
   if (light.length) s.push({ id: 'light', name: 'Lighting',
@@ -876,9 +883,10 @@ function renderWork(keepPanel) {
     entering = true;
   }
   const cur = secs.find(s => s.id === section);
-  if (section !== 'camera') discardCameraPreview();
+  if (!['camera','image'].includes(section)) discardCameraPreview();
   if (entering && !sel) sel = autoOpen(cur);
   // Slow reads happen only when their section is open, once per device.
+  if(dev.kind==='webcam'&&['image','camera'].includes(section))loadStandardControls(dev.id);
   if (section === 'buttons') loadButtons(dev);
   if ((section === 'buttons' || section === 'macros') && dev.macros && macroData[dev.id] === undefined) loadMacros(dev);
   if (sel && sectionOf(sel) !== section) sel = null;
@@ -894,6 +902,7 @@ function renderTiles(cur) {
   t.innerHTML = '';
   const head = el('div', { className: 'sechead' }, el('h2', { textContent: cur.name }));
   const tools = el('div', { className: 'tools' });
+  if(dev.kind==='webcam'&&['image','camera'].includes(cur.id))tools.append(el('button',{className:'ghost',textContent:'Refresh camera values',onclick:()=>loadStandardControls(dev.id,true)}));
   if (cur.tools === 'layer') {
     if (Object.keys(dev.profile.buttons || {}).length) tools.append(el('button', { className: 'ghost', textContent: 'Restore all',
       title: 'Every changed button back to what the mouse stores', onclick: restoreAllButtons }));
@@ -921,7 +930,10 @@ function renderTiles(cur) {
   const g = el('div', { className: 'tgrid' });
   plain.forEach(r => g.append(tile(r)));
   t.append(g);
-  if (cur.id === 'camera') mountCameraPreview(t);
+  if (dev.kind==='webcam'&&['image','camera'].includes(cur.id)) {
+    if(standardControls[dev.id]?.error)t.append(el('p',{className:'note',textContent:standardControls[dev.id].error}));
+    mountCameraPreview(t);
+  }
   if (grid.length) {
     t.append(el('p', { className: 'subhead', textContent: 'Side grid' }));
     const k = el('div', { className: 'keypad' });
@@ -1073,6 +1085,7 @@ $('compareBtn').onclick = () => { view = view === 'compare' ? 'work' : 'compare'
 // Comparable value of a cell, to mark where another profile differs from the active one.
 function cellValue(key, name) {
   const p = prof(name), active = name === dev.active;
+  if(key.startsWith('standard:'))return JSON.stringify(p.camera?.controls?.[key.slice(9)]||null);
   if (key.startsWith('camera:')) return String(p.camera?.[key.slice(7).replaceAll('-', '_')] ?? '');
   if (key.startsWith('zone:')) { const z = zoneOf(p, key.slice(5)); return p.keys && p.keys.length && dev.matrix ? 'keys' : z.off ? 'off' : (z.effect || z.color || '') + '/' + (z.brightness ?? 100); }
   if (key === 'keys') return (p.keys || []).join();
@@ -1095,6 +1108,13 @@ const differs = (key, name) => name !== dev.active && cellValue(key, name) !== c
 // mouse saved. Other columns get their mark from differs().
 function cellView(key, name) {
   const p = prof(name), active = name === dev.active;
+  if(key.startsWith('standard:')) {
+    const control=key.slice(9),info=(standardControls[dev.id]?.items||[]).find(item=>item.control===control);
+    if(!info?.range)return ['<span class="unset">Unavailable</span>'];
+    const saved=p.camera?.controls?.[control];
+    if(active&&info.current)return [esc(info.current.automatic?'Auto':standardLabel(info,info.current.value))+' <small>readback</small>'];
+    return [saved?esc(saved.mode==='auto'?'Auto':standardLabel(info,saved.value))+' <small>saved</small>':'<span class="unset">Unchanged</span>'];
+  }
   if (key.startsWith('camera:')) {
     const value = p.camera?.[key.slice(7).replaceAll('-', '_')];
     return [value == null ? '<span class="unset">Unchanged · current unknown</span>' : esc(typeof value === 'boolean' ? (value ? 'On' : 'Off') : label(value)) + ' <small>saved</small>'];
@@ -1199,7 +1219,8 @@ function profileHeader(n) {
 function buildEditor(host, r) {
   const box = el('div', { className: 'edbox' });
   host.append(box);
-  if (r.key.startsWith('camera:')) cameraEditor(box, r.key.slice(7));
+  if (r.key.startsWith('standard:')) standardEditor(box,r.key.slice(9));
+  else if (r.key.startsWith('camera:')) cameraEditor(box, r.key.slice(7));
   else if (r.key === 'lighting-control') lightingControlEditor(box);
   else if (r.key.startsWith('zone:')) zoneEditor(box, r.key.slice(5));
   else if (r.key === 'keys') keysEditor(box);
@@ -1239,6 +1260,64 @@ function cameraEditor(box, control) {
   box.append(input, el('p', { className: 'note', textContent: 'Saved/requested settings, not live hardware readback. Unset controls are left unchanged.' }));
   if (control === 'af-mode') box.append(el('p', { className: 'note', textContent: 'Responsive/passive changes the focusing strategy; this is not manual focus or an autofocus on/off switch.' }));
   if (target.camera?.error) box.append(el('p', { className: 'note', textContent: target.camera.error }));
+}
+
+const standardControls={};
+const standardBusy=new Set();
+function standardLabel(info,value){return info.kind==='range'?String(value):SecbirdControls.options(info).find(item=>item.value===value)?.label||String(value);}
+async function loadStandardControls(id,force=false){
+  const cache=standardControls[id]||={items:null,loading:false,error:null};
+  if(cache.loading||(!force&&(cache.items||cache.error)))return;
+  cache.loading=true;
+  try {cache.items=(await api('/api/camera-controls',{id})).controls;cache.error=null;}
+  catch(error){cache.error=error.message;}
+  finally {cache.loading=false;if(dev?.id===id&&!showAll&&!showSettings)render();}
+}
+async function writeStandard(target,profile,control,value){
+  const id=target.id;
+  if(standardBusy.has(id))return toast('Wait for the current camera change.',true);
+  standardBusy.add(id);
+  try {
+    const response=await api('/api/camera',{id,profile,control,value});
+    const item=devices.find(device=>device.id===id);
+    if(item) {
+      const saved=response.device.profilesData[profile].camera.controls[control];
+      const data=item.profilesData[profile]||=(item.profilesData[profile]={});
+      (data.camera||=( {})).controls||={};data.camera.controls[control]=saved;
+      if(item.active===profile)item.profile=data;
+    }
+    if(response.controls)standardControls[id]={items:response.controls,loading:false,error:null};
+    else standardControls[id]=undefined;
+    if(previewWidget?.ownerId===id)previewWidget.controller.refresh();
+    if(dev?.id===id)toast('Changed on camera and saved.');
+  }catch(error){if(dev?.id===id)toast(error.message,true);}
+  finally {standardBusy.delete(id);if(dev?.id===id)render();}
+}
+function standardEditor(box,control){
+  const target=dev,profile=target.active,items=standardControls[target.id]?.items||[],info=items.find(item=>item.control===control);
+  if(!info){box.append(el('p',{className:'note',textContent:'Read camera controls first.'}));return;}
+  const view=SecbirdControls.model(info,items),range=info.range;
+  box.append(el('h3',{textContent:control.replaceAll('-',' ')}));
+  if(view.disabled){box.append(el('p',{className:'note',textContent:view.disabled}));return;}
+  const send=value=>writeStandard(target,profile,control,value);
+  if(info.kind==='toggle'||info.kind==='frequency') {
+    const input=el('select',{ariaLabel:control,disabled:view.manualDisabled});
+    input.append(new Option('Current value unknown','',false,!info.current));
+    SecbirdControls.options(info,standardControls[target.id]?.items||[]).forEach(choice=>input.append(new Option(choice.label,String(choice.value),false,info.current?.value===choice.value)));
+    input.onchange=()=>{if(input.value!=='')send(input.value);};box.append(input);
+  }else{
+    const input=el('input',{type:'number',min:range.min,max:range.max,step:range.step,value:info.current?.value??'',ariaLabel:control,disabled:view.manualDisabled});
+    const change=()=>{try{send(SecbirdControls.manualValue(info,input.value));}catch(error){toast(error.message,true);}};
+    input.onchange=change;
+    if(info.current&&range.manual){const slider=el('input',{type:'range',min:range.min,max:range.max,step:range.step,value:info.current.value,ariaLabel:control+' slider',disabled:view.manualDisabled});slider.oninput=()=>input.value=slider.value;slider.onchange=change;box.append(slider);}
+    box.append(input);
+    if(range.automatic){const auto=el('input',{type:'checkbox',checked:!!info.current?.automatic,ariaLabel:'Automatic '+control});auto.indeterminate=!info.current;auto.onchange=()=>{try{send(auto.checked?'auto':SecbirdControls.manualValue(info,input.value));}catch(error){auto.checked=!!info.current?.automatic;toast(error.message,true);}};box.append(el('label',{className:'row'},auto,'Auto'));}
+  }
+  box.append(el('p',{className:'note',textContent:`Driver range ${range.min}…${range.max}, step ${range.step}. Auto may change the live value.`}),
+    el('button',{className:'ghost',textContent:'Reset to driver default',disabled:view.defaultDisabled,onclick:()=>send('default')}));
+  if(control==='anti-flicker')box.append(el('p',{className:'note',textContent:'50/60 Hz is lighting anti-flicker, not video FPS.'}));
+  if(control==='focus')box.append(el('p',{className:'note',textContent:'Auto focus is separate from responsive/passive focus strategy.'}));
+  if(control==='low-light-compensation')box.append(el('p',{className:'note',textContent:'Requires Auto exposure; can lower the frame rate in dim light.'}));
 }
 
 // The browser owns video frames. Backend identities and browser source IDs are not

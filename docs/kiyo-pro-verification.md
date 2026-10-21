@@ -26,6 +26,32 @@ view, and responsive/passive autofocus strategy. The autofocus strategy is not
 an autofocus enable switch or a manual-focus slider. The exact image/focus
 behavior of these vendor modes still needs confirmation on hardware.
 
+The **Image** and **Camera** sections expose standard Windows controls when the
+driver reports them. Run `secbird -d 0E05 camera controls` to see each control's
+readback, range, step and Auto/manual capability. Numeric values use driver units
+(exposure is commonly logarithmic rather than milliseconds). Unsupported controls
+are disabled. Per-control Reset uses the driver's numeric default when known;
+it is not a whole-camera factory reset. Anti-flicker 50/60 Hz is lighting
+frequency, not camera FPS. Low-light compensation needs Auto exposure and can
+reduce FPS in dim light. Focus Auto is separate from responsive/passive focus
+strategy. Standard control writes are read back, unlike vendor extension writes;
+other apps can still override them. Auto values can change over time.
+
+The **Image** and **Camera** sections expose standard Windows controls if the
+driver reports support. Query with `secbird -d 0E05 camera controls` for each
+control's native range, step, current value, and Auto/manual capabilities.
+Numeric values use driver units; exposure is commonly logarithmic rather than
+milliseconds. A grayed-out control is not writable on that driver. Reset sends
+the driver's reported numeric default in manual mode when supported; it is not
+a full factory reset. Anti-flicker 50/60 Hz describes the mains frequency of
+lighting, not camera FPS. Low-light compensation requires Auto exposure and may
+lower FPS in dim light. Standard autofocus Auto is separate from the vendor's
+responsive/passive autofocus strategy.
+
+Standard controls have driver readback after writes, unlike the vendor extension
+controls. A running preview should reflect accepted changes without restarting,
+but other apps can override controls and Auto mode can alter values over time.
+
 Unset profile controls leave the camera unchanged. Values shown in the editor
 and CLI are saved/requested values, not reliable current-camera readbacks. A
 successful write is not evidence that the visible result matches the request.
@@ -101,6 +127,18 @@ unperformed checks unchecked and attach failures instead of inferring success.
 - [ ] HDR dark/bright modes behave as expected; document the observed difference.
 - [ ] Wide/medium/narrow FOV changes framing correctly in both directions.
 - [ ] Responsive/passive focus strategies are accepted; document observed behavior.
+- [ ] Query standard driver ranges; change brightness/contrast/white balance,
+  focus Auto/manual, exposure Auto/manual, and observe the running preview.
+- [ ] Confirm unsupported controls stay disabled; check anti-flicker and low-light
+  behavior separately from capture FPS.
+- [ ] Verify per-control reset where a default exists and explicit profile replay
+  after reconnect; compare readback with the saved Auto/manual choice.
+- [ ] Standard controls: read driver ranges, apply brightness/contrast/white balance,
+  focus Auto/manual, exposure Auto/manual, and see the running preview respond.
+- [ ] Confirm disabled/unsupported controls remain read-only; anti-flicker values
+  are not confused with video FPS; low-light requires Auto exposure.
+- [ ] Test per-control reset when a driver default is available and profile replay
+  on reconnect; compare current readback versus the saved Auto/manual choice.
 - [ ] Saved profiles switch/reapply correctly, including foreground-app profiles.
 - [ ] Restart, reconnect and wake reapply only explicitly stored controls.
 - [ ] An existing mouse/keyboard still works alongside the camera.
