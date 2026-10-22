@@ -4,8 +4,11 @@
     &&(value-range.min)%range.step===0&&(!range.choices?.length||range.choices.includes(value));}
   function model(info,all){
     let disabled=!info?.range?info?.error||'Not supported by this driver':null;
-    return {disabled,manualDisabled:!!disabled||!info?.range?.manual||info?.current?.automatic===true,
-      autoDisabled:!!disabled||!info?.range?.automatic,defaultDisabled:!!disabled||info?.range?.default==null};
+    const lowLight=all.find(item=>item.control==='low-light-compensation')?.current?.value===1;
+    return {disabled,manualDisabled:!!disabled||!info?.range?.manual||info?.current?.automatic===true
+        || (info?.control==='exposure'&&lowLight),
+      autoDisabled:!!disabled||!info?.range?.automatic,defaultDisabled:!!disabled||info?.range?.default==null,
+      prerequisite:info?.control==='exposure'&&lowLight?'Turn off low-light compensation before switching Exposure to Manual.':null};
   }
   function manualValue(info,text){
     if(typeof text!=='string'||!text.trim()||!accepts(info.range,Number(text)))throw new Error('Value must match the driver range and step.');

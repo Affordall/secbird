@@ -23,6 +23,11 @@ driver.
   writes. Unsupported controls are disabled. Standard autofocus Auto is separate
   from responsive/passive focus strategy; low-light compensation requires Auto
   exposure.
+- The editor reads control values/ranges from the driver, separates Auto from
+  manual values, and applies changes while browser preview remains running.
+  Windows driver/permission errors are shown per control. Profiles store explicit
+  requests and reapply them; Auto remains Auto instead of freezing a sampled
+  measurement. Low-light compensation is kept in dependency with Auto exposure.
 - Offer opt-in, video-only preview through the browser. It releases its stream
   on Stop/navigation. Resolution/FPS choices affect **preview only**, never
   other applications or a camera-wide default.
@@ -53,13 +58,17 @@ publicly without checking it.
   diagnostics: the driver advertised 1920×1080 at discrete 60 FPS. That output
   establishes an advertised format, **not** this branch's standard-control
   behavior, image effects, or camera-wide format persistence.
-- On this development Mac, `cargo test --release --workspace --quiet` passed:
-  **100 unit tests, 1 CLI integration test, 1 doctest**; two pre-existing
-  live-network tests remained ignored. `node --test` passed **25** editor tests.
+- On this development Mac after merging upstream v0.4.9,
+  `cargo test --release --workspace --quiet` passed:
+  **105 unit tests, 1 CLI integration test, 1 doctest**; two pre-existing
+  live-network tests remained ignored. `node --test` passed **26** editor tests.
   `cargo clippy --release --workspace --all-targets -- -D warnings` passed
   locally and for the Windows GNU cross-target. These checks verify compilation
   and portable behavior; they do **not** prove the Windows driver accepts each
   control. CI and a physical Kiyo Pro are still required for that claim.
+- A synthetic-video browser smoke test confirmed a standard brightness edit
+  updated the API-supplied current value and saved profile while preview remained
+  active. This used a fake camera endpoint, not a real device or driver.
 - **Physical standard-control behavior and preview response are not yet verified.**
   Please follow [`docs/kiyo-pro-verification.md`](kiyo-pro-verification.md)
   and attach a sanitized `secbird report` when submitting the upstream device

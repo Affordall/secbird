@@ -25,3 +25,10 @@ test('low-light can always be turned off even if exposure is manual',()=>{
   assert.equal(model(item,[exposure]).manualDisabled,false);
   assert.deepEqual(options(item, [exposure]).map(choice=>choice.value),[0]);
 });
+test('manual exposure stays disabled until active low-light compensation is off',()=>{
+  const exp=info(), low={...info(),control:'low-light-compensation',kind:'toggle',current:{value:1,automatic:false},range:{min:0,max:1,step:1,manual:true,choices:[]}};
+  assert.equal(model(exp,[exp,low]).manualDisabled,true);
+  assert.match(model(exp,[exp,low]).prerequisite,/Turn off low-light/);
+  assert.equal(model({...exp,current:{value:-6,automatic:true}},[exp,low]).autoDisabled,false);
+  assert.equal(model({...exp,current:{value:-6,automatic:false}},[exp,{...low,current:{value:0,automatic:false}}]).manualDisabled,false);
+});

@@ -1318,6 +1318,7 @@ function standardEditor(box,control){
   }
   box.append(el('p',{className:'note',textContent:`Driver range ${range.min}…${range.max}, step ${range.step}. Auto may change the live value.`}),
     el('button',{className:'ghost',textContent:'Reset to driver default',disabled:view.defaultDisabled,onclick:()=>send('default')}));
+  if(view.prerequisite)box.append(el('p',{className:'note',textContent:view.prerequisite}));
   if(control==='anti-flicker')box.append(el('p',{className:'note',textContent:'50/60 Hz is lighting anti-flicker, not video FPS.'}));
   if(control==='focus')box.append(el('p',{className:'note',textContent:'Auto focus is separate from responsive/passive focus strategy.'}));
   if(control==='low-light-compensation')box.append(el('p',{className:'note',textContent:'Requires Auto exposure; can lower the frame rate in dim light.'}));
@@ -2108,6 +2109,7 @@ const profileActions = SecbirdProfiles.createProfileActions({api, update(id, dev
   target.profile = target.profile || {};
   target.profilesData[target.active] = target.profile;
   if (target.kind === 'mouse') btnData[id] = undefined;
+  if (target.kind === 'webcam') loadStandardControls(id,true);
 }});
 
 async function activate(name, quiet) {

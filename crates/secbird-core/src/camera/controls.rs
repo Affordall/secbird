@@ -194,6 +194,27 @@ pub struct ControlInfo {
     pub current: Option<ControlState>,
     pub error: Option<String>,
 }
+
+pub fn validate_prerequisite(
+    control: Control,
+    requested: ControlState,
+    related: Option<i32>,
+) -> Result<()> {
+    if control == Control::LowLightCompensation
+        && requested.value != 0
+        && !related.is_some_and(|flags| flags & 1 != 0)
+    {
+        return Err(Error::InvalidArg(
+            "low-light compensation needs automatic exposure; enable Exposure Auto first".into(),
+        ));
+    }
+    if control == Control::Exposure && !requested.automatic && related == Some(1) {
+        return Err(Error::InvalidArg(
+            "turn off low-light compensation before switching Exposure to Manual".into(),
+        ));
+    }
+    Ok(())
+}
 impl ControlInfo {
     pub fn new(
         control: Control,
@@ -289,5 +310,54 @@ mod tests {
             serde_json::to_string(&ControlValue::Auto).unwrap(),
             r#"{"mode":"auto"}"#
         );
+    }
+
+    #[test]
+    fn exposure_manual_requires_low_light_compensation_off() {
+        assert!(validate_prerequisite(
+            Control::Exposure,
+            ControlState {
+                value: -6,
+                automatic: false
+            },
+            Some(1)
+        )
+        .is_err());
+        assert!(validate_prerequisite(
+            Control::Exposure,
+            ControlState {
+                value: -6,
+                automatic: false
+            },
+            Some(0)
+        )
+        .is_ok());
+        assert!(validate_prerequisite(
+            Control::Exposure,
+            ControlState {
+                value: -6,
+                automatic: true
+            },
+            Some(1)
+        )
+        .is_ok());
+        assert!(validate_prerequisite(
+            Control::LowLightCompensation,
+            ControlState {
+                value: 1,
+                automatic: false
+            },
+            Some(0)
+        )
+        .is_err());
+        assert!(validate_prerequisite(
+            Control::LowLightCompensation,
+            ControlState {
+                value: 1,
+                automatic: false
+            },
+            Some(1)
+        )
+        .is_ok());
     }
 }

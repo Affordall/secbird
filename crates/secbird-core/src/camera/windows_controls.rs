@@ -1,7 +1,9 @@
 //! Standard controls through the inbox DirectShow camera interfaces. Power-line
 //! frequency and low-light exposure priority use their KS properties instead.
 use super::{
-    controls::{Control, ControlInfo, ControlRange, ControlState, ControlValue},
+    controls::{
+        validate_prerequisite, Control, ControlInfo, ControlRange, ControlState, ControlValue,
+    },
     windows::system,
 };
 use crate::{Error, Result};
@@ -255,14 +257,16 @@ pub(super) fn set(
     if current == Some(requested) {
         return Ok(requested);
     }
-    if control == Control::LowLightCompensation
-        && requested.value != 0
-        && !read(filter, Control::Exposure)?.automatic
-    {
-        return Err(Error::InvalidArg(
-            "low-light compensation needs automatic exposure; enable Exposure Auto first".into(),
-        ));
-    }
+    let related = match control {
+        Control::LowLightCompensation => read(filter, Control::Exposure)
+            .ok()
+            .map(|state| i32::from(state.automatic)),
+        Control::Exposure => read(filter, Control::LowLightCompensation)
+            .ok()
+            .map(|state| state.value),
+        _ => None,
+    };
+    validate_prerequisite(control, requested, related)?;
     if ks_only(control) {
         ks_state(filter, control, Some(requested))?;
     } else {

@@ -26,17 +26,6 @@ view, and responsive/passive autofocus strategy. The autofocus strategy is not
 an autofocus enable switch or a manual-focus slider. The exact image/focus
 behavior of these vendor modes still needs confirmation on hardware.
 
-The **Image** and **Camera** sections expose standard Windows controls when the
-driver reports them. Run `secbird -d 0E05 camera controls` to see each control's
-readback, range, step and Auto/manual capability. Numeric values use driver units
-(exposure is commonly logarithmic rather than milliseconds). Unsupported controls
-are disabled. Per-control Reset uses the driver's numeric default when known;
-it is not a whole-camera factory reset. Anti-flicker 50/60 Hz is lighting
-frequency, not camera FPS. Low-light compensation needs Auto exposure and can
-reduce FPS in dim light. Focus Auto is separate from responsive/passive focus
-strategy. Standard control writes are read back, unlike vendor extension writes;
-other apps can still override them. Auto values can change over time.
-
 The **Image** and **Camera** sections expose standard Windows controls if the
 driver reports support. Query with `secbird -d 0E05 camera controls` for each
 control's native range, step, current value, and Auto/manual capabilities.
@@ -52,9 +41,9 @@ Standard controls have driver readback after writes, unlike the vendor extension
 controls. A running preview should reflect accepted changes without restarting,
 but other apps can override controls and Auto mode can alter values over time.
 
-Unset profile controls leave the camera unchanged. Values shown in the editor
-and CLI are saved/requested values, not reliable current-camera readbacks. A
-successful write is not evidence that the visible result matches the request.
+Unset profile controls leave the camera unchanged. Vendor extension values shown
+in the editor and CLI are saved/requested values, not current-camera readbacks. A
+successful vendor write is not evidence that the visible result matches the request.
 Profiles reapply explicitly stored controls on startup, reconnect, wake, and
 profile changes. Firmware operations and on-device persistent-save commands are
 not part of this implementation.
