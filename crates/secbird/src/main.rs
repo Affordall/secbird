@@ -19,6 +19,8 @@ DEVICE:
   report [--json]           Read-only description of connected Razer hardware, to share
                             when a device is missing or misbehaves (serials shortened)
   camera controls           Read current image/camera controls and supported ranges
+  dock-test <red|spectrum|battery|off>
+                            Test: set a Mouse Dock Pro's own light once (#39)
 
 SETTINGS (saved to the active profile):
   camera [<control> <value>] Kiyo Pro (Windows): hdr on|off, hdr-mode dark|bright,
@@ -160,7 +162,11 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
                 return Err(Error::NotFound(file.clone()));
             }
             let incoming = Store::load(path)?;
-            let added = store.import(incoming);
+            let connected: Vec<String> = match (HidApi::new(), Db::load(Some(&config_dir().join("devices.json")))) {
+                (Ok(api), Ok(db)) => discover(&api, &db).iter().map(Device::key).collect(),
+                _ => Vec::new(),
+            };
+            let added = store.import_for(incoming, &connected);
             store.save()?;
             println!("Imported {added} profile(s). Existing profiles were kept; clashing names got \"(imported)\".");
         }
@@ -202,6 +208,10 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
             print!("{report}");
         }
         return Ok(());
+    }
+
+    if command == "dock-test" {
+        return dock_test(&devices, args.get(1).map(String::as_str));
     }
 
     if command == "list" {
@@ -649,6 +659,26 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
         }
         _ => Err(Error::InvalidArg("usage: button [list] | button <button> <action|reset> [--hypershift]".into())),
     }
+}
+
+/// One write to a mouse dock's own light, to check what Synapse's dock code says: effect
+/// 0F:02 on LED 15, sent with the dock's transaction id (#39).
+fn dock_test(devices: &[Device], what: Option<&str>) -> Result<(), Error> {
+    use secbird_core::device::{DOCK_LED, DOCK_TXID};
+    let args: &[u8] = match what {
+        Some("red") => &[1, DOCK_LED, 0x01, 0, 0, 1, 0xFF, 0, 0],
+        Some("spectrum") => &[1, DOCK_LED, 0x03, 0, 0, 0],
+        Some("battery") => &[1, DOCK_LED, 0x0E, 0, 0, 0],
+        Some("off") => &[1, DOCK_LED, 0x00, 0, 0, 0],
+        _ => return Err(Error::InvalidArg("usage: dock-test red|spectrum|battery|off".into())),
+    };
+    let dock = devices.iter().find(|d| d.is_mouse_dock()).ok_or_else(|| Error::NotFound("a Mouse Dock Pro".into()))?;
+    let command = secbird_core::commands::MATRIX_EFFECT;
+    match dock.transact_as(DOCK_TXID, command, args.len() as u8, args) {
+        Ok(_) => println!("The dock accepted {command} with txid {DOCK_TXID:02X}. Did its light change?"),
+        Err(e) => println!("The dock didn't take it: {e}"),
+    }
+    Ok(())
 }
 
 fn report_apply(results: Vec<secbird_core::profile::Applied>) -> Result<(), Error> {

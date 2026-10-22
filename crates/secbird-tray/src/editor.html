@@ -487,7 +487,7 @@ const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assi
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
 const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
                  ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
-const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight' };
+const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate' };
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
   headset: 'Headset', accessory: 'Accessory', webcam: 'Webcam', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
@@ -519,13 +519,16 @@ const TKL = [['Esc', 0, 1, 0, 0, 1, 1], ['F1', 0, 3, 2.05, 0, 1, 1], ['F2', 0, 4
 const MINI = [['Esc', 0, 1, 0, 0, 1, 1], ['1', 0, 2, 1, 0, 1, 1], ['2', 0, 3, 2, 0, 1, 1], ['3', 0, 4, 3, 0, 1, 1], ['4', 0, 5, 4, 0, 1, 1], ['5', 0, 6, 5, 0, 1, 1], ['6', 0, 7, 6, 0, 1, 1], ['7', 0, 8, 7, 0, 1, 1], ['8', 0, 9, 8, 0, 1, 1], ['9', 0, 10, 9, 0, 1, 1], ['0', 0, 11, 10, 0, 1, 1], ['-', 0, 12, 11, 0, 1, 1], ['=', 0, 13, 12, 0, 1, 1], ['Backspace', 0, 14, 13, 0, 2, 1], ['Tab', 1, 1, 0, 1, 1.5, 1], ['Q', 1, 2, 1.5, 1, 1, 1], ['W', 1, 3, 2.5, 1, 1, 1], ['E', 1, 4, 3.5, 1, 1, 1], ['R', 1, 5, 4.5, 1, 1, 1], ['T', 1, 6, 5.5, 1, 1, 1], ['Y', 1, 7, 6.5, 1, 1, 1], ['U', 1, 8, 7.5, 1, 1, 1], ['I', 1, 9, 8.5, 1, 1, 1], ['O', 1, 10, 9.5, 1, 1, 1], ['P', 1, 11, 10.5, 1, 1, 1], ['[', 1, 12, 11.5, 1, 1, 1], [']', 1, 13, 12.5, 1, 1, 1], ['\\', 1, 14, 13.5, 1, 1.5, 1], ['Caps', 2, 1, 0, 2, 1.75, 1], ['A', 2, 2, 1.75, 2, 1, 1], ['S', 2, 3, 2.75, 2, 1, 1], ['D', 2, 4, 3.75, 2, 1, 1], ['F', 2, 5, 4.75, 2, 1, 1], ['G', 2, 6, 5.75, 2, 1, 1], ['H', 2, 7, 6.75, 2, 1, 1], ['J', 2, 8, 7.75, 2, 1, 1], ['K', 2, 9, 8.75, 2, 1, 1], ['L', 2, 10, 9.75, 2, 1, 1], [';', 2, 11, 10.75, 2, 1, 1], ["'", 2, 12, 11.75, 2, 1, 1], ['Enter', 2, 14, 12.75, 2, 2.25, 1], ['Shift', 3, 1, 0, 3, 2.25, 1], ['Z', 3, 3, 2.25, 3, 1, 1], ['X', 3, 4, 3.25, 3, 1, 1], ['C', 3, 5, 4.25, 3, 1, 1], ['V', 3, 6, 5.25, 3, 1, 1], ['B', 3, 7, 6.25, 3, 1, 1], ['N', 3, 8, 7.25, 3, 1, 1], ['M', 3, 9, 8.25, 3, 1, 1], [',', 3, 10, 9.25, 3, 1, 1], ['.', 3, 11, 10.25, 3, 1, 1], ['/', 3, 12, 11.25, 3, 1, 1], ['Shift', 3, 14, 12.25, 3, 2.75, 1], ['Ctrl', 4, 1, 0, 4, 1.3, 1], ['Win', 4, 2, 1.3, 4, 1.2, 1], ['Alt', 4, 3, 2.5, 4, 1.3, 1], ['Space', 4, 7, 3.8, 4, 6.2, 1], ['Alt', 4, 11, 10, 4, 1.3, 1], ['Fn', 4, 12, 11.25, 4, 1.25, 1], ['Menu', 4, 13, 12.5, 4, 1.25, 1], ['Ctrl', 4, 14, 13.75, 4, 1.25, 1]];
 const PLACED = { '6x16:laptop': BLADE, '6x18:keyboard': TKL, '5x15:keyboard': MINI };
 // The keys of a per-key device, or null when its layout isn't known (one square per light).
+// The maps above start at column 1; boards whose leftmost key is column 0 (DeathStalker V2, #41)
+// shift every key left, and their tenkeyless grid is one column narrower.
 function knownLayout(m, kind) {
+  const shift = (m.first ?? 1) - 1;
   if (m.rows === 6 && m.cols === 22) return FULLSIZE.flatMap((keys, row) => {
     let x = 0;
-    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => { x += gap; const k = { label, row, col, x, y: row + (row ? .25 : 0), w, h }; x += w; return k; });
+    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => { x += gap; const k = { label, row, col: col + shift, x, y: row + (row ? .25 : 0), w, h }; x += w; return k; });
   });
-  const placed = PLACED[m.rows + 'x' + m.cols + ':' + kind];
-  return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col, x, y, w, h })) : null;
+  const placed = PLACED[m.rows + 'x' + (m.cols - shift) + ':' + kind];
+  return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h })) : null;
 }
 function layout(m, kind) {
   const known = knownLayout(m, kind);
@@ -2267,7 +2270,7 @@ function renderSettings() {
       const r = await api('/api/import', { data: JSON.parse(await f.text()) });
       devices = r.state.devices; devices.forEach(d => { d.profile = d.profile || {}; d.profilesData = d.profilesData || {}; d.profilesData[d.active] = d.profile; });
       dev = devices.find(d => dev && d.id === dev.id) || devices[0] || null;
-      toast(r.added ? 'Added ' + plural(r.added, 'profile') + '; yours were kept' : 'Nothing new in that file');
+      toast(r.added ? 'Added ' + plural(r.added, 'profile') + '; yours were kept. Pick one in the profile list.' : 'Nothing new in that file');
     } catch (err) { toast(err instanceof SyntaxError ? 'That file isn’t a Secretarybird backup' : err.message, true); }
     e.target.value = '';
   } });

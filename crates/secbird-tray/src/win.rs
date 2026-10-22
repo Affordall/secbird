@@ -41,6 +41,10 @@ const TIMER_RESCAN: usize = 1;
 /// Extra rescans after start and wake: devices often answer late at boot.
 const TIMER_RETRY: usize = 2;
 const RETRY_DELAYS_MS: [u32; 3] = [4_000, 15_000, 45_000];
+/// After those, a wireless device that sleeps until its first keypress gets looked for
+/// once a minute for half an hour, so it still gets its profile (#37).
+const SLEEPER_RETRY_MS: u32 = 60_000;
+const SLEEPER_RETRIES: usize = 30;
 /// Battery check for wireless devices (cheap: two short USB requests per device).
 const TIMER_BATTERY: usize = 3;
 const BATTERY_MS: u32 = 5 * 60 * 1000;
@@ -387,7 +391,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             let next = with_app(|app| {
                 app.rescan();
                 app.retry_step += 1;
-                RETRY_DELAYS_MS.get(app.retry_step).copied()
+                RETRY_DELAYS_MS.get(app.retry_step).copied().or_else(|| {
+                    let more = app.retry_step < RETRY_DELAYS_MS.len() + SLEEPER_RETRIES;
+                    (more && app.engine().has_sleeping()).then_some(SLEEPER_RETRY_MS)
+                })
             });
             if let Some(Some(ms)) = next {
                 SetTimer(hwnd, TIMER_RETRY, ms, None);

@@ -82,7 +82,7 @@ impl Device {
             return Err(Error::Unsupported(format!("lighting effects on {} (older lighting commands)", self.name())));
         }
         let (id, flags, rate, colors) = effect.params();
-        let mut args = vec![cmd::VARSTORE, led, id, flags, rate, colors.len() as u8];
+        let mut args = vec![self.saved_slot(), led, id, flags, rate, colors.len() as u8];
         args.extend(colors.iter().flat_map(|c| [c.0, c.1, c.2]));
         match self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args) {
             // Some firmware runs only a few effects itself (the Basilisk V3: spectrum and wave);
