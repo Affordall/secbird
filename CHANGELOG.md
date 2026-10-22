@@ -12,6 +12,8 @@
 ### Fixed
 - Wireless mice lost their button remaps after sleeping until the profile was switched (#45).
   The tray checks one remapped button every 20 seconds and sends the remaps again if they're gone.
+- Tartarus V2: colour and brightness changes did nothing. It uses the newer lighting commands, not
+  the older ones the device list had (#46, thanks fen0z).
 
 ## [0.4.9] - 2026-10-21
 
