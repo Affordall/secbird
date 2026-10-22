@@ -58,10 +58,10 @@ publicly without checking it.
   diagnostics: the driver advertised 1920×1080 at discrete 60 FPS. That output
   establishes an advertised format, **not** this branch's standard-control
   behavior, image effects, or camera-wide format persistence.
-- On this development Mac after merging upstream v0.4.9,
+- On this development Mac after merging upstream v0.4.10,
   `cargo test --release --workspace --quiet` passed:
-  **105 unit tests, 1 CLI integration test, 1 doctest**; two pre-existing
-  live-network tests remained ignored. `node --test` passed **26** editor tests.
+  **106 unit tests, 1 CLI integration test, 1 doctest**; three live-network
+  tests remained ignored. `node --test` passed **26** editor tests.
   `cargo clippy --release --workspace --all-targets -- -D warnings` passed
   locally and for the Windows GNU cross-target. These checks verify compilation
   and portable behavior; they do **not** prove the Windows driver accepts each
