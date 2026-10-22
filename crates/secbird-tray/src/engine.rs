@@ -315,6 +315,31 @@ impl Engine {
         reports
     }
 
+    /// Wireless mice that dropped their button remaps while asleep (#45) get them back.
+    /// `skip` holds keys re-sent moments ago, left alone so a mouse that keeps losing
+    /// them isn't written over and over. Returns the keys re-sent, with their reports.
+    pub fn restore_lost_buttons(&self, skip: &HashSet<String>) -> Vec<(String, ApplyReport)> {
+        let Ok(mut store) = self.store() else { return Vec::new() };
+        self.devices
+            .iter()
+            .filter(|d| d.spec.as_ref().is_some_and(|s| s.wireless && s.kind == secbird_core::Kind::Mouse))
+            .filter(|d| !skip.contains(&d.key()))
+            .filter_map(|dev| {
+                let p = store.for_device(dev);
+                let name = p.effective(self.foreground()).to_string();
+                if !p.buttons_lost(&name, dev) {
+                    return None;
+                }
+                let failures = p
+                    .apply_buttons(&name, dev)
+                    .into_iter()
+                    .filter_map(|a| a.result.err().map(|e| format!("{}: {e}", a.setting)))
+                    .collect();
+                Some((dev.key(), ApplyReport { device: self.label(dev), profile: name, failures }))
+            })
+            .collect()
+    }
+
     pub fn all_keys(&self) -> Vec<String> {
         self.devices.iter().map(|d| d.key()).chain(self.cameras.iter().map(|camera| camera.id.clone())).collect()
     }

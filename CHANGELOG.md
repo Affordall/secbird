@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.10] - 2026-10-22
+
+### Added
+- Naga V2 Pro: the side grid and the profile light underneath are their own zones (#13, thanks
+  Wastelander121).
+- Per-key colours: a layout picker with UK (ISO) and German (QWERTZ) beside US. ISO boards get
+  their key left of Z and the one left of Enter, and lose the backslash key they don't have (#45,
+  thanks Skillprofi10).
+
+### Fixed
+- Wireless mice lost their button remaps after sleeping until the profile was switched (#45).
+  The tray checks one remapped button every 20 seconds and sends the remaps again if they're gone.
+- Tartarus V2: colour and brightness changes did nothing. It uses the newer lighting commands, not
+  the older ones the device list had (#46, thanks fen0z).
+
+## Unreleased
 ## Unreleased
 
 ### Added
@@ -8,7 +24,6 @@
   settings; unsupported controls are disabled. Physical control effects are not verified yet.
 - Optional browser-based, video-only preview in the tray editor to inspect camera changes. It asks
   for camera access only when started and can contend with other camera applications.
-
 ## [0.4.9] - 2026-10-21
 
 ### Added

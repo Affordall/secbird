@@ -162,6 +162,23 @@ impl DeviceProfiles {
         out
     }
 
+    /// Whether the device has lost profile `name`'s button remaps, as a wireless mouse
+    /// does when it sleeps and wakes (#45). Reads back one remapped button; `false` when
+    /// the profile remaps nothing or the device doesn't answer.
+    pub fn buttons_lost(&self, name: &str, dev: &Device) -> bool {
+        let Some((key, action)) = self.profiles.get(name).and_then(|p| p.buttons.iter().next()) else {
+            return false;
+        };
+        let Ok((id, layer)) = crate::buttons::parse_setting_key(key) else { return false };
+        let Ok(want) = action.parse::<crate::buttons::Action>() else { return false };
+        dev.button(id, layer).is_ok_and(|have| have != want)
+    }
+
+    /// Send only profile `name`'s button remaps (see [`DeviceProfiles::buttons_lost`]).
+    pub fn apply_buttons(&self, name: &str, dev: &Device) -> Vec<Applied> {
+        self.profiles.get(name).map(|p| p.apply_buttons(dev)).unwrap_or_default()
+    }
+
     pub fn switch(&mut self, name: &str) -> Result<()> {
         if !self.profiles.contains_key(name) {
             return Err(Error::NotFound(format!("profile '{name}'")));
@@ -350,14 +367,21 @@ impl Profile {
         if lighting && !self.keys.is_empty() {
             push(format!("per-key colors ({} keys)", self.keys.len()), dev.show_frame(&self.keys));
         }
-        for (key, action) in &self.buttons {
-            let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| {
-                let action: crate::buttons::Action = action.parse()?;
-                dev.set_button(id, layer, action).map(|_| ())
-            });
-            push(format!("{key} -> {action}"), result);
-        }
+        out.extend(self.apply_buttons(dev));
         out
+    }
+
+    fn apply_buttons(&self, dev: &Device) -> Vec<Applied> {
+        self.buttons
+            .iter()
+            .map(|(key, action)| {
+                let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| {
+                    let action: crate::buttons::Action = action.parse()?;
+                    dev.set_button(id, layer, action).map(|_| ())
+                });
+                Applied { setting: format!("{key} -> {action}"), result }
+            })
+            .collect()
     }
 }
 
@@ -376,6 +400,27 @@ impl<'de> Deserialize<'de> for Rgb {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// On the first real mouse: `cargo test -p secbird-core real_mouse -- --ignored`.
+    /// Sends F13 to side-forward for a moment and puts it back to the saved setting.
+    #[test]
+    #[ignore]
+    fn real_mouse_lost_buttons_are_noticed_and_sent_again() {
+        use crate::buttons::{Action, Layer};
+        let api = crate::hidapi::HidApi::new().unwrap();
+        let devs = crate::discover(&api, &crate::Db::builtin().unwrap());
+        let dev = devs.iter().find(|d| !d.buttons().is_empty()).expect("a mouse with remappable buttons");
+        let mut p = DeviceProfiles::default();
+        p.active_mut().buttons.insert("side-forward".into(), "key:f13".into());
+        assert!(p.apply_buttons("Default", dev).iter().all(|a| a.result.is_ok()));
+        assert!(!p.buttons_lost("Default", dev), "just sent");
+        dev.reset_button(5, Layer::Normal).unwrap(); // what a wake does to the live slot
+        assert!(p.buttons_lost("Default", dev), "noticed");
+        assert!(p.apply_buttons("Default", dev).iter().all(|a| a.result.is_ok()));
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), Action::Key { modifiers: 0, usage: 0x68 });
+        assert!(!p.buttons_lost("Default", dev), "sent again");
+        dev.reset_button(5, Layer::Normal).unwrap();
+    }
 
     #[test]
     fn lighting_ownership_defaults_migrates_and_survives_import() {
