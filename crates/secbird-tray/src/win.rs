@@ -1,6 +1,6 @@
 use crate::engine::{ApplyReport, Battery, Engine};
 use secbird_core::log;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use crate::settings::{autostart_enabled, open_config_folder, set_autostart, TraySettings};
 use crate::{apps, osd, server};
 use std::ffi::CString;
@@ -61,6 +61,11 @@ const FIRMWARE_TIMER_MS: u32 = 6 * 60 * 60 * 1000;
 const FIRMWARE_FIRST_MS: u32 = 2 * 60 * 1000;
 const FIRMWARE_EVERY_SECS: u64 = 7 * 24 * 60 * 60;
 const UPDATE_EVERY_SECS: u64 = 24 * 60 * 60;
+/// Wireless mice forget their button remaps when they sleep (#45): one button is read
+/// back this often and the remaps re-sent if it changed, at most once a minute each.
+const TIMER_BUTTONS: usize = 6;
+const BUTTONS_MS: u32 = 20_000;
+const BUTTONS_AGAIN_SECS: u64 = 60;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
@@ -100,6 +105,8 @@ struct App {
     /// Devices already warned about low battery (cleared once charging or recovered).
     low_battery: HashSet<String>,
     batteries: Vec<Battery>,
+    /// When each mouse last got its lost remaps back (device key -> unix seconds).
+    buttons_restored: HashMap<String, u64>,
     /// Event collections with a listener thread; a thread removes its path when the
     /// device goes away, so a later rescan starts a new one.
     listening: Arc<Mutex<HashSet<CString>>>,
@@ -275,6 +282,7 @@ pub fn run() {
                 retry_step: 0,
                 synapse_warned: false,
                 low_battery: HashSet::new(),
+                buttons_restored: HashMap::new(),
                 batteries: Vec::new(),
                 listening: Arc::new(Mutex::new(HashSet::new())),
                 events_tx,
@@ -295,6 +303,7 @@ pub fn run() {
         with_app(|app| app.rescan());
         start_retries(hwnd);
         SetTimer(hwnd, TIMER_BATTERY, BATTERY_MS, None);
+        SetTimer(hwnd, TIMER_BUTTONS, BUTTONS_MS, None);
         SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_FIRST_MS, None);
         if std::env::args().any(|a| a == "--editor") {
             with_app(|app| app.open_editor());
@@ -411,6 +420,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TIMER if wparam == TIMER_BATTERY => {
             with_app(|app| app.check_battery());
+            0
+        }
+        WM_TIMER if wparam == TIMER_BUTTONS => {
+            with_app(|app| app.restore_lost_buttons());
             0
         }
         WM_TIMER if wparam == TIMER_FOREGROUND => {
@@ -575,6 +588,19 @@ impl App {
                 "It can overwrite Secretarybird's settings. Close it, or run `secbird debloat` to stop it starting with Windows.",
             );
         }
+    }
+
+    fn restore_lost_buttons(&mut self) {
+        let now = now_secs();
+        self.buttons_restored.retain(|_, at| now.saturating_sub(*at) < BUTTONS_AGAIN_SECS);
+        let skip: HashSet<String> = self.buttons_restored.keys().cloned().collect();
+        let restored = self.engine().restore_lost_buttons(&skip);
+        for (key, report) in &restored {
+            self.buttons_restored.insert(key.clone(), now);
+            log::append(&format!("{}: button remaps were gone (asleep?), sent {} again", report.device, report.profile));
+        }
+        let reports: Vec<ApplyReport> = restored.into_iter().map(|(_, r)| r).collect();
+        self.notify_failures(&reports);
     }
 
     fn check_battery(&mut self) {

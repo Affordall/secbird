@@ -480,7 +480,7 @@ const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assi
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
 const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
                  ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
-const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate' };
+const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate', profile: 'Profile light' };
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
@@ -523,8 +523,26 @@ function knownLayout(m, kind) {
   const placed = PLACED[m.rows + 'x' + (m.cols - shift) + ':' + kind];
   return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h })) : null;
 }
+// The maps above are ANSI. ISO boards (#45) have a key left of Z (matrix column 2) and one left
+// of Enter (column 13), and a tall Enter where ANSI has its backslash.
+const KB_LAYOUTS = [['ansi', 'US (ANSI)'], ['iso', 'UK (ISO)'], ['de', 'German (QWERTZ)']];
+const DE_LABELS = { '`': '^', '-': 'ß', '=': '´', Y: 'Z', Z: 'Y', '[': 'Ü', ']': '+', ';': 'Ö', "'": 'Ä', '/': '-' };
+function kbLayout() { return (dev && remembered('kblayout-' + dev.id)) || 'ansi'; }
+function isoLayout(keys, labels) {
+  const bs = keys.find(k => k.label === '\\'); if (!bs) return keys;
+  const enter = keys.find(k => k.label === 'Enter' && k.row === bs.row + 1 && k.col === bs.col);
+  const shift = keys.find(k => k.label === 'Shift' && k.row === bs.row + 2 && k.x === 0);
+  if (!enter || !shift) return keys;
+  const out = keys.filter(k => k !== bs && k !== enter && k !== shift)
+    .map(k => labels && k.label in labels && k.col < enter.col ? { ...k, label: labels[k.label] } : k); // not the numpad's / and -
+  out.push({ ...enter, label: '#', col: enter.col - 1, w: 1 },
+    { ...enter, x: enter.x + 1, y: bs.y, w: enter.w - 1, h: enter.y + enter.h - bs.y },
+    { ...shift, w: 1.25 }, { ...shift, label: labels ? '<' : '\\', col: shift.col + 1, x: 1.25, w: 1 });
+  return out;
+}
 function layout(m, kind) {
-  const known = knownLayout(m, kind);
+  let known = knownLayout(m, kind);
+  if (known && kbLayout() !== 'ansi') known = isoLayout(known, kbLayout() === 'de' ? DE_LABELS : null);
   if (known) return known;
   const out = []; // unknown layout: one square per matrix cell
   for (let row = 0; row < m.rows; row++) for (let col = 0; col < m.cols; col++) out.push({ label: '', row, col, x: col, y: row, w: 1, h: 1 });
@@ -1359,6 +1377,11 @@ function keysEditor(box) {
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Quick' }),
       el('button', { className: 'ghost', textContent: 'Fill all keys', onclick: () => setKeys(Array(keyCount()).fill(brush)) }),
       el('button', { className: 'ghost', textContent: 'Back to whole keyboard', onclick: () => { const c = dev.leds[0] && (zoneOf(dev.profile, dev.leds[0].name).color || brush); if (c) setColor(c, dev.leds[0].name); } })),
+    knownLayout(dev.matrix, dev.kind) ? el('div', { className: 'edgroup' }, el('h3', { textContent: 'Layout' }), (() => {
+      const pick = el('select', { ariaLabel: 'Keyboard layout', onchange: () => { remember('kblayout-' + dev.id, pick.value); renderKb(svg); } });
+      KB_LAYOUTS.forEach(([v, t]) => pick.append(new Option(t, v, false, v === kbLayout())));
+      return pick;
+    })()) : null,
     el('p', { className: 'note', textContent: knownLayout(dev.matrix, dev.kind)
       ? 'Pick a brush color, then click or drag across keys to paint them.'
       : 'This keyboard’s key layout isn’t known yet, so each square is one of its lights, in rows from the top left. Paint one to see which key lights up.' }),

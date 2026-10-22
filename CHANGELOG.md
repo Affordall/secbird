@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.10] - 2026-10-22
+
+### Added
+- Naga V2 Pro: the side grid and the profile light underneath are their own zones (#13, thanks
+  Wastelander121).
+- Per-key colours: a layout picker with UK (ISO) and German (QWERTZ) beside US. ISO boards get
+  their key left of Z and the one left of Enter, and lose the backslash key they don't have (#45,
+  thanks Skillprofi10).
+
+### Fixed
+- Wireless mice lost their button remaps after sleeping until the profile was switched (#45).
+  The tray checks one remapped button every 20 seconds and sends the remaps again if they're gone.
+
 ## [0.4.9] - 2026-10-21
 
 ### Added

@@ -908,6 +908,30 @@ mod tests {
     }
 
     #[test]
+    fn buttons_lost_in_sleep_are_noticed_and_sent_again() {
+        use crate::buttons::{Action, Layer};
+        use crate::profile::DeviceProfiles;
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let mut p = DeviceProfiles::default();
+        assert!(!p.buttons_lost("Default", &dev), "nothing remapped, nothing to lose");
+        p.active_mut().buttons.insert("side-forward".into(), "key:ctrl+tab".into());
+        assert!(p.apply("Default", &dev).iter().all(|a| a.result.is_ok()));
+        assert!(!p.buttons_lost("Default", &dev));
+
+        // Waking from sleep, the mouse fills the live slot from its saved one (#45).
+        {
+            let mut s = sim.state();
+            let saved: Vec<_> = s.buttons.iter().filter(|(k, _)| k.0 == 1).map(|(k, v)| ((0, k.1, k.2), *v)).collect();
+            s.buttons.extend(saved);
+        }
+        assert!(p.buttons_lost("Default", &dev));
+        assert!(p.apply_buttons("Default", &dev).iter().all(|a| a.result.is_ok()));
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), "key:ctrl+tab".parse::<Action>().unwrap());
+        assert!(!p.buttons_lost("Default", &dev));
+    }
+
+    #[test]
     fn dpi_stages_round_trip_and_move_the_mouse() {
         use crate::features::DpiStages;
         let sim = Sim::mouse();
