@@ -255,6 +255,13 @@
   #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
   #kb g:hover rect { stroke: var(--muted); }
   #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+  .lightgrid { display: grid; gap: 3px; min-width: 600px; max-width: 1040px; }
+  .lightgrid button { aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid var(--key-stroke); border-radius: 4px; background: var(--key-fill);
+    color: var(--key-text); font-size: 10px; line-height: 1.1; overflow: hidden; cursor: pointer; overflow-wrap: anywhere; }
+  .lightgrid button.named { border-color: var(--line-strong); color: var(--text); }
+  .lightgrid button.none { color: var(--faint); }
+  .lightgrid button.at { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .finder input { min-width: 240px; }
   .hint { color: var(--muted); font-size: 13px; margin: 0; }
   .hint b { color: var(--text); font-weight: 600; }
 
@@ -513,12 +520,17 @@ const MINI = [['Esc', 0, 1, 0, 0, 1, 1], ['1', 0, 2, 1, 0, 1, 1], ['2', 0, 3, 2,
 const PLACED = { '6x16:laptop': BLADE, '6x18:keyboard': TKL, '5x15:keyboard': MINI };
 // The keys of a per-key device, or null when its layout isn't known (one square per light).
 // The maps above start at column 1; boards whose leftmost key is column 0 (DeathStalker V2, #41)
-// shift every key left, and their tenkeyless grid is one column narrower.
+// shift every key left, and their tenkeyless grid is one column narrower. Except the wide
+// numpad 0, which stays at column 18 there (#41: it lit before the shift and not after).
 function knownLayout(m, kind) {
   const shift = (m.first ?? 1) - 1;
   if (m.rows === 6 && m.cols === 22) return FULLSIZE.flatMap((keys, row) => {
     let x = 0;
-    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => { x += gap; const k = { label, row, col: col + shift, x, y: row + (row ? .25 : 0), w, h }; x += w; return k; });
+    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
+      x += gap;
+      const k = { label, row, col: row === 5 && label === '0' ? col : col + shift, x, y: row + (row ? .25 : 0), w, h };
+      x += w; return k;
+    });
   });
   const placed = PLACED[m.rows + 'x' + (m.cols - shift) + ':' + kind];
   return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h })) : null;
@@ -580,7 +592,7 @@ function live(send, done) {
     (async () => {
       while (next !== undefined) {
         const v = next; next = undefined;
-        try { const r = await send(v); toast(done ? done(r) : 'Saved to ' + dev.active); } catch (e) { toast(e.message, true); }
+        try { const r = await send(v), msg = done ? done(r) : 'Saved to ' + dev.active; if (msg) toast(msg); } catch (e) { toast(e.message, true); }
       }
       busy = false;
     })();
@@ -967,6 +979,7 @@ function select(key) {
 }
 
 function renderPanel(cur) {
+  stopFinding();
   const p = $('panel');
   p.innerHTML = '';
   const r = sel && cur.rows.find(x => x.key === sel);
@@ -1376,7 +1389,8 @@ function keysEditor(box) {
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Brush' }), presets, custom),
     el('div', { className: 'edgroup' }, el('h3', { textContent: 'Quick' }),
       el('button', { className: 'ghost', textContent: 'Fill all keys', onclick: () => setKeys(Array(keyCount()).fill(brush)) }),
-      el('button', { className: 'ghost', textContent: 'Back to whole keyboard', onclick: () => { const c = dev.leds[0] && (zoneOf(dev.profile, dev.leds[0].name).color || brush); if (c) setColor(c, dev.leds[0].name); } })),
+      el('button', { className: 'ghost', textContent: 'Back to whole keyboard', onclick: () => { const c = dev.leds[0] && (zoneOf(dev.profile, dev.leds[0].name).color || brush); if (c) setColor(c, dev.leds[0].name); } }),
+      el('button', { className: 'ghost', textContent: 'Find which light is which key…', onclick: () => { box.innerHTML = ''; findLights(box); } })),
     knownLayout(dev.matrix, dev.kind) ? el('div', { className: 'edgroup' }, el('h3', { textContent: 'Layout' }), (() => {
       const pick = el('select', { ariaLabel: 'Keyboard layout', onchange: () => { remember('kblayout-' + dev.id, pick.value); renderKb(svg); } });
       KB_LAYOUTS.forEach(([v, t]) => pick.append(new Option(t, v, false, v === kbLayout())));
@@ -1388,6 +1402,84 @@ function keysEditor(box) {
     el('div', { className: 'kbwrap' }, svg));
   renderKb(svg);
 }
+
+// Lights one cell of the board's grid at a time; the user types the key that lit up, and the
+// list goes into a GitHub issue. Maps boards whose layout is wrong or unknown (#45, #27, #41)
+// without guessing. Nothing is saved on the device; leaving puts the profile's lighting back.
+let finding = null;
+function findLights(box) {
+  const { rows, cols } = dev.matrix, mem = 'lightmap-' + dev.id;
+  let names = {};
+  try { names = JSON.parse(remembered(mem) || '{}'); } catch { }
+  let at = 0;
+  const known = knownLayout(dev.matrix, dev.kind) ? layout(dev.matrix, dev.kind) : [];
+  const guess = Object.fromEntries(known.filter(k => k.label).map(k => [k.row * cols + k.col, k.label]));
+  const show = live(i => api('/api/find-light', { light: [Math.floor(i / cols), i % cols] }), () => null);
+  finding = dev.id;
+  const where = el('p', { className: 'hint', ariaLive: 'polite' });
+  const input = el('input', { type: 'text', placeholder: 'e.g. Num ,  or  Volume dial', ariaLabel: 'Key that lit up' });
+  const grid = el('div', { className: 'lightgrid', style: `grid-template-columns: repeat(${cols}, minmax(0, 1fr))` });
+  const cells = [];
+  for (let i = 0; i < rows * cols; i++) {
+    const b = el('button', { title: `Row ${Math.floor(i / cols) + 1}, light ${i % cols + 1}`, onclick: () => go(i) });
+    cells.push(b); grid.append(b);
+  }
+  const keep = () => {
+    const v = input.value.trim();
+    if (v) names[at] = v; else delete names[at];
+    remember(mem, JSON.stringify(names));
+  };
+  const draw = () => cells.forEach((b, i) => {
+    const n = names[i];
+    b.textContent = n === '-' ? '–' : n || '';
+    b.className = (i === at ? 'at ' : '') + (n === '-' ? 'none' : n ? 'named' : '');
+  });
+  const go = i => {
+    keep();
+    at = (i + rows * cols) % (rows * cols);
+    input.value = names[at] || '';
+    where.textContent = `Row ${Math.floor(at / cols) + 1} of ${rows}, light ${at % cols + 1} of ${cols} is lit. Which key is it?` +
+      (guess[at] ? ` The editor has it as “${guess[at]}”.` : '');
+    draw(); show(at); input.focus();
+  };
+  input.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); go(at + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); go(at - cols); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); go(at + cols); }
+  };
+  const copy = async () => {
+    keep();
+    const done = Object.keys(names).map(Number).sort((a, b) => a - b);
+    const lines = done.map(i => `${Math.floor(i / cols) + 1},${i % cols + 1}: ${names[i] === '-' ? '(nothing)' : names[i]}`);
+    const text = `Light map for ${dev.name} (${dev.pid}), ${rows} x ${cols} grid, row,light: key\n` + lines.join('\n');
+    try { await navigator.clipboard.writeText(text); toast(`Copied ${done.length} of ${rows * cols}. Paste it into your GitHub issue`); }
+    catch (e) { toast(e.message, true); }
+  };
+  box.append(
+    el('div', { className: 'edgroup' }, el('h3', { textContent: 'Find which light is which key' }),
+      el('p', { className: 'note', textContent: 'One light on your keyboard is on at a time. Type the key it is under and press Enter for the next one. Keys that stay dark: press Nothing lit. Click any square to jump to it. Your answers are kept if you stop halfway.' }),
+      where,
+      el('div', { className: 'row finder' }, input,
+        el('button', { className: 'ghost', textContent: 'Nothing lit', onclick: () => { input.value = '-'; go(at + 1); } }),
+        el('button', { className: 'ghost', innerHTML: icon('left'), ariaLabel: 'Previous light', title: 'Previous', onclick: () => go(at - 1) }),
+        el('button', { className: 'ghost', innerHTML: icon('right'), ariaLabel: 'Next light', title: 'Next', onclick: () => go(at + 1) })),
+      el('div', { className: 'row' },
+        el('button', { textContent: 'Copy the list', onclick: copy }),
+        el('button', { className: 'ghost', textContent: 'Done', onclick: () => { keep(); stopFinding(); box.innerHTML = ''; keysEditor(box); } }))),
+    el('div', { className: 'kbwrap' }, grid));
+  go(0);
+}
+// Put the profile's lighting back after finding lights (also when the page is closed).
+function stopFinding(closing) {
+  if (!finding) return;
+  const id = finding; finding = null;
+  if (closing) {
+    fetch('/api/find-light', { method: 'POST', keepalive: true, headers: { 'X-Secbird-Token': T, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    return;
+  }
+  api('/api/find-light', { id }).catch(e => toast(e.message, true));
+}
+window.addEventListener('pagehide', () => stopFinding(true));
 
 function dpiEditor(box) {
   const d = dev.dpi, step = Math.max(d.step || 50, 50);

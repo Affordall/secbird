@@ -1311,8 +1311,22 @@ mod tests {
         assert_eq!(s.key(0, 0), Some([0, 0, 7]));
         assert_eq!(s.key(5, 21), Some([200, 210, 7]));
         assert_eq!(s.effects[&0][0], cmd::EFFECT_CUSTOM_FRAME);
-        // 6 rows + 1 effect command after the serial probe.
+        // 6 rows, then the effect live and saved (#45: quick adjustment reloads the saved one).
         assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_FRAME).count(), 6);
+        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 2);
+    }
+
+    #[test]
+    fn finding_a_light_shows_only_that_one_and_saves_nothing() {
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        let mut store = crate::Store::default();
+        crate::actions::show_light(&dev, &mut store, 0, 21).unwrap();
+        let s = sim.state();
+        assert_eq!(s.key(0, 21), Some([255, 255, 255]));
+        assert_eq!(s.key(0, 20), Some([0, 0, 0]));
+        assert!(store.for_device(&dev).active_mut().keys.is_empty());
+        assert!(crate::actions::show_light(&dev, &mut store, 6, 0).is_err());
     }
 
     #[test]

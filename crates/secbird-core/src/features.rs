@@ -438,10 +438,16 @@ impl Device {
         match self.lighting() {
             // Size 0x0C as Razer sends it; the trailing arguments are zero.
             Lighting::Extended => {
-                self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?
+                self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?;
+                // Also saved, so a keyboard that reloads its saved lighting (leaving quick
+                // adjustment mode, #45) comes back to these colors instead of going dark.
+                // Best effort, as for auto sleep.
+                let _ = self.transact(cmd::MATRIX_EFFECT, 0x0C, &[self.saved_slot(), 0x00, cmd::EFFECT_CUSTOM_FRAME]);
             }
-            _ => self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?,
-        };
+            _ => {
+                self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?;
+            }
+        }
         Ok(())
     }
 }

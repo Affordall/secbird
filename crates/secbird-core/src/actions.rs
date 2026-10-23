@@ -122,6 +122,19 @@ pub fn set_keys(dev: &Device, store: &mut Store, keys: Vec<Rgb>) -> Result<()> {
     store.save()
 }
 
+/// Light one matrix cell white and the rest off, so a user can say which key it is
+/// (finding a board's layout, #45). Nothing is saved; apply the profile again afterwards.
+pub fn show_light(dev: &Device, store: &mut Store, row: u8, col: u8) -> Result<()> {
+    check_lighting(dev, store)?;
+    let m = dev.matrix().ok_or_else(|| crate::error::Error::Unsupported("no per-key lighting".into()))?;
+    if row >= m.rows || col >= m.cols {
+        return Err(crate::error::Error::InvalidArg(format!("light {row},{col} outside {}x{}", m.rows, m.cols)));
+    }
+    let mut frame = vec![Rgb(0, 0, 0); m.rows as usize * m.cols as usize];
+    frame[row as usize * m.cols as usize + col as usize] = Rgb(255, 255, 255);
+    dev.show_frame(&frame)
+}
+
 /// Remap a button (`None` puts back its saved setting). `button` is a name from
 /// [`crate::buttons::BUTTONS`].
 pub fn set_button(
