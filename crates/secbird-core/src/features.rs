@@ -321,6 +321,18 @@ impl Device {
         self.spec.as_ref().map_or(Lighting::Extended, |s| s.lighting)
     }
 
+    /// The lighting commands for one LED: a dock's own light takes the newer ones whatever
+    /// the docked mouse speaks.
+    pub(crate) fn lighting_for(&self, led: u8) -> Lighting {
+        if self.is_dock_led(led) { Lighting::Extended } else { self.lighting() }
+    }
+
+    /// Where an LED's setting is saved: the active slot ([`Device::saved_slot`]), or slot 1
+    /// for a dock's own light, which has none of the mouse's slots (#39 took `[1, 15, ...]`).
+    pub(crate) fn store_for(&self, led: u8) -> u8 {
+        if self.is_dock_led(led) { cmd::VARSTORE } else { self.saved_slot() }
+    }
+
     /// Old-style grids light the whole device with one effect instead of per-LED commands.
     fn is_grid_backlight(&self, led: u8) -> bool {
         led == BACKLIGHT_LED && self.matrix().is_some()
@@ -333,20 +345,20 @@ impl Device {
     /// Brightness 0-100 %.
     pub fn set_brightness(&self, led: u8, percent: u8) -> Result<()> {
         let level = (percent.min(100) as u32 * 255 / 100) as u8;
-        let (command, store) = match self.lighting() {
-            Lighting::Extended => (cmd::MATRIX_BRIGHTNESS, self.saved_slot()),
+        let (command, store) = match self.lighting_for(led) {
+            Lighting::Extended => (cmd::MATRIX_BRIGHTNESS, self.store_for(led)),
             Lighting::Standard | Lighting::MouseExtended => (cmd::LED_BRIGHTNESS, cmd::VARSTORE),
             Lighting::Kraken => return Err(self.no_lighting()),
         };
-        self.transact(command, 3, &[store, led, level])?;
+        self.transact_led(led, command, 3, &[store, led, level])?;
         Ok(())
     }
 
     pub fn set_static_color(&self, led: u8, Rgb(r, g, b): Rgb) -> Result<()> {
-        match self.lighting() {
+        match self.lighting_for(led) {
             Lighting::Extended => {
-                let args = [self.saved_slot(), led, cmd::EFFECT_STATIC, 0x00, 0x00, 0x01, r, g, b];
-                self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
+                let args = [self.store_for(led), led, cmd::EFFECT_STATIC, 0x00, 0x00, 0x01, r, g, b];
+                self.transact_led(led, cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
             }
             Lighting::Standard if self.is_grid_backlight(led) => {
                 self.transact(cmd::GRID_EFFECT, 4, &[cmd::GRID_STATIC, r, g, b])?;
@@ -365,10 +377,10 @@ impl Device {
     }
 
     pub fn lights_off(&self, led: u8) -> Result<()> {
-        match self.lighting() {
+        match self.lighting_for(led) {
             Lighting::Extended => {
-                let args = [self.saved_slot(), led, cmd::EFFECT_OFF, 0x00, 0x00, 0x00];
-                self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
+                let args = [self.store_for(led), led, cmd::EFFECT_OFF, 0x00, 0x00, 0x00];
+                self.transact_led(led, cmd::MATRIX_EFFECT, args.len() as u8, &args)?;
             }
             Lighting::Standard if self.is_grid_backlight(led) => {
                 self.transact(cmd::GRID_EFFECT, 1, &[cmd::GRID_OFF])?;
@@ -438,10 +450,16 @@ impl Device {
         match self.lighting() {
             // Size 0x0C as Razer sends it; the trailing arguments are zero.
             Lighting::Extended => {
-                self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?
+                self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?;
+                // Also saved, so a keyboard that reloads its saved lighting (leaving quick
+                // adjustment mode, #45) comes back to these colors instead of going dark.
+                // Best effort, as for auto sleep.
+                let _ = self.transact(cmd::MATRIX_EFFECT, 0x0C, &[self.saved_slot(), 0x00, cmd::EFFECT_CUSTOM_FRAME]);
             }
-            _ => self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?,
-        };
+            _ => {
+                self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?;
+            }
+        }
         Ok(())
     }
 }

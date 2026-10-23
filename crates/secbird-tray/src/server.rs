@@ -269,6 +269,9 @@ struct Body {
     name: String,
     #[serde(default)]
     keys: Vec<String>,
+    /// Finding a keyboard's layout: the `[row, col]` light to show; none puts the profile back.
+    #[serde(default)]
+    light: Option<(u8, u8)>,
     #[serde(default)]
     apps: Vec<String>,
     /// A Settings page switch (`key`) and whether it is on; `data` for an imported file.
@@ -403,6 +406,17 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                 let keys = b.keys.iter().map(|k| k.parse::<Rgb>()).collect::<Result<Vec<_>, _>>()?;
                 actions::set_keys(dev, &mut store, keys).map(|_| json!({}))
             }
+            "/api/find-light" => match b.light {
+                Some((row, col)) => actions::show_light(dev, &mut store, row, col).map(|_| json!({})),
+                None => {
+                    let failures: Vec<String> =
+                        engine.apply(&[dev.key()]).into_iter().flat_map(|r| r.failures).collect();
+                    match failures.is_empty() {
+                        true => Ok(json!({})),
+                        false => Err(Error::InvalidArg(failures.join("; "))),
+                    }
+                }
+            },
             "/api/buttons" => Ok(buttons_json(dev, &mut store)),
             "/api/buttons-restore" => {
                 actions::restore_all_buttons(dev, &mut store)?;

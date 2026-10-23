@@ -79,6 +79,32 @@ impl Device {
     pub(crate) fn identify_receiver(&mut self, db: &Db) {
         self.identify_docked_mouse(db);
         self.identify_hyperpolling_mouse(db);
+        self.add_dock_light();
+    }
+
+    /// A mouse dock's own light is one more zone beside the docked mouse's (#39).
+    fn add_dock_light(&mut self) {
+        if !self.is_mouse_dock() {
+            return;
+        }
+        if let Some(spec) = self.spec.as_mut().filter(|s| !s.leds.iter().any(|l| l.id == DOCK_LED)) {
+            spec.leds.push(crate::db::Led { name: "dock".into(), id: DOCK_LED });
+        }
+    }
+
+    /// Whether `led` is a dock's own light, reached with [`DOCK_TXID`] and the newer
+    /// lighting commands whatever the docked mouse uses.
+    pub(crate) fn is_dock_led(&self, led: u8) -> bool {
+        self.is_mouse_dock() && led == DOCK_LED
+    }
+
+    /// [`Device::transact`] for a lighting command to `led`, sent to the dock for its light.
+    pub(crate) fn transact_led(&self, led: u8, command: Command, size: u8, args: &[u8]) -> Result<Report> {
+        if self.is_dock_led(led) {
+            self.transact_as(DOCK_TXID, command, size, args)
+        } else {
+            self.transact(command, size, args)
+        }
     }
 
     /// Send one command and wait for its reply. `size` is the argument length the

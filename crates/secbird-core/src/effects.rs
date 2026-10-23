@@ -24,6 +24,9 @@ pub enum Effect {
     Reactive { color: Rgb, duration: u8 },
     /// Twinkling: one or two colours, or random when empty; `duration` 1 to 3.
     Starlight { colors: Vec<Rgb>, duration: u8 },
+    /// The wireless mouse's battery as a colour, green to red. Docks refuse Synapse's
+    /// Battery Level effect (14, #39), so it is a static colour the tray keeps up to date.
+    Battery,
 }
 
 // Effect ids (Synapse's `RP` enum).
@@ -47,6 +50,20 @@ impl Effect {
             }
             Effect::Reactive { color, duration } => (REACTIVE, 0, *duration, vec![*color]),
             Effect::Starlight { colors, duration } => (STARLIGHT, colors.len() as u8, *duration, colors.clone()),
+            // Sent as a static colour instead (see Device::set_effect).
+            Effect::Battery => (cmd::EFFECT_STATIC, 0, 0, Vec::new()),
+        }
+    }
+
+    /// Colour for a battery level, as the dock's charging status in Synapse: full, high,
+    /// mid, low, critical.
+    pub fn battery_color(percent: u8) -> Rgb {
+        match percent {
+            80.. => Rgb(0x00, 0xFF, 0x00),
+            50..=79 => Rgb(0x80, 0xFF, 0x00),
+            25..=49 => Rgb(0xFF, 0x96, 0x00),
+            11..=24 => Rgb(0xFF, 0x28, 0x00),
+            _ => Rgb(0xFF, 0x00, 0x00),
         }
     }
 
@@ -58,6 +75,7 @@ impl Effect {
             Effect::Wave { .. } => "wave",
             Effect::Reactive { .. } => "reactive",
             Effect::Starlight { .. } => "starlight",
+            Effect::Battery => "battery",
         }
     }
 
@@ -78,13 +96,17 @@ impl Device {
     /// Run a built-in effect on one lighting zone.
     pub fn set_effect(&self, led: u8, effect: &Effect) -> Result<()> {
         effect.check()?;
-        if self.spec.as_ref().is_some_and(|s| s.lighting != Lighting::Extended) {
+        if *effect == Effect::Battery {
+            let percent = self.battery()?.ok_or_else(|| Error::Unsupported(format!("{} has no battery", self.name())))?;
+            return self.set_static_color(led, Effect::battery_color(percent));
+        }
+        if self.lighting_for(led) != Lighting::Extended {
             return Err(Error::Unsupported(format!("lighting effects on {} (older lighting commands)", self.name())));
         }
         let (id, flags, rate, colors) = effect.params();
-        let mut args = vec![self.saved_slot(), led, id, flags, rate, colors.len() as u8];
+        let mut args = vec![self.store_for(led), led, id, flags, rate, colors.len() as u8];
         args.extend(colors.iter().flat_map(|c| [c.0, c.1, c.2]));
-        match self.transact(cmd::MATRIX_EFFECT, args.len() as u8, &args) {
+        match self.transact_led(led, cmd::MATRIX_EFFECT, args.len() as u8, &args) {
             // Some firmware runs only a few effects itself (the Basilisk V3: spectrum and wave);
             // Synapse animates the rest from the PC.
             Err(Error::Device { status: crate::proto::Status::NotSupported, .. }) => Err(Error::Unsupported(format!(
@@ -113,6 +135,7 @@ impl fmt::Display for Effect {
             Effect::Wave { reverse, speed } => write!(f, "wave:{}@{speed}", if *reverse { "left" } else { "right" }),
             Effect::Reactive { color, duration } => write!(f, "reactive:{color}@{duration}"),
             Effect::Starlight { colors, duration } => write!(f, "starlight:{}@{duration}", colors_text(colors)),
+            Effect::Battery => write!(f, "battery"),
         }
     }
 }
@@ -127,7 +150,7 @@ impl FromStr for Effect {
         let bad = || {
             Error::InvalidArg(format!(
                 "unknown effect '{s}' (spectrum, breathing:RRGGBB[,RRGGBB]|random, wave:left|right[@1-5], \
-                 reactive:RRGGBB[@1-3], starlight:RRGGBB[,RRGGBB]|random[@1-3])"
+                 reactive:RRGGBB[@1-3], starlight:RRGGBB[,RRGGBB]|random[@1-3], battery)"
             ))
         };
         let (kind, rest) = s.split_once(':').unwrap_or((&s, ""));
@@ -143,6 +166,7 @@ impl FromStr for Effect {
         };
         let effect = match kind {
             "spectrum" => Effect::Spectrum,
+            "battery" => Effect::Battery,
             "breathing" => Effect::Breathing(colors(arg)?),
             "wave" => Effect::Wave {
                 reverse: match arg {
@@ -182,6 +206,7 @@ mod tests {
     fn effects_round_trip_through_text() {
         for text in [
             "spectrum",
+            "battery",
             "breathing:FF0000",
             "breathing:FF0000,0000FF",
             "breathing:random",

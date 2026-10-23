@@ -179,6 +179,22 @@ impl DeviceProfiles {
         self.profiles.get(name).map(|p| p.apply_buttons(dev)).unwrap_or_default()
     }
 
+    /// Send the battery colour again to each zone of profile `name` that shows the battery
+    /// ([`crate::effects::Effect::Battery`]), so it follows the level. Nothing when this
+    /// device's lighting is left to another app.
+    pub fn refresh_battery_lights(&self, name: &str, dev: &Device) -> Vec<Applied> {
+        let Some(profile) = self.profiles.get(name).filter(|_| !self.lighting_off) else { return Vec::new() };
+        profile
+            .lighting
+            .iter()
+            .filter(|(_, z)| !z.off && z.effect == Some(crate::effects::Effect::Battery))
+            .map(|(zone, _)| Applied {
+                setting: format!("{zone} battery"),
+                result: dev.led_id(zone).and_then(|led| dev.set_effect(led, &crate::effects::Effect::Battery)),
+            })
+            .collect()
+    }
+
     pub fn switch(&mut self, name: &str) -> Result<()> {
         if !self.profiles.contains_key(name) {
             return Err(Error::NotFound(format!("profile '{name}'")));

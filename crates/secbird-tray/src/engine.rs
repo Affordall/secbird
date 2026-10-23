@@ -219,6 +219,18 @@ impl Engine {
             .collect()
     }
 
+    /// Zones showing a wireless mouse's battery (a dock's light, #39) follow its level.
+    /// Failures are left out: a mouse off its dock or asleep doesn't answer, and the
+    /// colour stays until the next check.
+    pub fn refresh_battery_lights(&self) {
+        let Ok(mut store) = Self::store() else { return };
+        for dev in self.devices.iter().filter(|d| d.spec.as_ref().is_some_and(|s| s.wireless)) {
+            let p = store.for_device(dev);
+            let name = p.effective(self.foreground()).to_string();
+            p.refresh_battery_lights(&name, dev);
+        }
+    }
+
     /// Re-enumerate devices. Returns the keys of devices that were not present before.
     pub fn rescan(&mut self) -> Vec<String> {
         let before: HashSet<String> = self.all_keys().into_iter().collect();

@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock", with colours and effects (#39,
+  thanks esperianterra). It can also show the docked mouse's battery, green to red, which
+  Secretarybird updates every 5 minutes; the dock doesn't have Synapse's battery effect built in.
+  In a test build (v0.4.11-dock2) until a dock owner confirms it.
+
+## [0.4.11] - 2026-10-23
+
+### Added
+- Per-key colours: a "Find which light is which key" mode. It lights one light at a time; you type
+  the key that lit up and copy the list into an issue, so boards whose layout is wrong or unknown
+  can be mapped (#45, #27, #41). Nothing is saved on the device, and your lighting comes back when
+  you leave.
+
+### Fixed
+- Per-key colours went dark after leaving quick adjustment mode on the Huntsman V3 Pro. The per-key
+  effect is now also saved to the keyboard, as the single backlight colour already was (#45, #27,
+  thanks Skillprofi10). Not tested on the keyboard yet.
+- DeathStalker V2: Numpad 0 lit nothing after the 0.4.9 layout shift (#41, thanks a3k7dotmd).
+
 ## [0.4.10] - 2026-10-22
 
 ### Added

@@ -54,6 +54,10 @@ pub type SimMacro = (Vec<u8>, Vec<u8>);
 pub struct SimState {
     /// The only transaction id the device answers; others get no reply.
     pub txid: u8,
+    /// A mouse dock's own light, answering [`crate::device::DOCK_TXID`] like the #39 dock:
+    /// the last `0F:02` it took on LED 15 (`[effect, flags, rate, ...]`). It refuses the
+    /// Battery Level effect (14). `None`: no dock answers that txid.
+    pub dock_light: Option<Vec<u8>>,
     pub serial: String,
     pub firmware: (u8, u8),
     /// `None` = the device has no DPI sensor (keyboards).
@@ -123,6 +127,7 @@ impl SimState {
             auto_sleep_saved: None,
             active_slot: None,
             paired: Vec::new(),
+            dock_light: None,
             battery: None,
             charging: false,
             leds: Vec::new(),
@@ -142,6 +147,20 @@ impl SimState {
     }
 
     /// A write to a saved slot that isn't the active one: accepted, but not what shows.
+    /// The dock's own light (see [`SimState::dock_light`]).
+    fn handle_dock(&mut self, c: Command, a: &[u8], size: u8) -> (Status, Vec<u8>) {
+        let led = crate::device::DOCK_LED;
+        match c {
+            cmd::MATRIX_EFFECT if a[1] == led && a[2] == 14 => (Status::NotSupported, vec![]),
+            cmd::MATRIX_EFFECT if a[1] == led => {
+                self.dock_light = Some(a[2..size as usize].to_vec());
+                (Status::Success, a[..size as usize].to_vec())
+            }
+            cmd::MATRIX_BRIGHTNESS if a[1] == led => (Status::Success, a[..3].to_vec()),
+            _ => (Status::Failed, vec![]),
+        }
+    }
+
     fn hidden_slot(&self, store: u8) -> bool {
         store != 0 && self.active_slot.is_some_and(|slot| slot != store)
     }
@@ -633,12 +652,15 @@ impl Transport for Sim {
         let mut s = self.state();
         let command = req.command();
 
-        if req.txid() != s.txid {
+        let to_dock = req.txid() == crate::device::DOCK_TXID && req.txid() != s.txid && s.dock_light.is_some();
+        if req.txid() != s.txid && !to_dock {
             s.reply = None; // a real device ignores other transaction ids
             return Ok(());
         }
         let (status, args) = if checksum(&body) != body[88] {
             (Status::Failed, Vec::new())
+        } else if to_dock {
+            s.handle_dock(command, req.args(), body[5])
         } else {
             s.log.push(command);
             s.handle(command, req.args(), body[5])
@@ -691,7 +713,7 @@ pub fn from_env() -> Vec<Device> {
             // Fake product ids carry their own spec; real ones use the device list, as for hardware.
             let spec = Sim::spec_for(pid).or_else(|| db.get(pid).cloned());
             let mut dev = sim.open(pid, spec)?;
-            dev.identify_docked_mouse(&db);
+            dev.identify_receiver(&db);
             Some(dev)
         })
         .collect()
@@ -732,6 +754,7 @@ pub fn preset(name: &str) -> Option<(Sim, u16)> {
             s.idle_seconds = Some(300);
             s.leds = vec![1, 4, 10];
             s.paired = vec![(true, 0x00AB)];
+            s.dock_light = Some(vec![13, 1]);
             s.macros = Some(BTreeMap::new());
             with_buttons(&mut s, &[(1, 1, [1, 0, 0, 0, 0]), (2, 1, [2, 0, 0, 0, 0]), (3, 1, [3, 0, 0, 0, 0]),
                 (4, 1, [4, 0, 0, 0, 0]), (5, 1, [5, 0, 0, 0, 0]), (14, 7, [4, 0, 0, 0, 0]),
@@ -1179,6 +1202,32 @@ mod tests {
     }
 
     #[test]
+    fn the_dock_light_is_its_own_zone_on_the_dock_txid() {
+        let (sim, mut dev, db) = docked_basilisk();
+        sim.state().dock_light = Some(vec![13, 1]);
+        dev.identify_receiver(&db);
+        let led = dev.led_id("dock").unwrap();
+        assert_eq!(led, crate::device::DOCK_LED);
+
+        dev.set_static_color(led, Rgb(255, 0, 0)).unwrap();
+        assert_eq!(sim.state().dock_light.as_deref(), Some(&[cmd::EFFECT_STATIC, 0, 0, 1, 255, 0, 0][..]));
+        assert!(!sim.state().effects.contains_key(&led), "nothing sent to the mouse");
+        dev.set_effect(led, &crate::effects::Effect::Spectrum).unwrap();
+        assert_eq!(sim.state().dock_light.as_ref().unwrap()[0], 3);
+
+        // Battery: the mouse is at 95%, so the dock goes green.
+        dev.set_effect(led, &crate::effects::Effect::Battery).unwrap();
+        assert_eq!(sim.state().dock_light.as_ref().unwrap()[4..7], [0, 255, 0]);
+        sim.state().battery = Some(0x30); // 19%
+        dev.set_effect(led, &crate::effects::Effect::Battery).unwrap();
+        assert_eq!(sim.state().dock_light.as_ref().unwrap()[4..7], [255, 0x28, 0]);
+
+        // The mouse's own lights still go to the mouse.
+        dev.set_static_color(dev.led_id("logo").unwrap(), Rgb(1, 2, 3)).unwrap();
+        assert_eq!(sim.state().effects[&4][4..7], [1, 2, 3]);
+    }
+
+    #[test]
     fn report_asks_the_dock_itself_with_its_own_txid() {
         let (_sim, mut dev, db) = docked_basilisk();
         dev.identify_docked_mouse(&db);
@@ -1311,8 +1360,22 @@ mod tests {
         assert_eq!(s.key(0, 0), Some([0, 0, 7]));
         assert_eq!(s.key(5, 21), Some([200, 210, 7]));
         assert_eq!(s.effects[&0][0], cmd::EFFECT_CUSTOM_FRAME);
-        // 6 rows + 1 effect command after the serial probe.
+        // 6 rows, then the effect live and saved (#45: quick adjustment reloads the saved one).
         assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_FRAME).count(), 6);
+        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 2);
+    }
+
+    #[test]
+    fn finding_a_light_shows_only_that_one_and_saves_nothing() {
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        let mut store = crate::Store::default();
+        crate::actions::show_light(&dev, &mut store, 0, 21).unwrap();
+        let s = sim.state();
+        assert_eq!(s.key(0, 21), Some([255, 255, 255]));
+        assert_eq!(s.key(0, 20), Some([0, 0, 0]));
+        assert!(store.for_device(&dev).active_mut().keys.is_empty());
+        assert!(crate::actions::show_light(&dev, &mut store, 6, 0).is_err());
     }
 
     #[test]
