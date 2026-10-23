@@ -604,6 +604,7 @@ impl App {
     }
 
     fn check_battery(&mut self) {
+        self.engine().refresh_battery_lights();
         let batteries = self.engine().batteries();
         let settings = TraySettings::load();
         let low = settings.low_battery();

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock", with colours and effects (#39,
+  thanks esperianterra). It can also show the docked mouse's battery, green to red, which
+  Secretarybird updates every 5 minutes; the dock doesn't have Synapse's battery effect built in.
+  In a test build (v0.4.11-dock2) until a dock owner confirms it.
+
 ## [0.4.11] - 2026-10-23
 
 ### Added

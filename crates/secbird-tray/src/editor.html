@@ -487,7 +487,7 @@ const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assi
 // so presets use pure channels. Orange and yellow need far less green than on a monitor.
 const PRESETS = [['FF0000','Red'],['FF2800','Orange'],['FF9600','Yellow'],['00FF00','Green'],['00FFFF','Cyan'],
                  ['0000FF','Blue'],['5000FF','Purple'],['FF00FF','Magenta'],['FF0028','Pink'],['FFFFFF','White']];
-const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate', profile: 'Profile light' };
+const NAMES = { scroll: 'Scroll wheel', logo: 'Logo', underglow: 'Underglow', backlight: 'Backlight', side: 'Side plate', profile: 'Profile light', dock: 'Dock' };
 const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 'Keypad', mousepad: 'Mousepad',
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
@@ -1332,7 +1332,7 @@ function copyGroup(name) {
 
 // Built-in effects the device runs by itself. Colors come from the zone's color above.
 const EFFECTS = [['static', 'Static color'], ['spectrum', 'Spectrum cycling'], ['wave', 'Wave'],
-  ['breathing', 'Breathing'], ['reactive', 'Reactive'], ['starlight', 'Starlight']];
+  ['breathing', 'Breathing'], ['reactive', 'Reactive'], ['starlight', 'Starlight'], ['battery', 'Mouse battery']];
 function effectLabel(e) {
   const [kind, rest = ''] = e.split(':'), [arg, n] = rest.split('@');
   const name = (EFFECTS.find(x => x[0] === kind) || [kind, kind])[1];
@@ -1345,7 +1345,8 @@ function effectGroup(name) {
   const [kind0, rest = ''] = cur.split(':'), [arg0, n0] = rest.split('@');
   const kind = cur ? kind0 : 'static';
   const sel = el('select', { id: 'zoneFx', ariaLabel: 'Effect' });
-  EFFECTS.forEach(([v, t]) => sel.append(new Option(t, v, false, v === kind)));
+  // Offered for a dock's light only (#39), where Synapse has its battery-level lighting.
+  EFFECTS.filter(([v]) => v !== 'battery' || name === 'dock').forEach(([v, t]) => sel.append(new Option(t, v, false, v === kind)));
   const dir = el('select', { ariaLabel: 'Wave direction' });
   [['right', 'Right →'], ['left', '← Left']].forEach(([v, t]) => dir.append(new Option(t, v, false, kind === 'wave' && v === (arg0 || 'right'))));
   const speed = el('input', { type: 'range', min: 1, max: 5, step: 1, value: kind === 'wave' ? (n0 || 3) : 3, ariaLabel: 'Wave speed' });
@@ -1353,8 +1354,12 @@ function effectGroup(name) {
   [['1', 'Short'], ['2', 'Medium'], ['3', 'Long']].forEach(([v, t]) => dur.append(new Option(t, v, false, v === (n0 || '2'))));
   const rnd = el('input', { type: 'checkbox', id: 'fxRandom', checked: arg0 === 'random' });
   const rndLabel = el('label', { htmlFor: 'fxRandom', textContent: 'Random colors' });
+  const note = el('p', { className: 'note' });
   const show = () => {
     const k = sel.value;
+    note.textContent = k === 'battery'
+      ? 'Green when the mouse is charged, through yellow and orange to red when it’s nearly empty. Secretarybird updates it every 5 minutes.'
+      : 'Runs on the device itself. Not every device has every effect; it says so if not.';
     dir.hidden = speed.hidden = k !== 'wave';
     dur.hidden = !(k === 'reactive' || k === 'starlight');
     rnd.hidden = rndLabel.hidden = !(k === 'breathing' || k === 'starlight');
@@ -1363,7 +1368,7 @@ function effectGroup(name) {
     show();
     const k = sel.value, color = zoneOf(dev.profile, name).color || '00FF00';
     if (k === 'static') return setColor(color, name);
-    const text = k === 'spectrum' ? 'spectrum'
+    const text = k === 'spectrum' || k === 'battery' ? k
       : k === 'wave' ? `wave:${dir.value}@${speed.value}`
       : k === 'reactive' ? `reactive:${color}@${dur.value}`
       : k === 'breathing' ? `breathing:${rnd.checked ? 'random' : color}`
@@ -1377,8 +1382,7 @@ function effectGroup(name) {
   [sel, dir, speed, dur, rnd].forEach(c => c.onchange = send);
   show();
   return el('div', { className: 'edgroup' }, el('h3', { textContent: 'Effect' }),
-    el('div', { className: 'row' }, sel, dir, speed, dur, rnd, rndLabel),
-    el('p', { className: 'note', textContent: 'Runs on the device itself. Not every device has every effect; it says so if not.' }));
+    el('div', { className: 'row' }, sel, dir, speed, dur, rnd, rndLabel), note);
 }
 
 function keysEditor(box) {
