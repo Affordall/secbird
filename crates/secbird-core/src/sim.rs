@@ -1360,9 +1360,29 @@ mod tests {
         assert_eq!(s.key(0, 0), Some([0, 0, 7]));
         assert_eq!(s.key(5, 21), Some([200, 210, 7]));
         assert_eq!(s.effects[&0][0], cmd::EFFECT_CUSTOM_FRAME);
-        // 6 rows, then the effect live and saved (#45: quick adjustment reloads the saved one).
+        // 6 rows, then the effect, live only (nothing saved on the device).
         assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_FRAME).count(), 6);
-        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 2);
+        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 1);
+    }
+
+    #[test]
+    fn per_key_colors_come_back_after_the_keyboard_drops_them() {
+        use crate::profile::DeviceProfiles;
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        let mut p = DeviceProfiles::default();
+        assert!(p.refresh_frame("Default", &dev).is_none(), "no per-key colors, nothing to send");
+        p.active_mut().keys = vec![Rgb(9, 8, 7); 6 * 22];
+        p.apply("Default", &dev);
+
+        // Quick adjustment mode (#45) leaves the keys dark.
+        sim.state().matrix.as_mut().unwrap().2.fill([0; 3]);
+        assert_eq!(sim.state().key(3, 10), Some([0, 0, 0]));
+        assert!(p.refresh_frame("Default", &dev).unwrap().is_ok());
+        assert_eq!(sim.state().key(3, 10), Some([9, 8, 7]));
+
+        p.lighting_off = true;
+        assert!(p.refresh_frame("Default", &dev).is_none(), "lighting left to another app");
     }
 
     #[test]

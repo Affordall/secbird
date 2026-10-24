@@ -450,11 +450,10 @@ impl Device {
         match self.lighting() {
             // Size 0x0C as Razer sends it; the trailing arguments are zero.
             Lighting::Extended => {
+                // Not saved: a saved custom frame left the Huntsman V3 Pro dark after quick
+                // adjustment mode anyway (#45), and dark after a power cycle without the tray.
+                // The tray sends the frame again instead (Engine::refresh_frames).
                 self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?;
-                // Also saved, so a keyboard that reloads its saved lighting (leaving quick
-                // adjustment mode, #45) comes back to these colors instead of going dark.
-                // Best effort, as for auto sleep.
-                let _ = self.transact(cmd::MATRIX_EFFECT, 0x0C, &[self.saved_slot(), 0x00, cmd::EFFECT_CUSTOM_FRAME]);
             }
             _ => {
                 self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?;

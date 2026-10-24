@@ -522,16 +522,31 @@ const PLACED = { '6x16:laptop': BLADE, '6x18:keyboard': TKL, '5x15:keyboard': MI
 // The maps above start at column 1; boards whose leftmost key is column 0 (DeathStalker V2, #41)
 // shift every key left, and their tenkeyless grid is one column narrower. Except the wide
 // numpad 0, which stays at column 18 there (#41: it lit before the shift and not after).
+// Boards that differ from the maps, from their owners' light-finder lists.
+const LAYOUT_FIXES = {
+  // Huntsman V3 Pro (#45): numpad . is column 19; column 20 is the volume dial, and the three
+  // media keys share row 0, column 18. Both sit top right.
+  '02A6': keys => {
+    const num = keys.find(k => k.label === 'Num'), star = keys.find(k => k.label === '*');
+    return [...keys.map(k => k.row === 5 && k.label === '.' ? { ...k, col: 19 } : k),
+      { label: 'Media', row: 0, col: 18, x: num.x, y: 0, w: 2, h: 1 },
+      { label: 'Dial', row: 5, col: 20, x: star.x + 1, y: 0, w: 1, h: 1 }];
+  },
+};
 function knownLayout(m, kind) {
   const shift = (m.first ?? 1) - 1;
-  if (m.rows === 6 && m.cols === 22) return FULLSIZE.flatMap((keys, row) => {
-    let x = 0;
-    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
-      x += gap;
-      const k = { label, row, col: row === 5 && label === '0' ? col : col + shift, x, y: row + (row ? .25 : 0), w, h };
-      x += w; return k;
+  if (m.rows === 6 && m.cols === 22) {
+    const out = FULLSIZE.flatMap((keys, row) => {
+      let x = 0;
+      return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
+        x += gap;
+        const k = { label, row, col: row === 5 && label === '0' ? col : col + shift, x, y: row + (row ? .25 : 0), w, h };
+        x += w; return k;
+      });
     });
-  });
+    const fix = dev && LAYOUT_FIXES[dev.pid];
+    return fix ? fix(out) : out;
+  }
   const placed = PLACED[m.rows + 'x' + (m.cols - shift) + ':' + kind];
   return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h })) : null;
 }
@@ -1345,8 +1360,10 @@ function effectGroup(name) {
   const [kind0, rest = ''] = cur.split(':'), [arg0, n0] = rest.split('@');
   const kind = cur ? kind0 : 'static';
   const sel = el('select', { id: 'zoneFx', ariaLabel: 'Effect' });
-  // Offered for a dock's light only (#39), where Synapse has its battery-level lighting.
-  EFFECTS.filter(([v]) => v !== 'battery' || name === 'dock').forEach(([v, t]) => sel.append(new Option(t, v, false, v === kind)));
+  // Battery is offered for a dock's light only (#39), where Synapse has its battery-level
+  // lighting. The dock takes reactive and starlight but shows nothing, so those are left out.
+  const dockOnly = ['battery'], notOnDock = ['reactive', 'starlight'];
+  EFFECTS.filter(([v]) => name === 'dock' ? !notOnDock.includes(v) : !dockOnly.includes(v)).forEach(([v, t]) => sel.append(new Option(t, v, false, v === kind)));
   const dir = el('select', { ariaLabel: 'Wave direction' });
   [['right', 'Right →'], ['left', '← Left']].forEach(([v, t]) => dir.append(new Option(t, v, false, kind === 'wave' && v === (arg0 || 'right'))));
   const speed = el('input', { type: 'range', min: 1, max: 5, step: 1, value: kind === 'wave' ? (n0 || 3) : 3, ariaLabel: 'Wave speed' });

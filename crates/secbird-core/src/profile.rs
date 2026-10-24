@@ -192,6 +192,14 @@ impl DeviceProfiles {
             .collect()
     }
 
+    /// Send profile `name`'s per-key colors again: a keyboard drops them in its quick
+    /// adjustment mode (#45) and never says when it leaves it. `None` when the profile has
+    /// none or this device's lighting is left to another app.
+    pub fn refresh_frame(&self, name: &str, dev: &Device) -> Option<Result<()>> {
+        let profile = self.profiles.get(name).filter(|p| !self.lighting_off && !p.keys.is_empty())?;
+        Some(dev.show_frame(&profile.keys))
+    }
+
     pub fn switch(&mut self, name: &str) -> Result<()> {
         if !self.profiles.contains_key(name) {
             return Err(Error::NotFound(format!("profile '{name}'")));

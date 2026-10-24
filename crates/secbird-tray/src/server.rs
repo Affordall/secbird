@@ -494,6 +494,9 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
         }
     };
 
+    if path == "/api/find-light" {
+        engine.pause_frames(b.light.is_some());
+    }
     match attempt(engine) {
         Err(Error::Hid(_)) | Err(Error::NotFound(_)) | Err(Error::NoReply(_)) => {
             engine.rescan();

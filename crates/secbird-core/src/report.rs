@@ -215,8 +215,10 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
     }
 }
 
+/// Every byte of a short reply: a trailing 00 can be the answer (#34: smart dimming's
+/// `01 00 00` read as just `01`). Long replies drop their zero tail past the first 16.
 fn hex(bytes: &[u8]) -> String {
-    let end = bytes.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    let end = bytes.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1).max(bytes.len().min(16));
     bytes[..end].iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
 }
 
@@ -295,7 +297,7 @@ mod tests {
         let r = report_for(&Sim::mouse(), MOUSE_PID);
         assert_eq!(r.leds, [1, 4, 10]);
         assert_eq!(status(&r, "dpi"), "ok");
-        assert_eq!(r.probes.iter().find(|p| p.name == "dpi").unwrap().reply, "00 03 20 03 20");
+        assert_eq!(r.probes.iter().find(|p| p.name == "dpi").unwrap().reply, "00 03 20 03 20 00 00");
         assert_eq!(status(&r, "battery"), "NotSupported");
         assert_eq!(r.serial, "SIMM...01");
     }
@@ -330,8 +332,13 @@ mod tests {
 
     #[test]
     fn hex_and_shorten() {
-        assert_eq!(hex(&[1, 0, 0x20, 0, 0]), "01 00 20");
-        assert_eq!(hex(&[0, 0]), "");
+        assert_eq!(hex(&[1, 0, 0x20, 0, 0]), "01 00 20 00 00");
+        assert_eq!(hex(&[0, 0]), "00 00");
+        let mut long = [0u8; 0x50];
+        long[1] = 7;
+        assert_eq!(hex(&long), ["00 07", &" 00".repeat(14)].concat());
+        long[20] = 1;
+        assert_eq!(hex(&long).split(' ').count(), 21);
         assert_eq!(shorten("AB1234C56789012"), "AB12...12");
         assert_eq!(shorten("ABC"), "***");
     }

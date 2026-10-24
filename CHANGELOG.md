@@ -1,12 +1,28 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.12] - 2026-10-24
 
 ### Added
-- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock", with colours and effects (#39,
-  thanks esperianterra). It can also show the docked mouse's battery, green to red, which
-  Secretarybird updates every 5 minutes; the dock doesn't have Synapse's battery effect built in.
-  In a test build (v0.4.11-dock2) until a dock owner confirms it.
+- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock" (#39, thanks esperianterra).
+  Static colour, spectrum, wave and breathing are confirmed on a real dock; reactive and starlight
+  showed nothing there, so they aren't offered. The dock can also show the docked mouse's
+  battery, green to red, updated every 5 minutes; the dock doesn't have Synapse's battery effect
+  built in.
+
+### Fixed
+- Per-key colours still went dark after quick adjustment mode on the Huntsman V3 Pro (#45). The
+  keyboard doesn't say when it leaves that mode, so the tray now sends the per-key colours of
+  wired keyboards and keypads again every 3 seconds, as Synapse keeps doing. It pauses while the
+  light finder is open. Wireless boards are left out, so they can still sleep. The 0.4.11 change
+  that saved the per-key effect on the keyboard is undone: it didn't help, and without the tray
+  it could leave the keyboard dark after a power cycle.
+- Huntsman V3 Pro per-key layout from the light-finder list (#45, #27, thanks Skillprofi10).
+  Painting numpad `.` lit the volume dial. The media keys and the dial are now in the editor.
+- Blade laptops set to "Keyboard when idle: stays lit" still faded by themselves (#34, thanks
+  garyh-2). Any read restarts that fade, so the tray reads the setting back every 3 seconds. This
+  only works while the tray runs.
+- `secbird report` dropped zero bytes at the end of short replies, so smart dimming's `01 00 00`
+  showed as `01` (#34).
 
 ## [0.4.11] - 2026-10-23
 

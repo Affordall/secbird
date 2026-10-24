@@ -1,8 +1,8 @@
 //! Device and profile handling for the tray, kept free of Win32 code.
 
-use secbird_core::{config_dir, discover, hidapi::HidApi, Db, Device, Result, Store};
+use secbird_core::{config_dir, discover, hidapi::HidApi, Db, Device, Dimming, Result, Store};
 use std::collections::{HashMap, HashSet};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 pub struct Engine {
     api: HidApi,
@@ -18,7 +18,11 @@ pub struct Engine {
     /// Latest DPI each device reported through its event reports.
     live_dpi: HashMap<String, (u16, u16)>,
     live_seq: u64,
+    /// No per-key refresh until then, while the editor's light finder is open.
+    frames_paused_until: Option<Instant>,
 }
+
+const FINDER_PAUSE: Duration = Duration::from_secs(10 * 60);
 
 /// Battery state of one wireless device.
 pub struct Battery {
@@ -64,6 +68,7 @@ impl Engine {
             apps_read: None,
             live_dpi: HashMap::new(),
             live_seq: 0,
+            frames_paused_until: None,
         })
     }
 
@@ -184,6 +189,49 @@ impl Engine {
             let name = p.effective(self.foreground()).to_string();
             p.refresh_battery_lights(&name, dev);
         }
+    }
+
+    /// Per-key colors of wired keyboards and keypads, sent again. Leaving quick adjustment
+    /// mode (#45) leaves them dark, and the keyboard doesn't say when; Synapse streams
+    /// frames all the time, so this does the same at a slow pace. Wireless boards are left
+    /// alone: the traffic would keep them awake. Failures are left out, as for batteries.
+    pub fn refresh_frames(&self) {
+        if self.frames_paused_until.is_some_and(|t| Instant::now() < t) {
+            return;
+        }
+        let Ok(mut store) = Self::store() else { return };
+        let wired_boards = self.devices.iter().filter(|d| {
+            d.matrix().is_some()
+                && d.spec.as_ref().is_some_and(|s| {
+                    !s.wireless && matches!(s.kind, secbird_core::Kind::Keyboard | secbird_core::Kind::Keypad)
+                })
+        });
+        for dev in wired_boards {
+            let p = store.for_device(dev);
+            let name = p.effective(self.foreground()).to_string();
+            p.refresh_frame(&name, dev);
+        }
+    }
+
+    /// Laptops set to "stays lit" still fade by themselves (#34), but any read restarts
+    /// that idle fade, so read the setting back now and then. Only while the tray runs.
+    pub fn keep_laptops_lit(&self) {
+        let Ok(mut store) = Self::store() else { return };
+        let laptops = self.devices.iter().filter(|d| d.spec.as_ref().is_some_and(|s| s.kind == secbird_core::Kind::Laptop));
+        for dev in laptops {
+            let p = store.for_device(dev);
+            let name = p.effective(self.foreground()).to_string();
+            let stays_lit = Dimming::StaysLit.to_string();
+            if p.profiles.get(&name).is_some_and(|p| p.dimming.as_deref() == Some(stays_lit.as_str())) {
+                let _ = dev.dimming();
+            }
+        }
+    }
+
+    /// The editor's light finder shows one light at a time; don't paint over it. A finder
+    /// left open (a closed browser never says) stops pausing after a while.
+    pub fn pause_frames(&mut self, pause: bool) {
+        self.frames_paused_until = pause.then(|| Instant::now() + FINDER_PAUSE);
     }
 
     /// Re-enumerate devices. Returns the keys of devices that were not present before.

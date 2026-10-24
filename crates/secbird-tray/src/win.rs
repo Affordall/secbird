@@ -66,6 +66,11 @@ const UPDATE_EVERY_SECS: u64 = 24 * 60 * 60;
 const TIMER_BUTTONS: usize = 6;
 const BUTTONS_MS: u32 = 20_000;
 const BUTTONS_AGAIN_SECS: u64 = 60;
+/// Per-key colors of wired keyboards sent again this often: quick adjustment mode drops
+/// them without saying (#45), so this is how long they can stay dark after it. Laptops
+/// set to stay lit get a read on the same beat (#34).
+const TIMER_LIGHTS: usize = 7;
+const LIGHTS_MS: u32 = 3_000;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
@@ -304,6 +309,7 @@ pub fn run() {
         start_retries(hwnd);
         SetTimer(hwnd, TIMER_BATTERY, BATTERY_MS, None);
         SetTimer(hwnd, TIMER_BUTTONS, BUTTONS_MS, None);
+        SetTimer(hwnd, TIMER_LIGHTS, LIGHTS_MS, None);
         SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_FIRST_MS, None);
         if std::env::args().any(|a| a == "--editor") {
             with_app(|app| app.open_editor());
@@ -424,6 +430,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TIMER if wparam == TIMER_BUTTONS => {
             with_app(|app| app.restore_lost_buttons());
+            0
+        }
+        WM_TIMER if wparam == TIMER_LIGHTS => {
+            with_app(|app| {
+                let engine = app.engine();
+                engine.refresh_frames();
+                engine.keep_laptops_lit();
+            });
             0
         }
         WM_TIMER if wparam == TIMER_FOREGROUND => {
