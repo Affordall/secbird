@@ -30,6 +30,9 @@ SETTINGS (saved to the active profile):
   dimming [stays-lit|half|quarter|dark]
                             Laptops: what the keyboard backlight does when idle
                             (Synapse's Smart Dimming). Untested on hardware yet
+  gaming [off|win,alt-tab,alt-f4]
+                            Keyboards: gaming mode, the keys it blocks (any of win,
+                            alt-tab and alt-f4). Untested on hardware yet
   color <zone> <RRGGBB>     Static color for a lighting zone (name or id)
   brightness <zone> <0-100> Brightness for a lighting zone
   off <zone>                Turn a lighting zone off
@@ -44,6 +47,10 @@ BUTTONS (mice with on-board button memory; add --hypershift for the HyperShift l
   button <button> <action>  Remap a button, e.g. `button side-forward key:ctrl+c`
   button <button> reset     Back to its saved setting (Synapse's or the factory one)
   button restore-all        Every remapped button back to its saved setting at once
+                            (also puts back a save-to-mouse)
+  button save-to-mouse      Write this profile's remaps into the mouse's on-board slot, so
+                            they work without Secretarybird; the slot's old settings are kept
+  button put-back           Put the slot back to what it held before save-to-mouse
   Actions: left right middle back forward scroll-up scroll-down scroll-left scroll-right
            double-click  key:<combo> (key:a, key:ctrl+shift+f13, key:space)
            turbo:<button or key:..>[@presses-per-second]  (turbo:left@15)
@@ -51,6 +58,17 @@ BUTTONS (mice with on-board button memory; add --hypershift for the HyperShift l
            hypershift  media:volume-up|volume-down|mute|play-pause|next-track|previous-track
            profile-cycle-up  disabled
            macro:<id>[@times|@hold|@toggle]  (macro:3, macro:3@5, macro:3@hold)
+
+KEYS (keyboards and keypads; BETA, no keyboard has confirmed it works yet; --hypershift too):
+  key [list]                Keys the keyboard lets us remap, and what they do now
+  key <key> <action>        Remap a key, e.g. `key capslock key:esc` (actions as for buttons)
+  key <key> reset           Back to its saved setting
+  key restore-all           Every remapped key and button back to its saved setting
+  Keys: a-z 0-9 f1-f12 esc tab capslock lshift rshift lctrl rctrl lalt ralt lwin menu space
+        enter backspace grave minus equal lbracket rbracket backslash semicolon quote comma
+        period slash insert delete home end pageup pagedown up down left right printscreen
+        scrolllock pause numlock num0-num9 num-slash num-star num-minus num-plus num-enter
+        num-period iso-hash iso-backslash
 
 MACROS (stored on the device, shared by all profiles):
   macro [list]              Macros on the device and free memory
@@ -376,6 +394,21 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
                 Ok(())
             }
         },
+        "gaming" => match rest.first() {
+            None => {
+                match dev.game_mode()? {
+                    None => println!("Only keyboards and keypads have a gaming mode."),
+                    Some(g) => println!("Gaming mode: {}", game_mode_text(g)),
+                }
+                Ok(())
+            }
+            Some(v) => {
+                let g = v.parse()?;
+                actions::set_game_mode(dev, &mut store, g)?;
+                println!("Gaming mode: {}", game_mode_text(g));
+                Ok(())
+            }
+        },
         "macro" => macro_cmd(dev, &mut store, rest),
         "poll" => match rest.first() {
             None => {
@@ -420,6 +453,7 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
             report_apply(profiles.apply(&profiles.active, dev))
         }
         "button" => button_cmd(dev, &mut store, rest),
+        "key" => key_cmd(dev, &mut store, rest),
         "profile" => profile_cmd(dev, &mut store, rest),
         other => Err(Error::InvalidArg(format!("unknown command '{other}' (try --help)"))),
     }
@@ -464,6 +498,9 @@ fn profile_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), E
             }
             if let Some(d) = &p.dimming {
                 println!("  dimming    {d}");
+            }
+            if let Some(g) = &p.game_mode {
+                println!("  gaming     {g}");
             }
             for (zone, z) in &p.lighting {
                 let state = match (z.off, z.color) {
@@ -606,6 +643,17 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
             println!("Restored {n} button(s) to what the mouse stores.");
             Ok(())
         }
+        ["save-to-mouse"] => {
+            let slot = actions::save_buttons_to_mouse(dev, store)?;
+            let n = store.for_device(dev).active().buttons.len();
+            println!("Saved {n} remapped button(s) in on-board slot {slot}; `secbird button put-back` undoes it.");
+            Ok(())
+        }
+        ["put-back"] => {
+            let n = actions::put_back_onboard(dev, store)?;
+            println!("Put {n} button(s) in the mouse's slot back to what they were.");
+            Ok(())
+        }
         [button, "reset"] => {
             button_id(button).ok_or_else(|| Error::InvalidArg(format!("unknown button '{button}' (see `secbird button`)")))?;
             actions::set_button(dev, store, button, layer, None)?;
@@ -618,7 +666,71 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
             println!("{button} now does {action}");
             Ok(())
         }
-        _ => Err(Error::InvalidArg("usage: button [list] | button <button> <action|reset> [--hypershift]".into())),
+        _ => Err(Error::InvalidArg("usage: button [list|restore-all|save-to-mouse|put-back] | button <button> <action|reset> [--hypershift]".into())),
+    }
+}
+
+fn key_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error> {
+    use secbird_core::buttons::{Input, Layer};
+    let layer = if rest.iter().any(|a| a == "--hypershift") { Layer::HyperShift } else { Layer::Normal };
+    let args: Vec<&str> = rest.iter().map(String::as_str).filter(|a| *a != "--hypershift").collect();
+    // `capslock` or `key-capslock`; stored in the profile as `key-capslock`.
+    let input = |key: &str| -> Result<Input, Error> {
+        let name = if key.starts_with("key-") { key.to_string() } else { format!("key-{key}") };
+        Input::parse(&name).ok_or_else(|| Error::InvalidArg(format!("unknown key '{key}' (see `secbird --help`)")))
+    };
+    let unsupported = || {
+        use secbird_core::Kind;
+        match dev.spec.as_ref().map(|s| s.kind) {
+            Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop) | None => Error::Unsupported(format!(
+                "{} doesn't answer key remapping commands; please send `secbird report` in a GitHub issue",
+                dev.name()
+            )),
+            Some(_) => Error::Unsupported(format!("{} has no keyboard keys (see `secbird button`)", dev.name())),
+        }
+    };
+    match args.as_slice() {
+        [] | ["list"] => {
+            let keys = dev.keys();
+            if keys.is_empty() {
+                return Err(unsupported());
+            }
+            for (id, normal) in keys {
+                let key = Input::Key(id);
+                let action = match layer {
+                    Layer::Normal => normal.to_string(),
+                    Layer::HyperShift => dev.input(key, layer).map_or_else(|e| e.to_string(), |a| a.to_string()),
+                };
+                let name = key.name();
+                println!("  {:<16} {action:<24} {}", &name["key-".len()..], key.label());
+            }
+            Ok(())
+        }
+        ["restore-all"] => {
+            let n = actions::restore_all_buttons(dev, store)?;
+            println!("Restored {n} key(s) and button(s) to what the device stores.");
+            Ok(())
+        }
+        [key, "reset"] => {
+            let input = input(key)?;
+            actions::set_button(dev, store, &input.name(), layer, None)?;
+            println!("{key}: back to {}", dev.input(input, layer)?);
+            Ok(())
+        }
+        [key, action] => {
+            let input = input(key)?;
+            let action = action.parse()?;
+            match actions::set_button(dev, store, &input.name(), layer, Some(action)) {
+                // A keyboard that doesn't take key commands at all, rather than this one key.
+                Err(Error::Device { .. } | Error::NoReply(_)) if dev.input(Input::Key(31), Layer::Normal).is_err() => {
+                    return Err(unsupported())
+                }
+                other => other?,
+            }
+            println!("{key} now does {action}");
+            Ok(())
+        }
+        _ => Err(Error::InvalidArg("usage: key [list|restore-all] | key <key> <action|reset> [--hypershift]".into())),
     }
 }
 
@@ -672,6 +784,17 @@ fn dimming_text(d: secbird_core::Dimming) -> &'static str {
     }
 }
 
+fn game_mode_text(g: secbird_core::GameMode) -> String {
+    if g.is_off() {
+        return "off".into();
+    }
+    let keys: Vec<&str> = [(g.win, "Windows key"), (g.alt_tab, "Alt+Tab"), (g.alt_f4, "Alt+F4")]
+        .into_iter()
+        .filter_map(|(on, name)| on.then_some(name))
+        .collect();
+    format!("on, blocks {}", keys.join(", "))
+}
+
 fn info(dev: &Device, store: &mut Store) -> Result<(), Error> {
     let (major, minor) = dev.firmware()?;
     println!("Device    {} ({:04X})", dev.name(), dev.pid);
@@ -699,6 +822,9 @@ fn info(dev: &Device, store: &mut Store) -> Result<(), Error> {
     }
     if let Ok(Some(d)) = dev.dimming() {
         println!("Dimming   {}", dimming_text(d));
+    }
+    if let Ok(Some(g)) = dev.game_mode() {
+        println!("Gaming    {}", game_mode_text(g));
     }
     if let Some(spec) = &dev.spec {
         if !spec.leds.is_empty() {

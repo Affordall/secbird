@@ -80,6 +80,17 @@ const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("macro count", cmd::MACRO_COUNT.get(), cmd::MACRO_COUNT_SIZE, &[]),
     ("button ids", cmd::BUTTON_IDS.get(), cmd::BUTTON_IDS_SIZE, &[]),
     ("sensor rotation", cmd::SENSOR_ANGLE.get(), cmd::SENSOR_ANGLE_SIZE, &[cmd::VARSTORE]),
+    ("gaming mode", cmd::GAME_MODE.get(), cmd::GAME_MODE_SIZE, &[]),
+];
+
+/// Keyboard key remapping (02:0D), which Synapse defines but never sends: whether the
+/// keyboard answers the key list and a read of key A (31), in the live slot and slot 1.
+const KEY_PROBES: &[(&str, Command, u8, &[u8])] = &[
+    ("key ids", cmd::KEY_IDS, cmd::KEY_SIZE, &[1, 0, 0]),
+    ("key ids (live slot)", cmd::KEY_IDS, cmd::KEY_SIZE, &[0, 0, 0]),
+    ("key A (live slot)", cmd::KEY.get(), cmd::KEY_SIZE, &[0, 31, 0]),
+    ("key A (slot 1)", cmd::KEY.get(), cmd::KEY_SIZE, &[1, 31, 0]),
+    ("key A HyperShift (slot 1)", cmd::KEY.get(), cmd::KEY_SIZE, &[1, 31, 1]),
 ];
 
 /// Laptop fan and power reads (Synapse's thermal module, class 0D, and power class 07), for
@@ -171,6 +182,7 @@ pub fn build(api: &HidApi, db: &Db) -> Report {
 /// Send every read-only probe to one device.
 pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
     let laptop = dev.spec.as_ref().is_none_or(|s| s.kind == crate::Kind::Laptop);
+    let keyboard = laptop || dev.spec.as_ref().is_some_and(|s| matches!(s.kind, crate::Kind::Keyboard | crate::Kind::Keypad));
     let run = |txid: u8, &(name, command, size, args): &(&'static str, Command, u8, &[u8])| {
         let sent = if txid == dev.txid { dev.transact(command, size, args) } else { dev.transact_as(txid, command, size, args) };
         let (status, reply) = match sent {
@@ -181,7 +193,12 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
         };
         Probe { name, command: command.to_string(), status, reply }
     };
-    let probes = PROBES.iter().chain(LAPTOP_PROBES.iter().filter(|_| laptop)).map(|p| run(dev.txid, p)).collect();
+    let probes = PROBES
+        .iter()
+        .chain(KEY_PROBES.iter().filter(|_| keyboard))
+        .chain(LAPTOP_PROBES.iter().filter(|_| laptop))
+        .map(|p| run(dev.txid, p))
+        .collect();
     let leds_at = |txid: u8| -> Vec<u8> {
         LED_IDS
             .filter(|&led| {

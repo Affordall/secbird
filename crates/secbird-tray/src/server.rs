@@ -298,6 +298,9 @@ struct Body {
     /// Laptop keyboard when idle: stays-lit, half, quarter or dark.
     #[serde(default)]
     dimming: String,
+    /// Keyboards: the keys gaming mode blocks, `off` or like `win,alt-tab`.
+    #[serde(default)]
+    game_mode: String,
     /// Macro steps as text (`tap:ctrl+c wait:50`), and a macro id.
     #[serde(default)]
     script: String,
@@ -312,7 +315,11 @@ struct Body {
 /// profile remaps.
 fn buttons_json(dev: &Device, store: &mut Store) -> Value {
     use secbird_core::buttons::{button_label, button_name, setting_key, Layer};
-    let remapped = &store.for_device(dev).active().buttons;
+    let profiles = store.for_device(dev);
+    let remapped = &profiles.active().buttons;
+    let onboard = profiles.onboard.as_ref();
+    // Before a "Save to mouse" the slot holds our remap; the original is in its backup.
+    let original = |key: &str| onboard.and_then(|o| o.before.get(key)).cloned();
     let list: Vec<Value> = dev
         .buttons()
         .into_iter()
@@ -322,7 +329,7 @@ fn buttons_json(dev: &Device, store: &mut Store) -> Value {
             let is_remapped = |layer| remapped.contains_key(&setting_key(&name, layer));
             // What the mouse itself holds: the live value unless the active profile remapped it.
             let saved = |layer, live: Option<String>| match is_remapped(layer) {
-                true => dev.saved_button(id, layer).map(|a| a.to_string()).ok(),
+                true => original(&setting_key(&name, layer)).or_else(|| dev.saved_button(id, layer).map(|a| a.to_string()).ok()),
                 false => live,
             };
             json!({
@@ -338,7 +345,12 @@ fn buttons_json(dev: &Device, store: &mut Store) -> Value {
             })
         })
         .collect();
-    json!({ "buttons": list })
+    // What "Save to mouse" put in the mouse's slot, and whether that profile changed since.
+    let onboard = onboard.map(|o| {
+        let changed = profiles.profiles.get(&o.profile).map(|p| &p.buttons) != Some(&o.buttons);
+        json!({ "slot": o.slot, "profile": o.profile, "count": o.buttons.len(), "changed": changed })
+    });
+    json!({ "buttons": list, "onboard": onboard })
 }
 
 fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
@@ -380,6 +392,10 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
                 actions::set_dimming(dev, &mut store, b.dimming.parse()?)?;
                 Ok(json!({ "dimming": dev.dimming().ok().flatten().map(|d| d.to_string()) }))
             }
+            "/api/gaming" => {
+                actions::set_game_mode(dev, &mut store, b.game_mode.parse()?)?;
+                Ok(json!({ "game_mode": dev.game_mode().ok().flatten().map(|g| g.to_string()) }))
+            }
             "/api/sleep" => {
                 if let Some(on) = b.auto {
                     actions::set_auto_sleep(dev, &mut store, on)?;
@@ -413,6 +429,14 @@ fn post(engine: &mut Engine, path: &str, body: &[u8]) -> Result<Value, Error> {
             "/api/buttons" => Ok(buttons_json(dev, &mut store)),
             "/api/buttons-restore" => {
                 actions::restore_all_buttons(dev, &mut store)?;
+                Ok(buttons_json(dev, &mut store))
+            }
+            "/api/save-to-mouse" => {
+                actions::save_buttons_to_mouse(dev, &mut store)?;
+                Ok(buttons_json(dev, &mut store))
+            }
+            "/api/put-back" => {
+                actions::put_back_onboard(dev, &mut store)?;
                 Ok(buttons_json(dev, &mut store))
             }
             "/api/macros" => macros_json(dev),
@@ -548,6 +572,7 @@ fn settings_json(engine: &Engine) -> Value {
         "battery_warning": !s.battery_warning_off,
         "battery_warning_at": s.low_battery(),
         "auto_switch": !s.auto_switch_off,
+        "away_lights": s.away_lights.as_deref().unwrap_or(""),
         "synapse": engine.synapse(),
     })
 }
@@ -576,6 +601,14 @@ fn app_post(engine: &mut Engine, path: &str, b: &Body) -> Option<Result<Value, E
                     s.battery_warning_at = Some(b.value);
                 }
                 "auto_switch" => s.auto_switch_off = !b.on,
+                // `data`: "dim", "off", or "" to leave the lights as they are.
+                "away_lights" => {
+                    let want = b.data.as_str().unwrap_or_default();
+                    if !want.is_empty() && !crate::settings::AWAY_LIGHTS.iter().any(|(name, _)| *name == want) {
+                        return Some(Err(Error::InvalidArg(format!("unknown choice '{want}' for the lights when away"))));
+                    }
+                    s.away_lights = (!want.is_empty()).then(|| want.to_string());
+                }
                 other => return Some(Err(Error::InvalidArg(format!("unknown setting '{other}'")))),
             }
             s.save();
@@ -723,6 +756,8 @@ fn device_json(dev: &Device) -> Value {
             .map(|s| json!({ "active": s.active, "list": s.stages, "max": secbird_core::commands::MAX_DPI_STAGES })),
         "sleep": sleep_json(dev),
         "dimming": dev.dimming().ok().flatten().map(|d| d.to_string()),
+        // Only keyboards that answer the read get the Gaming section.
+        "game_mode": dev.game_mode().ok().flatten().map(|g| g.to_string()),
         "macros": dev.macro_storage().is_ok(),
         "matrix": spec.and_then(|s| s.matrix).map(|m| json!({ "rows": m.rows, "cols": m.cols, "first": m.first })),
         "leds": spec.map(|s| s.leds.iter().map(|l| json!({ "name": l.name, "id": l.id })).collect::<Vec<_>>()).unwrap_or_default(),

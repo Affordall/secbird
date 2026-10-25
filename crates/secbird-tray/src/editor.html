@@ -492,7 +492,7 @@ const KINDS = { mouse: 'Mouse', keyboard: 'Keyboard', laptop: 'Laptop', keypad: 
   headset: 'Headset', accessory: 'Accessory', unknown: 'Device' };
 let devices = [], unsupported = [], synapse = [], dev = null, showAll = null;
 let sel = null, section = null, view = 'work'; // selected tile, rail section, 'work' or 'compare'
-let btnFailed = {}, btnData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
+let btnFailed = {}, btnData = {}, onboardData = {}, macroData = {}, btnLayer = 'normal', brush = 'FF2800', painting = false, syncPicked = false;
 
 // Full-size ANSI keyboard on Razer's 6 x 22 per-key grid.
 // Each key: [label, matrix column, width, gap before, height], in key units.
@@ -836,9 +836,11 @@ function sections() {
   if (dev.kind === 'mouse') {
     const list = btnData[dev.id];
     s.push({ id: 'buttons', name: 'Buttons', tools: 'layer', loading: !list,
-      rows: (list || []).filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label, name: b.name })) });
+      rows: [...(list || []).filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label, name: b.name })),
+        ...(list && list.length ? [{ key: 'onboard', label: 'Saved on the mouse' }] : [])] });
   }
   if (dev.macros) s.push({ id: 'macros', name: 'Macros', rows: [{ key: 'macros', label: 'Macros on the device' }] });
+  if (dev.game_mode != null) s.push({ id: 'gaming', name: 'Gaming', rows: [{ key: 'gaming', label: 'Gaming mode' }] });
   const power = [];
   if (dev.sleep) power.push({ key: 'sleep', label: 'Sleep when idle' });
   if (dev.dimming) power.push({ key: 'dimming', label: 'Keyboard when idle' });
@@ -869,6 +871,7 @@ function railSummary(s) {
     const n = Object.keys(p.buttons || {}).length;
     return n ? plural(n, 'button') + ' changed' : 'As saved in the mouse';
   }
+  if (s.id === 'gaming') return gamingText(dev.game_mode);
   if (s.id === 'macros') { const m = macroData[dev.id]; return m ? (m.macros.length ? plural(m.macros.length, 'macro') : 'None yet') : 'On the device'; }
   if (s.id === 'power') {
     const sl = dev.sleep;
@@ -1115,7 +1118,8 @@ function cellValue(key, name) {
   if (key === 'stages') { const st = stagesOf(name); return st ? st.active + ':' + st.list.join(' ') : ''; }
   if (key === 'sleep') { const sl = sleepOf(name); return sl ? sl.auto + ':' + sl.minutes : ''; }
   if (key === 'dimming') return dimmingOf(name) || '';
-  if (key === 'macros') return 'shared'; // the device's, the same in every profile
+  if (key === 'gaming') return gamingOf(name) || '';
+  if (key === 'macros' || key === 'onboard') return 'shared'; // the device's, the same in every profile
   if (key.startsWith('btn:')) {
     const b = (btnData[dev.id] || []).find(x => x.name === key.slice(4)); if (!b) return '';
     const skey = btnLayer === 'normal' ? b.name : b.name + '/hypershift';
@@ -1130,6 +1134,12 @@ const differs = (key, name) => name !== dev.active && cellValue(key, name) !== c
 function cellView(key, name) {
   const p = prof(name), active = name === dev.active;
   if (key === 'lighting-control') return [dev.lighting_control ? 'Secretarybird' : '<span class="unset">Not controlled</span>'];
+  if (key === 'onboard') {
+    const o = onboardData[dev.id];
+    if (!o) return ['<span class="unset">Not saved</span>'];
+    if (o.profile !== name) return ['<span class="unset">Not this profile</span>'];
+    return [`Slot <span class="num">${o.slot}</span>` + (o.changed ? ' · <span class="unset">changed since</span>' : '')];
+  }
   if (key.startsWith('zone:')) {
     const z = zoneOf(p, key.slice(5));
     if (p.keys && p.keys.length && dev.matrix) return ['<span class="unset">Per-key colors</span>'];
@@ -1162,6 +1172,10 @@ function cellView(key, name) {
   if (key === 'dimming') {
     const d = dimmingOf(name);
     return [d ? DIMMING[d] : '<span class="unset">Not set</span>'];
+  }
+  if (key === 'gaming') {
+    const g = gamingOf(name);
+    return [g ? gamingText(g) : '<span class="unset">Not set</span>'];
   }
   if (key === 'sleep') {
     const sl = sleepOf(name);
@@ -1237,6 +1251,8 @@ function buildEditor(host, r) {
   else if (r.key === 'stages') stagesEditor(box);
   else if (r.key === 'sleep') sleepEditor(box);
   else if (r.key === 'dimming') dimmingEditor(box);
+  else if (r.key === 'gaming') gamingEditor(box);
+  else if (r.key === 'onboard') onboardEditor(box);
   else if (r.key === 'macros') macrosEditor(box);
   else if (r.key === 'apps') appsEditor(box);
   else if (r.key === 'device') deviceEditor(box);
@@ -1654,6 +1670,61 @@ function dimmingEditor(box) {
     el('p', { className: 'note', textContent: 'New and not yet confirmed on a laptop. If it goes dark anyway with Stays lit, please tell us.' }));
 }
 
+// Save to mouse: the profile's button remaps written into the mouse's on-board slot, so they
+// work without Secretarybird. Remaps are live only until then. Put back undoes it.
+function onboardEditor(box) {
+  const o = onboardData[dev.id], n = Object.keys(dev.profile.buttons || {}).length;
+  const status = !o ? 'Your button remaps work while Secretarybird is running. Saved on the mouse, they also work on another PC, on Linux or macOS, and before Secretarybird starts.'
+    : o.profile !== dev.active ? `${o.profile} is saved in on-board slot ${o.slot}. Saving ${dev.active} replaces it.`
+    : o.changed ? `${o.profile} was saved in on-board slot ${o.slot} and has changed since. Save again to update the mouse.`
+    : `${o.profile} is saved in on-board slot ${o.slot} (${plural(o.count, 'remapped button')}). It works without Secretarybird.`;
+  const done = (r, msg) => { btnData[dev.id] = r.buttons; onboardData[dev.id] = r.onboard; sel = 'onboard'; renderWork(); toast(msg); };
+  const save = el('button', { className: 'ghost', textContent: o && o.profile === dev.active ? 'Save again' : 'Save ' + dev.active + ' to the mouse',
+    onclick: async e => {
+      if (!o && !confirm(`Write ${dev.active}'s button remaps into the mouse's memory? What it holds now is kept, and Put back restores it.`)) return;
+      e.target.disabled = true;
+      try { done(await api('/api/save-to-mouse', {}), dev.active + ' saved on the mouse'); }
+      catch (err) { toast(err.message, true); e.target.disabled = false; }
+    } });
+  const putBack = o && el('button', { className: 'ghost', textContent: 'Put back what the mouse had', onclick: async e => {
+    e.target.disabled = true;
+    try { done(await api('/api/put-back', {}), 'The mouse has its own settings back. Your remaps still work while Secretarybird runs.'); }
+    catch (err) { toast(err.message, true); e.target.disabled = false; }
+  } });
+  box.append(el('div', { className: 'edgroup' }, el('p', { textContent: status }),
+      el('div', { className: 'row' }, save, putBack)),
+    el('p', { className: 'note', textContent: n ? 'Lighting, DPI and the sleep timer are on the mouse already; this saves the button remaps.' : 'This profile remaps no buttons, so saving it puts back anything saved before.' }),
+    el('p', { className: 'note', textContent: 'The mouse’s memory is only written when you click here, never when profiles switch.' }));
+}
+
+// Gaming mode (keyboards and keypads): the keys it blocks, as `off` or like `win,alt-tab`.
+const GAMING_KEYS = [['win', 'Windows key'], ['alt-tab', 'Alt+Tab'], ['alt-f4', 'Alt+F4']];
+function gamingOf(name) { return name === dev.active && dev.game_mode ? dev.game_mode : prof(name).game_mode; }
+function gamingKeys(g) { const keys = (g || '').split(','); return GAMING_KEYS.filter(([k]) => keys.includes(k)).map(([, label]) => label); }
+function gamingText(g) { const on = gamingKeys(g); return on.length ? 'Blocks ' + on.join(', ') : 'Off'; }
+function gamingEditor(box) {
+  const rows = GAMING_KEYS.map(([k, label]) => {
+    const input = el('input', { type: 'checkbox', className: 'switch', id: 'gm-' + k,
+      checked: (dev.game_mode || '').split(',').includes(k), onchange: async e => {
+        const t = e.target, keys = (dev.game_mode || '').split(',');
+        const want = GAMING_KEYS.map(([g]) => g).filter(g => g === k ? t.checked : keys.includes(g)).join(',') || 'off';
+        t.disabled = true;
+        try {
+          const r = await api('/api/gaming', { game_mode: want });
+          dev.game_mode = r.game_mode; dev.profile.game_mode = want;
+          refreshCell('gaming');
+          const on = gamingKeys(dev.game_mode);
+          toast((on.length ? 'Gaming mode blocks ' + on.join(', ') : 'Gaming mode off') + ' · saved to ' + dev.active);
+        } catch (err) { t.checked = !t.checked; toast(err.message, true); }
+        t.disabled = false;
+      } });
+    return el('div', { className: 'row' }, input, el('label', { htmlFor: 'gm-' + k, textContent: 'Block ' + label }));
+  });
+  box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Keys blocked so a game isn’t left by accident' }), ...rows),
+    el('p', { className: 'note', textContent: 'Saved to this profile: tie the profile to a game (Profile → Switches with) and gaming mode comes on while you play.' }),
+    el('p', { className: 'note', textContent: 'New and not yet confirmed on a keyboard. If a blocked key still works, please tell us.' }));
+}
+
 // Asks Razer's public product page whether newer firmware is out. Never installs anything.
 const fwResult = {};
 function firmwareCheck() {
@@ -1753,7 +1824,10 @@ async function loadButtons(d, force) {
   if (d.kind !== 'mouse' || (!force && btnData[d.id] !== undefined)) return;
   btnData[d.id] = null; // loading
   if (dev && dev.id === d.id && !showAll) renderSheet();
-  try { btnData[d.id] = (await api('/api/buttons', { id: d.id })).buttons; delete btnFailed[d.id]; } catch { btnData[d.id] = []; btnFailed[d.id] = true; }
+  try {
+    const r = await api('/api/buttons', { id: d.id });
+    btnData[d.id] = r.buttons; onboardData[d.id] = r.onboard; delete btnFailed[d.id];
+  } catch { btnData[d.id] = []; btnFailed[d.id] = true; }
   if (dev && dev.id === d.id && !showAll) renderSheet();
 }
 
@@ -1911,7 +1985,7 @@ async function macroCall(body, done) {
 async function restoreAllButtons() {
   try {
     const r = await api('/api/buttons-restore', {});
-    btnData[dev.id] = r.buttons; dev.profile.buttons = {};
+    btnData[dev.id] = r.buttons; onboardData[dev.id] = r.onboard; dev.profile.buttons = {};
     sel = null; renderWork();
     toast('Every button is back to what the mouse stores');
   } catch (err) { toast(err.message, true); }
@@ -1922,7 +1996,8 @@ async function assign(button, action, isUndo) {
   const prev = before && { action: before[layer], remapped: before.remapped[layer] };
   try {
     const r = await api('/api/button', { button, layer: btnLayer, assign: action });
-    btnData[dev.id] = r.buttons;
+    btnData[dev.id] = r.buttons; onboardData[dev.id] = r.onboard;
+    refreshCell('onboard');
     const skey = btnLayer === 'normal' ? button : button + '/hypershift';
     dev.profile.buttons = dev.profile.buttons || {};
     if (action) dev.profile.buttons[skey] = action; else delete dev.profile.buttons[skey];
@@ -2117,7 +2192,15 @@ function renderSettings() {
   // Startup and games
   const startup = group('Startup and games',
     row('Start with Windows', 'Your settings go back on as soon as you sign in. Off means they only apply while Secretarybird is running.', ...traySwitch('autostart', 'Start with Windows')),
-    row('Switch profiles with games', 'A profile tied to a program comes up while that program is in front, and goes back after.', ...traySwitch('auto_switch', 'Switch profiles with games')));
+    row('Switch profiles with games', 'A profile tied to a program comes up while that program is in front, and goes back after.', ...traySwitch('auto_switch', 'Switch profiles with games')),
+    row('Lights when away', 'While the PC is locked or its screen is off, the lights dim to a quarter or turn off, and come back when you return. Nothing is saved on the devices.',
+      seg('Lights when away', [['', 'Leave on'], ['dim', 'Dim'], ['off', 'Off']], a.away_lights || '', async v => {
+        try {
+          appSettings = await api('/api/settings', { key: 'away_lights', data: v });
+          toast(v === 'dim' ? 'Lights dim when away' : v === 'off' ? 'Lights turn off when away' : 'Lights stay on when away');
+          renderSettings();
+        } catch (e) { toast(e.message, true); }
+      })));
 
   // Notifications and checks
   // Any whole percent: typed (saved on Enter or leaving the box) or stepped with - and +

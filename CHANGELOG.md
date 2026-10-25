@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Lights when away: while the PC is locked or its screen is off, the lights dim to a quarter or
+  turn off, and come back when you return (Settings → Lights when away; #48, thanks a3k7dotmd).
+  Nothing is saved on the devices, so a replug brings the normal lights back. Devices with the
+  older lighting commands stay lit. Tested on the Basilisk V3.
+- Gaming mode on keyboards and keypads: block the Windows key, Alt+Tab and Alt+F4 (the new Gaming
+  section, or `secbird gaming win,alt-tab`). It's saved per profile, so a profile tied to a game
+  turns it on while you play. The keyboard does the blocking, the way Synapse asks it to; the
+  section shows only on keyboards that answer for it. Not tested on a keyboard yet.
+- Save to mouse: Buttons → Saved on the mouse writes a profile's button remaps into the mouse's
+  on-board memory, so they work without Secretarybird (another PC, Linux, macOS, before the tray
+  starts) and survive sleep. What the mouse held before is kept, and "Put back what the mouse
+  had" restores it; Restore all puts it back too. Remaps stay live-only until you click, and
+  switching profiles never writes the mouse's memory (`secbird button save-to-mouse`,
+  `secbird button put-back`). Tested on the Basilisk V3.
+- Keyboard key remapping, beta, command line only for now: `secbird key capslock key:esc`,
+  `secbird key` to list, `reset`, `restore-all` and `--hypershift`, with the same actions as
+  mouse buttons. Remaps are saved per profile, and the tray sends them on a profile switch. It
+  writes to the keyboard the way it does for mice (Razer's "Set Single Key Assignment"), but
+  Synapse remaps keyboards in software, so whether a keyboard accepts it isn't known yet. Asked
+  for in #46, #39, #45 and #49. `secbird report` now shows whether a keyboard answers.
+
+### Changed
+- 02EA is the Huntsman V3 HE TKL (#50, thanks Toru1475).
+
 ## [0.4.12] - 2026-10-24
 
 ### Added
