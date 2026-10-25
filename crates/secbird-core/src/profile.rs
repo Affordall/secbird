@@ -47,6 +47,10 @@ pub struct Profile {
     /// `dark`), see [`crate::Dimming`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dimming: Option<String>,
+    /// Keyboards: the keys gaming mode blocks (`off`, or like `win,alt-tab`), see
+    /// [`crate::GameMode`]. Per profile, so a profile tied to a game can turn it on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_mode: Option<String>,
     /// Lighting zone name (or numeric id) -> state.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub lighting: BTreeMap<String, Zone>,
@@ -81,6 +85,25 @@ pub struct DeviceProfiles {
     /// Leave this device's lighting to another app, across every profile.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub lighting_off: bool,
+    /// Button remaps written into the mouse's own memory with "Save to mouse".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onboard: Option<OnboardSave>,
+}
+
+/// A profile's button remaps saved in one of the mouse's on-board slots, so they work
+/// without Secretarybird (on another PC, on Linux, before the tray starts, after sleep).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct OnboardSave {
+    /// The on-board slot written: the one active when saving (1-5).
+    pub slot: u8,
+    /// The profile saved, and its remaps as saved, to tell when it changed since.
+    pub profile: String,
+    #[serde(default)]
+    pub buttons: BTreeMap<String, String>,
+    /// What each written button held before Secretarybird first wrote it (Synapse's or the
+    /// factory setting), to put back.
+    #[serde(default)]
+    pub before: BTreeMap<String, String>,
 }
 
 impl Default for DeviceProfiles {
@@ -89,6 +112,7 @@ impl Default for DeviceProfiles {
             active: DEFAULT_PROFILE.into(),
             profiles: BTreeMap::from([(DEFAULT_PROFILE.into(), Profile::default())]),
             lighting_off: false,
+            onboard: None,
         }
     }
 }
@@ -142,24 +166,36 @@ impl DeviceProfiles {
     }
 
     /// Send profile `name` to the device. Buttons remapped by another profile of this
-    /// device but not by this one go back to their saved setting, so switching profiles
-    /// never leaves a stray remap behind.
+    /// device (or saved on the mouse) but not by this one go back to their original
+    /// setting, so switching profiles never leaves a stray remap behind.
     pub fn apply(&self, name: &str, dev: &Device) -> Vec<Applied> {
         let Some(profile) = self.profiles.get(name) else {
             return vec![Applied { setting: format!("profile '{name}'"), result: Err(Error::NotFound(name.into())) }];
         };
         let mut out = profile.apply_settings(dev, !self.lighting_off);
+        let saved = self.onboard.iter().flat_map(|o| o.before.keys());
         let others: std::collections::BTreeSet<&String> = self
             .profiles
             .values()
             .flat_map(|p| p.buttons.keys())
+            .chain(saved)
             .filter(|k| !profile.buttons.contains_key(*k))
             .collect();
         for key in others {
-            let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| dev.reset_button(id, layer));
+            let result = self.reset_button(key, dev);
             out.push(Applied { setting: format!("{key} back to saved"), result: result.map(|_| ()) });
         }
         out
+    }
+
+    /// Put a button or key (a setting key like `side-forward/hypershift`) back to its original
+    /// setting: what it held before "Save to mouse" wrote the slot, else the slot's own.
+    pub fn reset_button(&self, key: &str, dev: &Device) -> Result<bool> {
+        let (input, layer) = crate::buttons::parse_setting_key(key)?;
+        match self.onboard.as_ref().and_then(|o| o.before.get(key)) {
+            Some(original) => dev.set_input(input, layer, original.parse()?),
+            None => dev.reset_input(input, layer),
+        }
     }
 
     /// Whether the device has lost profile `name`'s button remaps, as a wireless mouse
@@ -169,9 +205,9 @@ impl DeviceProfiles {
         let Some((key, action)) = self.profiles.get(name).and_then(|p| p.buttons.iter().next()) else {
             return false;
         };
-        let Ok((id, layer)) = crate::buttons::parse_setting_key(key) else { return false };
+        let Ok((input, layer)) = crate::buttons::parse_setting_key(key) else { return false };
         let Ok(want) = action.parse::<crate::buttons::Action>() else { return false };
-        dev.button(id, layer).is_ok_and(|have| have != want)
+        dev.input(input, layer).is_ok_and(|have| have != want)
     }
 
     /// Send only profile `name`'s button remaps (see [`DeviceProfiles::buttons_lost`]).
@@ -193,6 +229,14 @@ impl DeviceProfiles {
                 result: dev.led_id(zone).and_then(|led| dev.set_effect(led, &crate::effects::Effect::Battery)),
             })
             .collect()
+    }
+
+    /// Send profile `name`'s per-key colors again: a keyboard drops them in its quick
+    /// adjustment mode (#45) and never says when it leaves it. `None` when the profile has
+    /// none or this device's lighting is left to another app.
+    pub fn refresh_frame(&self, name: &str, dev: &Device) -> Option<Result<()>> {
+        let profile = self.profiles.get(name).filter(|p| !self.lighting_off && !p.keys.is_empty())?;
+        Some(dev.show_frame(&profile.keys))
     }
 
     pub fn switch(&mut self, name: &str) -> Result<()> {
@@ -258,6 +302,8 @@ impl Store {
                 active: incoming.active.clone(),
                 profiles: BTreeMap::new(),
                 lighting_off: incoming.lighting_off,
+                // The only copy of what the mouse's slot held before a "Save to mouse".
+                onboard: incoming.onboard.clone(),
             });
             for (name, profile) in incoming.profiles {
                 let mut unique = name.clone();
@@ -361,6 +407,9 @@ impl Profile {
         if let Some(d) = &self.dimming {
             push(format!("keyboard when idle: {d}"), d.parse().and_then(|d| dev.set_dimming(d)));
         }
+        if let Some(g) = &self.game_mode {
+            push(format!("gaming mode: {g}"), g.parse().and_then(|g| dev.set_game_mode(g)));
+        }
         for (name, zone) in self.lighting.iter().filter(|_| lighting) {
             let led = match dev.led_id(name) {
                 Ok(led) => led,
@@ -391,9 +440,9 @@ impl Profile {
         self.buttons
             .iter()
             .map(|(key, action)| {
-                let result = crate::buttons::parse_setting_key(key).and_then(|(id, layer)| {
+                let result = crate::buttons::parse_setting_key(key).and_then(|(input, layer)| {
                     let action: crate::buttons::Action = action.parse()?;
-                    dev.set_button(id, layer, action).map(|_| ())
+                    dev.set_input(input, layer, action).map(|_| ())
                 });
                 Applied { setting: format!("{key} -> {action}"), result }
             })
@@ -436,6 +485,52 @@ mod tests {
         assert_eq!(dev.button(5, Layer::Normal).unwrap(), Action::Key { modifiers: 0, usage: 0x68 });
         assert!(!p.buttons_lost("Default", dev), "sent again");
         dev.reset_button(5, Layer::Normal).unwrap();
+    }
+
+    /// On the first real mouse: `cargo test -p secbird-core real_mouse_saves -- --ignored --nocapture`.
+    /// Saves F13 on side-forward into the active on-board slot, then puts the slot back.
+    #[test]
+    #[ignore]
+    fn real_mouse_saves_to_its_slot_and_puts_it_back() {
+        use crate::buttons::{Action, Layer};
+        let api = crate::hidapi::HidApi::new().unwrap();
+        let devs = crate::discover(&api, &crate::Db::builtin().unwrap());
+        let dev = devs.iter().find(|d| !d.buttons().is_empty()).expect("a mouse with remappable buttons");
+        let slot = dev.saved_slot();
+        let before = dev.slot_button(slot, 5, Layer::Normal).unwrap();
+        println!("slot {slot}: side-forward is {before}");
+        let path = std::env::temp_dir().join(format!("secbird-real-onboard-{}.json", std::process::id()));
+        let mut store = Store::load(&path).unwrap();
+        let f13 = Action::Key { modifiers: 0, usage: 0x68 };
+        crate::actions::set_button(dev, &mut store, "side-forward", Layer::Normal, Some(f13)).unwrap();
+        crate::actions::save_buttons_to_mouse(dev, &mut store).unwrap();
+        let saved = dev.slot_button(slot, 5, Layer::Normal).unwrap();
+        println!("after save: slot has {saved}, backup {:?}", store.for_device(dev).onboard.as_ref().map(|o| &o.before));
+        crate::actions::restore_all_buttons(dev, &mut store).unwrap();
+        let after = dev.slot_button(slot, 5, Layer::Normal).unwrap();
+        println!("after put back: slot has {after}, live {}", dev.button(5, Layer::Normal).unwrap());
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(saved, f13);
+        assert_eq!(after, before);
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), before);
+    }
+
+    /// On the first real mouse: `cargo test -p secbird-core real_mouse_dims -- --ignored --nocapture`.
+    /// Its first zone goes dark for 3 seconds with a write that isn't saved, then back.
+    #[test]
+    #[ignore]
+    fn real_mouse_dims_without_saving() {
+        let api = crate::hidapi::HidApi::new().unwrap();
+        let devs = crate::discover(&api, &crate::Db::builtin().unwrap());
+        let dev = devs.iter().find(|d| !d.buttons().is_empty()).expect("a mouse");
+        let led = dev.spec.as_ref().unwrap().leds[0].id;
+        let saved = dev.brightness(led).unwrap();
+        dev.set_brightness_live(led, 0).unwrap();
+        let during = dev.brightness(led).unwrap();
+        println!("led {led}: saved {saved}%, read while dark {during}%");
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        dev.set_brightness_live(led, saved).unwrap();
+        assert_eq!(dev.brightness(led).unwrap(), saved);
     }
 
     #[test]

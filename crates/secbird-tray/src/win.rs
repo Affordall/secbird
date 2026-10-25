@@ -15,6 +15,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::System::Power::{RegisterPowerSettingNotification, POWERBROADCAST_SETTING};
+use windows_sys::Win32::System::RemoteDesktop::{WTSRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION};
+use windows_sys::Win32::System::SystemServices::GUID_CONSOLE_DISPLAY_STATE;
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::Shell::*;
@@ -66,6 +69,11 @@ const UPDATE_EVERY_SECS: u64 = 24 * 60 * 60;
 const TIMER_BUTTONS: usize = 6;
 const BUTTONS_MS: u32 = 20_000;
 const BUTTONS_AGAIN_SECS: u64 = 60;
+/// Per-key colors of wired keyboards sent again this often: quick adjustment mode drops
+/// them without saying (#45), so this is how long they can stay dark after it. Laptops
+/// set to stay lit get a read on the same beat (#34).
+const TIMER_LIGHTS: usize = 7;
+const LIGHTS_MS: u32 = 3_000;
 
 const ID_REAPPLY: u32 = 1;
 const ID_FOLDER: u32 = 2;
@@ -124,6 +132,9 @@ struct App {
     updating: bool,
     installs_tx: Sender<Result<(), String>>,
     installs: Receiver<Result<(), String>>,
+    /// The session is locked, or the screen is off: the lights go down if set (#48).
+    locked: bool,
+    screen_off: bool,
 }
 
 /// What clicking a notification does.
@@ -184,6 +195,10 @@ thread_local! {
 /// happens if a message arrives re-entrantly.
 fn with_app<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
     APP.with(|cell| cell.try_borrow_mut().ok().and_then(|mut a| a.as_mut().map(f)))
+}
+
+fn same_guid(a: &GUID, b: &GUID) -> bool {
+    (a.data1, a.data2, a.data3, a.data4) == (b.data1, b.data2, b.data3, b.data4)
 }
 
 fn wide(s: &str) -> Vec<u16> {
@@ -252,6 +267,10 @@ pub fn run() {
         );
         TASKBAR_CREATED.store(RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()), Ordering::Relaxed);
         register_hid_notifications(hwnd);
+        // Locking and the screen turning off, for the lights while away (#48). Windows
+        // sends the display state once right away.
+        WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION);
+        RegisterPowerSettingNotification(hwnd, &GUID_CONSOLE_DISPLAY_STATE, DEVICE_NOTIFY_WINDOW_HANDLE);
         // Event-driven, no polling: Windows calls back on this thread when the window
         // in front changes, and nothing runs in between.
         TRAY_HWND.store(hwnd, Ordering::Relaxed);
@@ -296,6 +315,8 @@ pub fn run() {
                 updating: false,
                 installs_tx,
                 installs,
+                locked: false,
+                screen_off: false,
             })
         });
         log::append("tray started");
@@ -304,6 +325,7 @@ pub fn run() {
         start_retries(hwnd);
         SetTimer(hwnd, TIMER_BATTERY, BATTERY_MS, None);
         SetTimer(hwnd, TIMER_BUTTONS, BUTTONS_MS, None);
+        SetTimer(hwnd, TIMER_LIGHTS, LIGHTS_MS, None);
         SetTimer(hwnd, TIMER_FIRMWARE, FIRMWARE_FIRST_MS, None);
         if std::env::args().any(|a| a == "--editor") {
             with_app(|app| app.open_editor());
@@ -385,8 +407,23 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 log::append("resumed from sleep");
                 schedule_rescan(hwnd, true);
                 start_retries(hwnd);
+            } else if wparam as u32 == PBT_POWERSETTINGCHANGE {
+                let setting = &*(lparam as *const POWERBROADCAST_SETTING);
+                if same_guid(&setting.PowerSetting, &GUID_CONSOLE_DISPLAY_STATE) {
+                    // 0 off, 1 on, 2 dimmed (still on).
+                    let off = setting.Data[0] == 0;
+                    with_app(|app| app.set_away(app.locked, off));
+                }
             }
             TRUE as LRESULT
+        }
+        WM_WTSSESSION_CHANGE => {
+            match wparam as u32 {
+                WTS_SESSION_LOCK => with_app(|app| app.set_away(true, app.screen_off)),
+                WTS_SESSION_UNLOCK => with_app(|app| app.set_away(false, app.screen_off)),
+                _ => None,
+            };
+            0
         }
         WM_TIMER if wparam == TIMER_RESCAN => {
             KillTimer(hwnd, TIMER_RESCAN);
@@ -424,6 +461,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TIMER if wparam == TIMER_BUTTONS => {
             with_app(|app| app.restore_lost_buttons());
+            0
+        }
+        WM_TIMER if wparam == TIMER_LIGHTS => {
+            with_app(|app| {
+                let engine = app.engine();
+                engine.refresh_frames();
+                engine.keep_laptops_lit();
+            });
             0
         }
         WM_TIMER if wparam == TIMER_FOREGROUND => {
@@ -491,6 +536,29 @@ impl App {
         self.warn_synapse(&synapse);
         self.check_battery();
         self.start_listeners();
+        // A device that arrives (or wakes) while the PC is locked comes up lit.
+        if let Some(percent) = TraySettings::load().away_percent().filter(|_| self.engine().is_away()) {
+            self.engine().lights_away(percent);
+        }
+    }
+
+    /// The lights go down while the PC is locked or its screen is off, if that's set (#48),
+    /// and come back after.
+    fn set_away(&mut self, locked: bool, screen_off: bool) {
+        (self.locked, self.screen_off) = (locked, screen_off);
+        let percent = TraySettings::load().away_percent().filter(|_| locked || screen_off);
+        let mut engine = self.engine();
+        match percent {
+            Some(percent) if !engine.is_away() => {
+                log::append(&format!("{}: lights to {percent}%", if locked { "locked" } else { "screen off" }));
+                engine.lights_away(percent);
+            }
+            None if engine.is_away() => {
+                log::append("back: lights as saved");
+                engine.lights_back();
+            }
+            _ => {}
+        }
     }
 
     /// One thread per event collection, blocked in a read until the device reports

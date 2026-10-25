@@ -89,6 +89,17 @@ const PROBES: &[(&str, Command, u8, &[u8])] = &[
     ("macro count", cmd::MACRO_COUNT.get(), cmd::MACRO_COUNT_SIZE, &[]),
     ("button ids", cmd::BUTTON_IDS.get(), cmd::BUTTON_IDS_SIZE, &[]),
     ("sensor rotation", cmd::SENSOR_ANGLE.get(), cmd::SENSOR_ANGLE_SIZE, &[cmd::VARSTORE]),
+    ("gaming mode", cmd::GAME_MODE.get(), cmd::GAME_MODE_SIZE, &[]),
+];
+
+/// Keyboard key remapping (02:0D), which Synapse defines but never sends: whether the
+/// keyboard answers the key list and a read of key A (31), in the live slot and slot 1.
+const KEY_PROBES: &[(&str, Command, u8, &[u8])] = &[
+    ("key ids", cmd::KEY_IDS, cmd::KEY_SIZE, &[1, 0, 0]),
+    ("key ids (live slot)", cmd::KEY_IDS, cmd::KEY_SIZE, &[0, 0, 0]),
+    ("key A (live slot)", cmd::KEY.get(), cmd::KEY_SIZE, &[0, 31, 0]),
+    ("key A (slot 1)", cmd::KEY.get(), cmd::KEY_SIZE, &[1, 31, 0]),
+    ("key A HyperShift (slot 1)", cmd::KEY.get(), cmd::KEY_SIZE, &[1, 31, 1]),
 ];
 
 /// Laptop fan and power reads (Synapse's thermal module, class 0D, and power class 07), for
@@ -188,6 +199,7 @@ pub fn build(api: &HidApi, db: &Db) -> Report {
 /// Send every read-only probe to one device.
 pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
     let laptop = dev.spec.as_ref().is_none_or(|s| s.kind == crate::Kind::Laptop);
+    let keyboard = laptop || dev.spec.as_ref().is_some_and(|s| matches!(s.kind, crate::Kind::Keyboard | crate::Kind::Keypad));
     let run = |txid: u8, &(name, command, size, args): &(&'static str, Command, u8, &[u8])| {
         let sent = if txid == dev.txid { dev.transact(command, size, args) } else { dev.transact_as(txid, command, size, args) };
         let (status, reply) = match sent {
@@ -198,7 +210,12 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
         };
         Probe { name, command: command.to_string(), status, reply }
     };
-    let probes = PROBES.iter().chain(LAPTOP_PROBES.iter().filter(|_| laptop)).map(|p| run(dev.txid, p)).collect();
+    let probes = PROBES
+        .iter()
+        .chain(KEY_PROBES.iter().filter(|_| keyboard))
+        .chain(LAPTOP_PROBES.iter().filter(|_| laptop))
+        .map(|p| run(dev.txid, p))
+        .collect();
     let leds_at = |txid: u8| -> Vec<u8> {
         LED_IDS
             .filter(|&led| {
@@ -232,8 +249,10 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
     }
 }
 
+/// Every byte of a short reply: a trailing 00 can be the answer (#34: smart dimming's
+/// `01 00 00` read as just `01`). Long replies drop their zero tail past the first 16.
 fn hex(bytes: &[u8]) -> String {
-    let end = bytes.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    let end = bytes.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1).max(bytes.len().min(16));
     bytes[..end].iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
 }
 
@@ -316,7 +335,7 @@ mod tests {
         let r = report_for(&Sim::mouse(), MOUSE_PID);
         assert_eq!(r.leds, [1, 4, 10]);
         assert_eq!(status(&r, "dpi"), "ok");
-        assert_eq!(r.probes.iter().find(|p| p.name == "dpi").unwrap().reply, "00 03 20 03 20");
+        assert_eq!(r.probes.iter().find(|p| p.name == "dpi").unwrap().reply, "00 03 20 03 20 00 00");
         assert_eq!(status(&r, "battery"), "NotSupported");
         assert_eq!(r.serial, "SIMM...01");
     }
@@ -351,8 +370,13 @@ mod tests {
 
     #[test]
     fn hex_and_shorten() {
-        assert_eq!(hex(&[1, 0, 0x20, 0, 0]), "01 00 20");
-        assert_eq!(hex(&[0, 0]), "");
+        assert_eq!(hex(&[1, 0, 0x20, 0, 0]), "01 00 20 00 00");
+        assert_eq!(hex(&[0, 0]), "00 00");
+        let mut long = [0u8; 0x50];
+        long[1] = 7;
+        assert_eq!(hex(&long), ["00 07", &" 00".repeat(14)].concat());
+        long[20] = 1;
+        assert_eq!(hex(&long).split(' ').count(), 21);
         assert_eq!(shorten("AB1234C56789012"), "AB12...12");
         assert_eq!(shorten("ABC"), "***");
     }

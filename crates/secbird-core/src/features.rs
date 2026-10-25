@@ -95,6 +95,67 @@ impl std::str::FromStr for Dimming {
     }
 }
 
+/// A keyboard's gaming mode: the keys it blocks so a game isn't left by accident. Nothing
+/// blocked is gaming mode off. As text: `off`, or the blocked keys, like `win,alt-tab`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct GameMode {
+    pub win: bool,
+    pub alt_tab: bool,
+    pub alt_f4: bool,
+}
+
+impl GameMode {
+    const KEYS: [(&'static str, u8); 3] = [("win", 4), ("alt-tab", 8), ("alt-f4", 16)];
+
+    pub fn is_off(self) -> bool {
+        self == GameMode::default()
+    }
+
+    fn flags(self) -> [bool; 3] {
+        [self.win, self.alt_tab, self.alt_f4]
+    }
+
+    fn bits(self) -> u8 {
+        if self.is_off() {
+            return 0;
+        }
+        Self::KEYS.iter().zip(self.flags()).filter(|(_, on)| *on).fold(1, |bits, ((_, bit), _)| bits | bit)
+    }
+
+    fn from_bits(bits: u8) -> GameMode {
+        let has = |bit: u8| bits & 1 != 0 && bits & bit != 0;
+        GameMode { win: has(4), alt_tab: has(8), alt_f4: has(16) }
+    }
+}
+
+impl std::fmt::Display for GameMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_off() {
+            return f.write_str("off");
+        }
+        let keys: Vec<&str> =
+            Self::KEYS.iter().zip(self.flags()).filter(|(_, on)| *on).map(|((name, _), _)| *name).collect();
+        f.write_str(&keys.join(","))
+    }
+}
+
+impl std::str::FromStr for GameMode {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let mut mode = GameMode::default();
+        for key in s.split(',').map(str::trim).filter(|k| !k.is_empty() && *k != "off") {
+            match key {
+                "win" => mode.win = true,
+                "alt-tab" => mode.alt_tab = true,
+                "alt-f4" => mode.alt_f4 = true,
+                _ => return Err(Error::InvalidArg(format!("'{key}': use off, or win, alt-tab and alt-f4"))),
+            }
+        }
+        Ok(mode)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SleepTimer {
     pub minutes: u16,
@@ -236,6 +297,27 @@ impl Device {
         Ok(())
     }
 
+    /// The keys a keyboard or keypad blocks in gaming mode. `None` for other devices; an
+    /// error when the keyboard has no gaming mode.
+    pub fn game_mode(&self) -> Result<Option<GameMode>> {
+        if !self.spec.as_ref().is_some_and(|s| matches!(s.kind, crate::Kind::Keyboard | crate::Kind::Keypad)) {
+            return Ok(None);
+        }
+        let r = self.get(cmd::GAME_MODE, cmd::GAME_MODE_SIZE, &[])?;
+        Ok(Some(GameMode::from_bits(r.args()[0])))
+    }
+
+    /// Set it, then read it back: a keyboard that doesn't block some of these keys says so.
+    pub fn set_game_mode(&self, want: GameMode) -> Result<()> {
+        self.transact(cmd::GAME_MODE, cmd::GAME_MODE_SIZE, &[want.bits(), 0, 0, 0])?;
+        let got = self.game_mode()?;
+        if got != Some(want) {
+            let got = got.map_or("nothing".into(), |g| g.to_string());
+            return Err(Error::Unsupported(format!("the keyboard didn't keep it (asked for {want}, reads {got})")));
+        }
+        Ok(())
+    }
+
     /// Turn sleeping when idle on or off, on devices that have the switch. The live value
     /// (store 0) is rebuilt from the saved slot at power-on, so the slot gets it too (#37).
     pub fn set_auto_sleep(&self, enabled: bool) -> Result<()> {
@@ -354,6 +436,29 @@ impl Device {
         Ok(())
     }
 
+    /// Brightness 0-100 %, as saved for the slot in use.
+    pub fn brightness(&self, led: u8) -> Result<u8> {
+        let (command, store) = match self.lighting_for(led) {
+            Lighting::Extended => (cmd::MATRIX_BRIGHTNESS, self.store_for(led)),
+            Lighting::Standard | Lighting::MouseExtended => (cmd::LED_BRIGHTNESS, cmd::VARSTORE),
+            Lighting::Kraken => return Err(self.no_lighting()),
+        };
+        let r = self.transact_led(led, command.get(), 3, &[store, led, 0])?;
+        Ok(((r.args()[2] as u32 * 100 + 127) / 255) as u8)
+    }
+
+    /// Brightness 0-100 % shown now but not saved, so a power cycle brings back the saved
+    /// level (dimming while the PC is locked, #48). Only the newer lighting commands have
+    /// a live-only write.
+    pub fn set_brightness_live(&self, led: u8, percent: u8) -> Result<()> {
+        if self.lighting_for(led) != Lighting::Extended {
+            return Err(Error::Unsupported(format!("brightness that isn't saved on {}", self.name())));
+        }
+        let level = (percent.min(100) as u32 * 255 / 100) as u8;
+        self.transact_led(led, cmd::MATRIX_BRIGHTNESS, 3, &[cmd::NOSTORE, led, level])?;
+        Ok(())
+    }
+
     pub fn set_static_color(&self, led: u8, Rgb(r, g, b): Rgb) -> Result<()> {
         match self.lighting_for(led) {
             Lighting::Extended => {
@@ -450,11 +555,10 @@ impl Device {
         match self.lighting() {
             // Size 0x0C as Razer sends it; the trailing arguments are zero.
             Lighting::Extended => {
+                // Not saved: a saved custom frame left the Huntsman V3 Pro dark after quick
+                // adjustment mode anyway (#45), and dark after a power cycle without the tray.
+                // The tray sends the frame again instead (Engine::refresh_frames).
                 self.transact(cmd::MATRIX_EFFECT, 0x0C, &[cmd::NOSTORE, 0x00, cmd::EFFECT_CUSTOM_FRAME])?;
-                // Also saved, so a keyboard that reloads its saved lighting (leaving quick
-                // adjustment mode, #45) comes back to these colors instead of going dark.
-                // Best effort, as for auto sleep.
-                let _ = self.transact(cmd::MATRIX_EFFECT, 0x0C, &[self.saved_slot(), 0x00, cmd::EFFECT_CUSTOM_FRAME]);
             }
             _ => {
                 self.transact(cmd::GRID_EFFECT, 2, &[cmd::GRID_CUSTOM_FRAME, cmd::VARSTORE])?;

@@ -3,10 +3,53 @@
 ## [Unreleased]
 
 ### Added
-- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock", with colours and effects (#39,
-  thanks esperianterra). It can also show the docked mouse's battery, green to red, which
-  Secretarybird updates every 5 minutes; the dock doesn't have Synapse's battery effect built in.
-  In a test build (v0.4.11-dock2) until a dock owner confirms it.
+- Lights when away: while the PC is locked or its screen is off, the lights dim to a quarter or
+  turn off, and come back when you return (Settings → Lights when away; #48, thanks a3k7dotmd).
+  Nothing is saved on the devices, so a replug brings the normal lights back. Devices with the
+  older lighting commands stay lit. Tested on the Basilisk V3.
+- Gaming mode on keyboards and keypads: block the Windows key, Alt+Tab and Alt+F4 (the new Gaming
+  section, or `secbird gaming win,alt-tab`). It's saved per profile, so a profile tied to a game
+  turns it on while you play. The keyboard does the blocking, the way Synapse asks it to; the
+  section shows only on keyboards that answer for it. Not tested on a keyboard yet.
+- Save to mouse: Buttons → Saved on the mouse writes a profile's button remaps into the mouse's
+  on-board memory, so they work without Secretarybird (another PC, Linux, macOS, before the tray
+  starts) and survive sleep. What the mouse held before is kept, and "Put back what the mouse
+  had" restores it; Restore all puts it back too. Remaps stay live-only until you click, and
+  switching profiles never writes the mouse's memory (`secbird button save-to-mouse`,
+  `secbird button put-back`). Tested on the Basilisk V3.
+- Keyboard key remapping, beta, command line only for now: `secbird key capslock key:esc`,
+  `secbird key` to list, `reset`, `restore-all` and `--hypershift`, with the same actions as
+  mouse buttons. Remaps are saved per profile, and the tray sends them on a profile switch. It
+  writes to the keyboard the way it does for mice (Razer's "Set Single Key Assignment"), but
+  Synapse remaps keyboards in software, so whether a keyboard accepts it isn't known yet. Asked
+  for in #46, #39, #45 and #49. `secbird report` now shows whether a keyboard answers.
+
+### Changed
+- 02EA is the Huntsman V3 HE TKL (#50, thanks Toru1475).
+
+## [0.4.12] - 2026-10-24
+
+### Added
+- Mouse Dock Pro: the dock's own light is a lighting zone, "Dock" (#39, thanks esperianterra).
+  Static colour, spectrum, wave and breathing are confirmed on a real dock; reactive and starlight
+  showed nothing there, so they aren't offered. The dock can also show the docked mouse's
+  battery, green to red, updated every 5 minutes; the dock doesn't have Synapse's battery effect
+  built in.
+
+### Fixed
+- Per-key colours still went dark after quick adjustment mode on the Huntsman V3 Pro (#45). The
+  keyboard doesn't say when it leaves that mode, so the tray now sends the per-key colours of
+  wired keyboards and keypads again every 3 seconds, as Synapse keeps doing. It pauses while the
+  light finder is open. Wireless boards are left out, so they can still sleep. The 0.4.11 change
+  that saved the per-key effect on the keyboard is undone: it didn't help, and without the tray
+  it could leave the keyboard dark after a power cycle.
+- Huntsman V3 Pro per-key layout from the light-finder list (#45, #27, thanks Skillprofi10).
+  Painting numpad `.` lit the volume dial. The media keys and the dial are now in the editor.
+- Blade laptops set to "Keyboard when idle: stays lit" still faded by themselves (#34, thanks
+  garyh-2). Any read restarts that fade, so the tray reads the setting back every 3 seconds. This
+  only works while the tray runs.
+- `secbird report` dropped zero bytes at the end of short replies, so smart dimming's `01 00 00`
+  showed as `01` (#34).
 
 ## [0.4.11] - 2026-10-23
 

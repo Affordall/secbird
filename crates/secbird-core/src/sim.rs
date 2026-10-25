@@ -71,6 +71,8 @@ pub struct SimState {
     pub idle_seconds: Option<u16>,
     /// Laptops: Smart Dimming as (enabled, level), level 0 half, 1 quarter, 2 dark.
     pub smart_dimming: Option<(u8, u8)>,
+    /// Keyboards: gaming mode bits (`00:08`); `None` where the device has none.
+    pub game_mode: Option<u8>,
     pub auto_sleep: Option<bool>,
     /// The auto-sleep switch saved in the on-board slot, which the live one starts from.
     pub auto_sleep_saved: Option<bool>,
@@ -88,6 +90,9 @@ pub struct SimState {
     /// LED ids that exist on the device.
     pub leds: Vec<u8>,
     pub brightness: BTreeMap<u8, u8>,
+    /// Brightness shown now after a write that isn't saved (store 0). Reads still answer
+    /// the saved level, as a real Basilisk V3 does.
+    pub live_brightness: BTreeMap<u8, u8>,
     /// Last effect per LED: `[effect, flags, rate, ...colors]`.
     pub effects: BTreeMap<u8, Vec<u8>>,
     /// Per-key colors `rows x cols`, row-major.
@@ -102,6 +107,9 @@ pub struct SimState {
     pub buttons: BTreeMap<(u8, u8, u8), (u8, [u8; 5])>,
     /// The mouse's own button id list (02:84), or `None` for a device that doesn't answer it.
     pub button_list: Option<Vec<u8>>,
+    /// Keyboard key assignments (02:0D) by (slot, key id, layer): (function, data). Empty:
+    /// the device doesn't answer key commands.
+    pub keys: BTreeMap<(u8, u8, u8), (u8, [u8; 5])>,
     /// Answer this many reads with Busy before the real reply.
     pub busy_reads: u32,
     /// Every well-formed command received, in order.
@@ -123,6 +131,7 @@ impl SimState {
             macro_recyclable: 0,
             idle_seconds: None,
             smart_dimming: None,
+            game_mode: None,
             auto_sleep: None,
             auto_sleep_saved: None,
             active_slot: None,
@@ -132,6 +141,7 @@ impl SimState {
             charging: false,
             leds: Vec::new(),
             brightness: BTreeMap::new(),
+            live_brightness: BTreeMap::new(),
             effects: BTreeMap::new(),
             matrix: None,
             standard: false,
@@ -140,6 +150,7 @@ impl SimState {
             grid_effect: Vec::new(),
             buttons: BTreeMap::new(),
             button_list: None,
+            keys: BTreeMap::new(),
             busy_reads: 0,
             log: Vec::new(),
             reply: None,
@@ -302,6 +313,25 @@ impl SimState {
                 self.buttons.insert((a[0], a[1], a[2]), (a[3], [a[5], a[6], a[7], a[8], a[9]]));
                 ok(a[..10].to_vec())
             }
+            c if c == cmd::KEY.get() => match self.keys.get(&(a[0], a[1], a[2])) {
+                Some(&(function, d)) => ok(vec![a[0], a[1], a[2], function, 1, d[0], d[1], d[2], d[3], d[4]]),
+                None if self.keys.is_empty() => (NotSupported, vec![]),
+                None => (Failed, vec![]),
+            },
+            cmd::KEY => {
+                if !self.keys.contains_key(&(1, a[1], a[2])) {
+                    return (if self.keys.is_empty() { NotSupported } else { Failed }, vec![]);
+                }
+                self.keys.insert((a[0], a[1], a[2]), (a[3], [a[5], a[6], a[7], a[8], a[9]]));
+                ok(a[..10].to_vec())
+            }
+            c if c == cmd::KEY_IDS => {
+                if self.keys.is_empty() {
+                    return (NotSupported, vec![]);
+                }
+                let ids = self.keys.keys().filter(|k| k.0 == a[0] && k.2 == a[1]).map(|k| k.1);
+                ok([a[0], a[1]].into_iter().chain(ids).collect())
+            }
             c if c == cmd::ACTIVE_SLOT.get() => match (self.active_slot, self.buttons.is_empty()) {
                 (Some(slot), _) => ok(vec![slot]),
                 (None, true) => (NotSupported, vec![]),
@@ -375,6 +405,17 @@ impl SimState {
                 }
                 _ => (NotSupported, vec![]),
             },
+            c if c == cmd::GAME_MODE.get() => match self.game_mode {
+                Some(bits) => ok(vec![bits, 0, 0, 0]),
+                None => (NotSupported, vec![]),
+            },
+            cmd::GAME_MODE => match self.game_mode {
+                Some(_) => {
+                    self.game_mode = Some(a[0]);
+                    ok(a[..4].to_vec())
+                }
+                None => (NotSupported, vec![]),
+            },
             c if c == cmd::AUTO_SLEEP.get() => match self.auto_sleep {
                 Some(on) => ok(vec![0, on as u8]),
                 None => (NotSupported, vec![]),
@@ -434,7 +475,10 @@ impl SimState {
                 if self.hidden_slot(a[0]) {
                     return ok(a[..3].to_vec());
                 }
-                self.brightness.insert(a[1], a[2]);
+                if a[0] != cmd::NOSTORE {
+                    self.brightness.insert(a[1], a[2]);
+                }
+                self.live_brightness.insert(a[1], a[2]);
                 ok(a[..3].to_vec())
             }
             cmd::MATRIX_EFFECT => {
@@ -604,6 +648,8 @@ impl Sim {
         s.txid = 0xFF;
         s.leds = vec![5];
         s.matrix = Some((6, 22, vec![[0; 3]; 6 * 22]));
+        s.game_mode = Some(0);
+        with_keys(&mut s);
         Sim::new(s)
     }
 
@@ -814,6 +860,18 @@ pub fn preset(name: &str) -> Option<(Sim, u16)> {
         }
         _ => return None,
     })
+}
+
+/// Every key in [`crate::buttons::KEYS`] typing itself, in the live and saved slot, on both
+/// layers. How a keyboard that takes 02:0D might answer; no real one has been seen yet.
+fn with_keys(s: &mut SimState) {
+    for slot in [0, 1] {
+        for layer in [0, 1] {
+            for &(id, _, _, usage) in crate::buttons::KEYS {
+                s.keys.insert((slot, id, layer), (2, [0, usage, 0, 0, 0]));
+            }
+        }
+    }
 }
 
 /// Factory button assignments in the live slot and the saved slot, on both layers.
@@ -1347,6 +1405,50 @@ mod tests {
     }
 
     #[test]
+    fn keyboard_keys_remap_reset_and_follow_profiles() {
+        use crate::buttons::{parse_setting_key, Action, Input, Layer};
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        assert_eq!(dev.keys().len(), crate::buttons::KEYS.len());
+        assert!(dev.buttons().is_empty(), "keys aren't mouse buttons");
+        let caps = Input::Key(30);
+        assert_eq!(parse_setting_key("key-capslock").unwrap(), (caps, Layer::Normal));
+        assert_eq!(parse_setting_key("key-left/hypershift").unwrap(), (Input::Key(79), Layer::HyperShift));
+        assert_eq!(parse_setting_key("left").unwrap(), (Input::Button(1), Layer::Normal), "the mouse button");
+        assert_eq!(Input::Key(200).name(), "key-id200");
+        assert_eq!(Input::parse("key-id200"), Some(Input::Key(200)));
+
+        let esc = Action::Key { modifiers: 0, usage: 0x29 };
+        let dir = std::env::temp_dir().join(format!("secbird-keys-{}", std::process::id()));
+        let mut store = crate::Store::load(&dir.join("profiles.json")).unwrap();
+        crate::actions::set_button(&dev, &mut store, "key-capslock", Layer::Normal, Some(esc)).unwrap();
+        assert_eq!(sim.state().keys[&(0, 30, 0)].1[1], 0x29, "live slot");
+        assert_eq!(sim.state().keys[&(1, 30, 0)].1[1], 0x39, "saved slot untouched");
+        assert!(sim.state().log.contains(&cmd::KEY), "sent as a key, not a button");
+        assert_eq!(store.for_device(&dev).active().buttons["key-capslock"], "key:esc");
+
+        // A profile switch puts the key back; switching again sends it again.
+        let p = store.for_device(&dev);
+        p.profiles.insert("Plain".into(), Profile::default());
+        p.apply("Plain", &dev);
+        assert_eq!(dev.input(caps, Layer::Normal).unwrap(), Action::Key { modifiers: 0, usage: 0x39 });
+        p.apply("Default", &dev);
+        assert_eq!(dev.input(caps, Layer::Normal).unwrap(), esc);
+
+        assert_eq!(crate::actions::restore_all_buttons(&dev, &mut store).unwrap(), 1);
+        assert_eq!(dev.input(caps, Layer::Normal).unwrap(), Action::Key { modifiers: 0, usage: 0x39 });
+    }
+
+    #[test]
+    fn keyboards_without_key_commands_list_no_keys() {
+        let sim = Sim::old_keyboard();
+        let dev = open(&sim, OLD_KEYBOARD_PID);
+        assert!(dev.keys().is_empty());
+        let mouse = Sim::mouse();
+        assert!(open(&mouse, MOUSE_PID).keys().is_empty(), "mice have no keys");
+    }
+
+    #[test]
     fn keyboard_shows_a_full_frame() {
         let sim = Sim::keyboard();
         let dev = open(&sim, KEYBOARD_PID);
@@ -1360,9 +1462,112 @@ mod tests {
         assert_eq!(s.key(0, 0), Some([0, 0, 7]));
         assert_eq!(s.key(5, 21), Some([200, 210, 7]));
         assert_eq!(s.effects[&0][0], cmd::EFFECT_CUSTOM_FRAME);
-        // 6 rows, then the effect live and saved (#45: quick adjustment reloads the saved one).
+        // 6 rows, then the effect, live only (nothing saved on the device).
         assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_FRAME).count(), 6);
-        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 2);
+        assert_eq!(s.log.iter().filter(|c| **c == cmd::MATRIX_EFFECT).count(), 1);
+    }
+
+    #[test]
+    fn save_to_mouse_writes_the_slot_keeps_a_backup_and_puts_it_back() {
+        use crate::buttons::{Action, Layer};
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        let path = std::env::temp_dir().join(format!("secbird-onboard-{}.json", std::process::id()));
+        let mut store = crate::Store::load(&path).unwrap();
+        let factory = dev.slot_button(1, 5, Layer::Normal).unwrap();
+        let f13 = Action::Key { modifiers: 0, usage: 0x68 };
+        crate::actions::set_button(&dev, &mut store, "side-forward", Layer::Normal, Some(f13)).unwrap();
+        assert_eq!(dev.slot_button(1, 5, Layer::Normal).unwrap(), factory, "a remap is live only");
+
+        assert_eq!(crate::actions::save_buttons_to_mouse(&dev, &mut store).unwrap(), 1);
+        assert_eq!(dev.slot_button(1, 5, Layer::Normal).unwrap(), f13, "saved in slot 1");
+        let save = store.for_device(&dev).onboard.clone().unwrap();
+        assert_eq!(save.before["side-forward"], factory.to_string(), "the backup holds the factory setting");
+
+        // Waking from sleep refills the live slot from the saved one: nothing is lost now.
+        {
+            let mut s = sim.state();
+            let saved: Vec<_> = s.buttons.iter().filter(|(k, _)| k.0 == 1).map(|(k, v)| ((0, k.1, k.2), *v)).collect();
+            s.buttons.extend(saved);
+        }
+        assert!(!store.for_device(&dev).buttons_lost("Default", &dev));
+
+        // A profile without the remap goes back to the factory setting, not the saved remap.
+        store.for_device(&dev).create("Game").unwrap();
+        store.for_device(&dev).profiles.get_mut("Game").unwrap().buttons.clear();
+        store.for_device(&dev).apply("Game", &dev);
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), factory);
+
+        // Saving a profile that doesn't remap it puts the slot back for that button.
+        store.for_device(&dev).active = "Game".into();
+        crate::actions::save_buttons_to_mouse(&dev, &mut store).unwrap();
+        assert_eq!(dev.slot_button(1, 5, Layer::Normal).unwrap(), factory);
+
+        // Put back, and Restore all, leave the slot as the factory had it.
+        store.for_device(&dev).active = "Default".into();
+        crate::actions::save_buttons_to_mouse(&dev, &mut store).unwrap();
+        assert_eq!(crate::actions::restore_all_buttons(&dev, &mut store).unwrap(), 1);
+        assert_eq!(dev.slot_button(1, 5, Layer::Normal).unwrap(), factory);
+        assert_eq!(dev.button(5, Layer::Normal).unwrap(), factory);
+        assert!(store.for_device(&dev).onboard.is_none());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn gaming_mode_blocks_keys_and_is_kept_in_the_profile() {
+        use crate::GameMode;
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        assert_eq!(dev.game_mode().unwrap(), Some(GameMode::default()));
+        let path = std::env::temp_dir().join(format!("secbird-gaming-{}.json", std::process::id()));
+        let mut store = crate::Store::load(&path).unwrap();
+        let want: GameMode = "win,alt-tab".parse().unwrap();
+        crate::actions::set_game_mode(&dev, &mut store, want).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(sim.state().game_mode, Some(1 | 4 | 8), "Synapse's bits");
+        assert_eq!(dev.game_mode().unwrap(), Some(want));
+        assert_eq!(store.for_device(&dev).active_mut().game_mode.as_deref(), Some("win,alt-tab"));
+
+        dev.set_game_mode(GameMode::default()).unwrap();
+        assert_eq!(sim.state().game_mode, Some(0), "off is all bits clear");
+        assert_eq!(GameMode::default().to_string(), "off");
+        assert_eq!("off".parse::<GameMode>().unwrap(), GameMode::default());
+        assert!("ctrl".parse::<GameMode>().is_err());
+
+        let mouse = open(&Sim::mouse(), MOUSE_PID);
+        assert_eq!(mouse.game_mode().unwrap(), None, "not a keyboard");
+    }
+
+    #[test]
+    fn live_brightness_isnt_saved_and_reads_answer_the_saved_level() {
+        let sim = Sim::mouse();
+        let dev = open(&sim, MOUSE_PID);
+        dev.set_brightness(1, 80).unwrap();
+        dev.set_brightness_live(1, 0).unwrap();
+        assert_eq!(sim.state().live_brightness[&1], 0, "dark now");
+        assert_eq!(dev.brightness(1).unwrap(), 80, "the saved level, as a real Basilisk V3 answers");
+        dev.set_brightness_live(1, dev.brightness(1).unwrap()).unwrap();
+        assert_eq!(sim.state().live_brightness[&1], 204);
+    }
+
+    #[test]
+    fn per_key_colors_come_back_after_the_keyboard_drops_them() {
+        use crate::profile::DeviceProfiles;
+        let sim = Sim::keyboard();
+        let dev = open(&sim, KEYBOARD_PID);
+        let mut p = DeviceProfiles::default();
+        assert!(p.refresh_frame("Default", &dev).is_none(), "no per-key colors, nothing to send");
+        p.active_mut().keys = vec![Rgb(9, 8, 7); 6 * 22];
+        p.apply("Default", &dev);
+
+        // Quick adjustment mode (#45) leaves the keys dark.
+        sim.state().matrix.as_mut().unwrap().2.fill([0; 3]);
+        assert_eq!(sim.state().key(3, 10), Some([0, 0, 0]));
+        assert!(p.refresh_frame("Default", &dev).unwrap().is_ok());
+        assert_eq!(sim.state().key(3, 10), Some([9, 8, 7]));
+
+        p.lighting_off = true;
+        assert!(p.refresh_frame("Default", &dev).is_none(), "lighting left to another app");
     }
 
     #[test]
