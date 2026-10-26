@@ -24,8 +24,23 @@
   Synapse remaps keyboards in software, so whether a keyboard accepts it isn't known yet. Asked
   for in #46, #39, #45 and #49. `secbird report` now shows whether a keyboard answers.
 
+- A Tab button next to Ctrl, Shift, Alt and Win when setting a key, for shortcuts the page can't
+  catch: click Tab, then Alt, for Alt+Tab (#51, thanks LukeSz03).
+
+### Fixed
+- Effects on older keyboards (the BlackWidow Chroma V2 and others on the older lighting commands)
+  fell back to a static colour. Spectrum, wave, breathing, reactive and starlight are now sent the
+  way openrazer sends them (#49, thanks liuzhong-xin). Not tested on the keyboard yet.
+- With no device the editor could control, every Settings and Help button failed with "invalid
+  argument" (the device report included) (#51).
+- A mouse or keyboard connected over Bluetooth shows as "DeathAdder V2 Pro (Bluetooth)" and so
+  on, with "use the cable or the USB receiver", instead of "Unknown model". Bluetooth can't be
+  controlled yet (#51, #10).
+
 ### Changed
 - 02EA is the Huntsman V3 HE TKL (#50, thanks Toru1475).
+- The Basilisk V4 Pro's button 128 is the extra side button, not a top button (#54, thanks
+  Vojtasanko). It's now `side-extra`; remaps saved as `top-extra` move over by themselves.
 
 ## [0.4.12] - 2026-10-24
 

@@ -274,7 +274,26 @@ impl Store {
             Err(e) => return Err(Error::Db(format!("{}: {e}", path.display()))),
         };
         store.path = path.to_path_buf();
+        store.rename_old_buttons();
         Ok(store)
+    }
+
+    /// Button 128 was saved as `top-extra` before 0.5; it is the extra side button (#54).
+    fn rename_old_buttons(&mut self) {
+        let rename = |map: &mut BTreeMap<String, String>| {
+            let old: Vec<String> = map.keys().filter(|k| k.split('/').next() == Some("top-extra")).cloned().collect();
+            for key in old {
+                let value = map.remove(&key).unwrap();
+                map.insert(key.replacen("top-extra", "side-extra", 1), value);
+            }
+        };
+        for device in self.devices.values_mut() {
+            device.profiles.values_mut().for_each(|p| rename(&mut p.buttons));
+            if let Some(onboard) = device.onboard.as_mut() {
+                rename(&mut onboard.buttons);
+                rename(&mut onboard.before);
+            }
+        }
     }
 
     /// Write atomically: a crash mid-save never leaves a half-written file.
@@ -524,6 +543,19 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(3));
         dev.set_brightness_live(led, saved).unwrap();
         assert_eq!(dev.brightness(led).unwrap(), saved);
+    }
+
+    #[test]
+    fn old_top_extra_button_is_renamed_on_load() {
+        let path = std::env::temp_dir().join(format!("secbird-top-extra-{}.json", std::process::id()));
+        let json = r#"{"devices":{"00E3":{"active":"Default","profiles":{"Default":{"buttons":{"top-extra":"key:f13","top-extra/hypershift":"disabled","wheel":"right"}}}}}}"#;
+        std::fs::write(&path, json).unwrap();
+        let store = Store::load(&path).unwrap();
+        std::fs::remove_file(&path).ok();
+        let buttons = &store.devices["00E3"].profiles["Default"].buttons;
+        let keys: Vec<&str> = buttons.keys().map(String::as_str).collect();
+        assert_eq!(keys, ["side-extra", "side-extra/hypershift", "wheel"]);
+        assert_eq!(buttons["side-extra"], "key:f13");
     }
 
     #[test]

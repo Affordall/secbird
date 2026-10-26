@@ -107,6 +107,25 @@ pub struct DeviceSpec {
     pub source: String,
 }
 
+/// Bluetooth ids and the product each belongs to, from Synapse's AvailableDevices.json
+/// (`bleId`), leaving out ids that are also the cable or receiver id. Synapse reaches these
+/// over Bluetooth GATT, not the HID reports Secretarybird sends, so they can't be controlled
+/// yet (#10, #51).
+const BLUETOOTH: &[(u16, u16)] = &[
+    (0x0061, 0x0062), (0x0076, 0x0080), (0x0082, 0x0083), (0x008E, 0x007C), (0x0092, 0x008F),
+    (0x009B, 0x009A), (0x009D, 0x009C), (0x00A9, 0x00A7), (0x00AC, 0x00AA), (0x00B1, 0x00AF),
+    (0x00BA, 0x00B9), (0x00C9, 0x00C7), (0x00CE, 0x00CC), (0x00D2, 0x00D0), (0x00D5, 0x00D3),
+    (0x00D8, 0x00D6), (0x00DC, 0x00DA), (0x00E1, 0x00E0), (0x00E4, 0x00E2), (0x00E9, 0x00E7),
+    (0x00EC, 0x00EB), (0x0248, 0x0249), (0x025B, 0x025A), (0x0272, 0x0258), (0x0278, 0x0277),
+    (0x0291, 0x0292), (0x0297, 0x0298), (0x02B5, 0x02B3), (0x02BB, 0x02B9), (0x02C3, 0x02C4),
+    (0x02CA, 0x02CC), (0x02CE, 0x02CD), (0x02D3, 0x02D4), (0x02D6, 0x02D7), (0x02F6, 0x02F4),
+    (0x054C, 0x0532), (0x0558, 0x0548), (0x0559, 0x054A), (0x055B, 0x055A), (0x055D, 0x055C),
+    (0x0572, 0x0567), (0x0575, 0x0576), (0x0578, 0x0579), (0x057B, 0x057C), (0x0589, 0x0587),
+    (0x0A4F, 0x0A4E), (0x0A52, 0x0A51), (0x0A56, 0x0A54), (0x0A82, 0x0A81), (0x0F2D, 0x0F2C),
+    (0x0F46, 0x0F45), (0x101D, 0x101C), (0x1023, 0x1022), (0x1028, 0x1025), (0x1033, 0x1030),
+    (0xB006, 0xB005), (0xB00C, 0xB00A),
+];
+
 #[derive(Debug, Default)]
 pub struct Db {
     specs: HashMap<u16, DeviceSpec>,
@@ -142,6 +161,17 @@ impl Db {
 
     pub fn get(&self, pid: u16) -> Option<&DeviceSpec> {
         self.specs.get(&pid)
+    }
+
+    /// The name of a device connected over Bluetooth, e.g. "DeathAdder V2 Pro (Bluetooth)".
+    /// `None` when `pid` isn't one of the Bluetooth ids in Synapse's catalogue.
+    pub fn bluetooth_name(&self, pid: u16) -> Option<String> {
+        let product = BLUETOOTH.iter().find(|b| b.0 == pid)?.1;
+        let name = self.get(product).map_or("Razer device", |s| {
+            let name = s.name.as_str();
+            [" (Wired)", " (Receiver)", " Wired"].iter().find_map(|end| name.strip_suffix(end)).unwrap_or(name)
+        });
+        Some(format!("{name} (Bluetooth)"))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &DeviceSpec> {
@@ -182,6 +212,15 @@ fn opt_hex_u8<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Option<u8>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bluetooth_ids_are_named_after_their_product() {
+        let db = Db::builtin().unwrap();
+        assert_eq!(db.bluetooth_name(0x008E).as_deref(), Some("DeathAdder V2 Pro (Bluetooth)"));
+        assert_eq!(db.bluetooth_name(0x00E1).as_deref(), Some("Razer device (Bluetooth)"));
+        assert_eq!(db.bluetooth_name(0x007C), None);
+        assert!(BLUETOOTH.iter().all(|b| db.get(b.0).is_none()), "a Bluetooth id is also in devices.json");
+    }
 
     #[test]
     fn builtin_parses_and_has_basilisk_v3() {
