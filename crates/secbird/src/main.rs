@@ -252,7 +252,10 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
                     println!("{pid:04X}  {}  (connected; its headset protocol isn't supported yet)", spec.name)
                 }
                 Some(spec) => println!("{pid:04X}  {}  (connected but not answering{})", spec.name, NOT_ANSWERING_HINT),
-                None => println!("{pid:04X}  Unknown Razer device  (connected, not answering; please share `secbird report`)"),
+                None => match db.bluetooth_name(pid) {
+                    Some(name) => println!("{pid:04X}  {name}  (connected over Bluetooth, which can't be controlled yet; use the cable or the USB receiver)"),
+                    None => println!("{pid:04X}  Unknown Razer device  (connected, not answering; please share `secbird report`)"),
+                },
             }
         }
         #[cfg(windows)]
@@ -323,9 +326,18 @@ Note: Razer Synapse is running ({}). It can overwrite these settings;", synapse.
         return Ok(());
     }
 
+    // `key` with a mouse and one keyboard connected means the keyboard (#39).
+    let keyboards: Vec<&Device> = devices
+        .iter()
+        .filter(|d| {
+            use secbird_core::Kind;
+            matches!(d.spec.as_ref().map(|s| s.kind), Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop))
+        })
+        .collect();
     let dev = match devices.as_slice() {
         [] => return Err(Error::NotFound("no matching Razer device".into())),
         [one] => one,
+        _ if command == "key" && keyboards.len() == 1 => keyboards[0],
         _ => {
             return Err(Error::InvalidArg(
                 "several devices connected; pick one with -d PID or -d SERIAL (see `secbird list`)".into(),
@@ -702,7 +714,8 @@ fn button_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Er
         [button, action] => {
             button_id(button).ok_or_else(|| Error::InvalidArg(format!("unknown button '{button}' (see `secbird button`)")))?;
             actions::set_button(dev, store, button, layer, Some(action.parse()?))?;
-            println!("{button} now does {action}");
+            let on = if layer == Layer::HyperShift { " (Hypershift)" } else { "" };
+            println!("{button}{on} now does {action}");
             Ok(())
         }
         _ => Err(Error::InvalidArg("usage: button [list|restore-all|save-to-mouse|put-back] | button <button> <action|reset> [--hypershift]".into())),
@@ -721,7 +734,11 @@ fn key_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error
     let unsupported = || {
         use secbird_core::Kind;
         match dev.spec.as_ref().map(|s| s.kind) {
-            Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop) | None => Error::Unsupported(format!(
+            Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop) => Error::Unsupported(format!(
+                "key remapping isn't supported on {} yet: it doesn't take Razer's remap commands",
+                dev.name()
+            )),
+            None => Error::Unsupported(format!(
                 "{} doesn't answer key remapping commands; please send `secbird report` in a GitHub issue",
                 dev.name()
             )),
@@ -766,7 +783,8 @@ fn key_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error
                 }
                 other => other?,
             }
-            println!("{key} now does {action}");
+            let on = if layer == Layer::HyperShift { " (Hypershift)" } else { "" };
+            println!("{key}{on} now does {action}");
             Ok(())
         }
         _ => Err(Error::InvalidArg("usage: key [list|restore-all] | key <key> <action|reset> [--hypershift]".into())),

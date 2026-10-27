@@ -3,6 +3,18 @@
   <img src="docs/banner.png" alt="Secretarybird: your Razer gear, minus the bloat." width="100%">
 </picture>
 
+<div align="center">
+  <a href="https://github.com/infinityInfinite/secbird/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/infinityInfinite/secbird?style=flat"></a>
+  <a href="https://github.com/infinityInfinite/secbird/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/infinityInfinite/secbird/total.svg?style=flat"></a>
+  <a href="https://github.com/infinityInfinite/secbird/commits"><img alt="Commit activity" src="https://img.shields.io/github/commit-activity/m/infinityInfinite/secbird?style=flat"></a>
+  <a href="https://github.com/infinityInfinite/secbird/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/infinityInfinite/secbird?style=flat"></a>
+  <a href="#legal"><img alt="License" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?style=flat"></a>
+</div>
+
+> [!NOTE]
+> Secretarybird is in beta and changes often. **Star** ⭐ and **Watch** 👀 the repo to hear when a
+> new release is out.
+
 A small, lightweight replacement for Razer Synapse on Windows. Set your Razer mouse,
 keyboard and other peripherals: lighting, DPI, polling rate, button remapping and profiles, without
 Synapse's background services, account, ads, pop-ups or restart prompts.
@@ -23,6 +35,20 @@ Free · Windows 10 and 11 · on the page that opens, click `Secretarybird-Setup-
 On Linux it's the command line, in beta: see [Linux](#linux-command-line-beta).
 
 ![All devices](docs/overview.png)
+
+## Beyond Synapse
+
+Things Secretarybird does that Synapse won't:
+
+- **Run on Linux.** The command line works on any x86_64 distribution.
+- **Compare profiles.** Every profile of a device side by side on one screen.
+- **Script it.** The [`secbird` command line](#command-line) does what the editor does: DPI,
+  lighting, remaps, macros, profiles.
+- **Plain files.** Your settings are one `profiles.json`; back it up or copy it to another PC.
+- **Share the lights.** Hand a device's RGB to another app and keep using Secretarybird for
+  everything else.
+- **Clean up after Razer.** [`secbird debloat`](#debloat) turns off Razer's background services,
+  and `debloat undo` puts them back.
 
 ## Install
 

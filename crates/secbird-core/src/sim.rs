@@ -1103,7 +1103,8 @@ mod tests {
         assert_eq!(sim.state().effects[&4], [3, 0, 0, 0], "the effect wins over the static color");
 
         let old = open(&Sim::old_keyboard(), OLD_KEYBOARD_PID);
-        assert!(matches!(old.set_effect(5, &Effect::Spectrum), Err(Error::Unsupported(_))));
+        // Its grid runs effects (older_keyboard_uses_the_03_command_set); a single LED doesn't.
+        assert!(matches!(old.set_effect(4, &Effect::Spectrum), Err(Error::Unsupported(_))));
     }
 
     #[test]
@@ -1256,7 +1257,7 @@ mod tests {
         assert_eq!(dev.polling_rate().unwrap(), 500);
         assert_eq!(dev.set_dpi(31000, 31000).unwrap(), (30000, 30000));
         let leds: Vec<u8> = dev.spec.as_ref().unwrap().leds.iter().map(|l| l.id).collect();
-        assert_eq!(leds, [4, 1]);
+        assert_eq!(leds, [4, 1, 10]);
     }
 
     #[test]
@@ -1699,6 +1700,18 @@ mod tests {
         assert_eq!(sim.state().grid_effect, [cmd::GRID_STATIC, 1, 2, 3]);
         dev.lights_off(5).unwrap();
         assert_eq!(sim.state().grid_effect, [cmd::GRID_OFF]);
+
+        // Effects on the whole grid, as openrazer sends them to the BlackWidow Chroma V2 (#49).
+        let effect = |text: &str| {
+            dev.set_effect(5, &text.parse().unwrap()).unwrap();
+            sim.state().grid_effect.clone()
+        };
+        assert_eq!(effect("spectrum"), [0x04]);
+        assert_eq!(effect("wave:left"), [0x01, 0x02]);
+        assert_eq!(effect("reactive:0A0B0C@3"), [0x02, 3, 0x0A, 0x0B, 0x0C]);
+        assert_eq!(effect("breathing:random"), [0x03, 0x03, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(effect("breathing:010203,040506"), [0x03, 0x02, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(effect("starlight:random@2"), [0x19]);
 
         dev.set_static_color(4, Rgb(9, 8, 7)).unwrap();
         dev.set_brightness(4, 100).unwrap();

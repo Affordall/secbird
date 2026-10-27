@@ -416,7 +416,7 @@ impl Device {
     }
 
     /// Old-style grids light the whole device with one effect instead of per-LED commands.
-    fn is_grid_backlight(&self, led: u8) -> bool {
+    pub(crate) fn is_grid_backlight(&self, led: u8) -> bool {
         led == BACKLIGHT_LED && self.matrix().is_some()
     }
 

@@ -465,7 +465,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_TIMER if wparam == TIMER_LIGHTS => {
             with_app(|app| {
-                let engine = app.engine();
+                let mut engine = app.engine();
+                engine.retry_lights_back();
                 engine.refresh_frames();
                 engine.keep_laptops_lit();
             });

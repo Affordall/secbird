@@ -156,6 +156,7 @@
   .sw { width: 16px; height: 16px; border-radius: 5px; border: 1px solid #00000066; flex: none; display: inline-block; }
   .sw.off { background: none; border: 1.5px dashed var(--line-strong); }
   .subhead { margin: 18px 0 8px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .morekeys summary { cursor: pointer; width: fit-content; }
   /* Naga side grid: a keypad, laid out like the mouse. */
   .keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 168px)); gap: 6px; }
   .keypad .tile { min-height: 52px; padding: 6px 10px 7px; }
@@ -259,6 +260,15 @@
   #kb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; transition: fill .12s; cursor: crosshair; }
   #kb g:hover rect { stroke: var(--muted); }
   #kb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+  #remapkb { width: 100%; min-width: 600px; max-width: 1040px; height: auto; user-select: none; -webkit-user-select: none; }
+  #remapkb rect { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: .03; }
+  #remapkb text { fill: var(--key-text); font-size: .24px; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+  #remapkb text.act { fill: var(--accent-text); font-size: .17px; }
+  #remapkb g[data-row] { cursor: pointer; outline: none; }
+  #remapkb g[data-row]:hover rect { stroke: var(--muted); }
+  #remapkb g.changed rect { fill: var(--lit); stroke: var(--accent); }
+  #remapkb g[aria-pressed=true] rect, #remapkb g[data-row]:focus-visible rect { stroke: var(--lit-edge); stroke-width: .07; }
+  #remapkb g.none { opacity: .4; }
   .lightgrid { display: grid; gap: 3px; min-width: 600px; max-width: 1040px; }
   .lightgrid button { aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid var(--key-stroke); border-radius: 4px; background: var(--key-fill);
     color: var(--key-text); font-size: 10px; line-height: 1.1; overflow: hidden; cursor: pointer; overflow-wrap: anywhere; }
@@ -552,10 +562,30 @@ function knownLayout(m, kind) {
       });
     });
     const fix = dev && LAYOUT_FIXES[dev.pid];
-    return fix ? fix(out) : out;
+    return nameKeys(fix ? fix(out) : out);
   }
   const placed = PLACED[m.rows + 'x' + (m.cols - shift) + ':' + kind];
-  return placed ? placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h })) : null;
+  return placed ? nameKeys(placed.map(([label, row, col, x, y, w, h]) => ({ label, row, col: col + shift, x, y, w, h }))) : null;
+}
+// Each drawn key's remap name (`secbird key`), from its label and where it sits: the second
+// Shift, Ctrl or Alt in a row is the right one, and keys from x 18.4 on are the numpad.
+const KEY_NAMES = { Esc: 'esc', '`': 'grave', '-': 'minus', '=': 'equal', Backspace: 'backspace', Tab: 'tab', '[': 'lbracket',
+  ']': 'rbracket', '\\': 'backslash', Caps: 'capslock', ';': 'semicolon', "'": 'quote', Enter: 'enter', ',': 'comma', '.': 'period',
+  '/': 'slash', Shift: 'lshift', Ctrl: 'lctrl', Alt: 'lalt', Win: 'lwin', Menu: 'menu', '': 'space', Space: 'space',
+  PrtSc: 'printscreen', ScrLk: 'scrolllock', Pause: 'pause', Ins: 'insert', Home: 'home', PgUp: 'pageup', Del: 'delete',
+  End: 'end', PgDn: 'pagedown', '↑': 'up', '↓': 'down', '←': 'left', '→': 'right', Num: 'numlock' };
+const NUMPAD_NAMES = { '/': 'num-slash', '*': 'num-star', '-': 'num-minus', '+': 'num-plus', Enter: 'num-enter', '.': 'num-period' };
+const RIGHT_NAMES = { lshift: 'rshift', lctrl: 'rctrl', lalt: 'ralt' };
+function nameKeys(keys) {
+  const seen = new Set();
+  return keys.map(k => {
+    let name;
+    if (k.x >= 18.4) name = /^\d$/.test(k.label) ? 'num' + k.label : NUMPAD_NAMES[k.label] || KEY_NAMES[k.label];
+    else if (/^([A-Z0-9]|F\d\d?)$/.test(k.label)) name = k.label.toLowerCase();
+    else name = KEY_NAMES[k.label];
+    if (RIGHT_NAMES[name]) { if (seen.has(k.row + name)) name = RIGHT_NAMES[name]; else seen.add(k.row + name); }
+    return { ...k, name };
+  });
 }
 // The maps above are ANSI. ISO boards (#45) have a key left of Z (matrix column 2) and one left
 // of Enter (column 13), and a tall Enter where ANSI has its backslash.
@@ -569,9 +599,9 @@ function isoLayout(keys, labels) {
   if (!enter || !shift) return keys;
   const out = keys.filter(k => k !== bs && k !== enter && k !== shift)
     .map(k => labels && k.label in labels && k.col < enter.col ? { ...k, label: labels[k.label] } : k); // not the numpad's / and -
-  out.push({ ...enter, label: '#', col: enter.col - 1, w: 1 },
+  out.push({ ...enter, label: '#', name: 'iso-hash', col: enter.col - 1, w: 1 },
     { ...enter, x: enter.x + 1, y: bs.y, w: enter.w - 1, h: enter.y + enter.h - bs.y },
-    { ...shift, w: 1.25 }, { ...shift, label: labels ? '<' : '\\', col: shift.col + 1, x: 1.25, w: 1 });
+    { ...shift, w: 1.25 }, { ...shift, label: labels ? '<' : '\\', name: 'iso-backslash', col: shift.col + 1, x: 1.25, w: 1 });
   return out;
 }
 function layout(m, kind) {
@@ -852,11 +882,11 @@ function sections() {
   if (dev.stages) sens.push({ key: 'stages', label: 'DPI stages' });
   if (dev.polling) sens.push({ key: 'polling', label: 'Polling rate' });
   if (sens.length) s.push({ id: 'sens', name: 'Sensitivity', rows: sens });
-  if (dev.kind === 'mouse') {
+  if (dev.kind === 'mouse' || isBoard()) {
     const list = btnData[dev.id];
-    s.push({ id: 'buttons', name: 'Buttons', tools: 'layer', loading: !list,
+    s.push({ id: 'buttons', name: isBoard() ? 'Keys' : 'Buttons', tools: 'layer', loading: !list,
       rows: [...(list || []).filter(b => b[btnLayer] != null).map(b => ({ key: 'btn:' + b.name, label: b.label, name: b.name })),
-        ...(list && list.length ? [{ key: 'onboard', label: 'Saved on the mouse' }] : [])] });
+        ...(list && list.length && !isBoard() ? [{ key: 'onboard', label: 'Saved on the mouse' }] : [])] });
   }
   if (dev.macros) s.push({ id: 'macros', name: 'Macros', rows: [{ key: 'macros', label: 'Macros on the device' }] });
   if (dev.game_mode != null) s.push({ id: 'gaming', name: 'Gaming', rows: [{ key: 'gaming', label: 'Gaming mode' }] });
@@ -888,7 +918,7 @@ function railSummary(s) {
   if (s.id === 'sens') return [dev.dpi && dev.dpi.x + ' DPI', dev.polling && hz(dev.polling.hz)].filter(Boolean).join(' · ');
   if (s.id === 'buttons') {
     const n = Object.keys(p.buttons || {}).length;
-    return n ? plural(n, 'button') + ' changed' : 'As saved in the mouse';
+    return n ? plural(n, isBoard() ? 'key' : 'button') + ' changed' : 'As saved in the ' + holder();
   }
   if (s.id === 'gaming') return gamingText(dev.game_mode);
   if (s.id === 'macros') { const m = macroData[dev.id]; return m ? (m.macros.length ? plural(m.macros.length, 'macro') : 'None yet') : 'On the device'; }
@@ -956,7 +986,12 @@ function renderTiles(cur) {
   if(dev.kind==='webcam'&&['image','camera'].includes(cur.id))tools.append(el('button',{className:'ghost',textContent:'Refresh camera values',onclick:()=>loadStandardControls(dev.id,true)}));
   if (cur.tools === 'layer') {
     if (Object.keys(dev.profile.buttons || {}).length) tools.append(el('button', { className: 'ghost', textContent: 'Restore all',
-      title: 'Every changed button back to what the mouse stores', onclick: restoreAllButtons }));
+      title: `Every changed ${isBoard() ? 'key' : 'button'} back to what the ${holder()} stores`, onclick: restoreAllButtons }));
+    if (isBoard() && remapLayout()) {
+      const pick = el('select', { ariaLabel: 'Keyboard layout', onchange: () => { remember('kblayout-' + dev.id, pick.value); renderWork(true); } });
+      KB_LAYOUTS.forEach(([v, txt]) => pick.append(new Option(txt, v, false, v === kbLayout())));
+      tools.append(pick);
+    }
     const seg = el('span', { className: 'seg', role: 'group', ariaLabel: 'Button layer' });
     [['normal', 'Normal'], ['hypershift', 'HyperShift']].forEach(([v, txt]) => seg.append(el('button', {
       textContent: txt, ariaPressed: btnLayer === v, title: v === 'hypershift' ? 'What each button does while a button set to HyperShift is held' : 'What each button does',
@@ -971,9 +1006,11 @@ function renderTiles(cur) {
   if (cur.loading) {
     const g = el('div', { className: 'tgrid' });
     for (let i = 0; i < 8; i++) g.append(el('div', { className: 'skel' }));
-    t.append(g, el('p', { className: 'hint', textContent: 'Reading the buttons from the mouse…' }));
+    t.append(g, el('p', { className: 'hint', textContent: isBoard()
+      ? 'Reading every key from the ' + holder() + '. This takes a few seconds…' : 'Reading the buttons from the mouse…' }));
     return;
   }
+  if (cur.id === 'buttons' && isBoard()) return keyTiles(t, cur);
   // Side plates (Naga) are drawn as keypads, the way they sit on the mouse.
   const plain = cur.rows.filter(r => !/^btn:(grid|hex)-/.test(r.key));
   const grid = cur.rows.filter(r => /^btn:grid-/.test(r.key));
@@ -997,6 +1034,94 @@ function renderTiles(cur) {
     hex.forEach(r => k.append(tile(r, r.key.slice(8))));
     t.append(k);
   }
+}
+
+const BOARDS = ['keyboard', 'keypad', 'laptop'];
+const isBoard = () => BOARDS.includes(dev.kind);
+const holder = () => dev.kind === 'mouse' ? 'mouse' : (KINDS[dev.kind] || 'device').toLowerCase();
+
+// The keyboard drawn for remapping. Key ids are key positions, not lights, so a board whose
+// lights aren't mapped still gets a standard drawing: full size if it has a numpad, else
+// tenkeyless. Keypads get tiles.
+// The size comes from the light grid: 5 rows is 60% (15 columns) or 65%, 6 rows of 16 or 17
+// columns is 75%. With no grid, a numpad key in the key list means full size.
+function remapLayout() {
+  if (dev.kind === 'keypad') return null;
+  const m = dev.matrix;
+  if (m && knownLayout(m, dev.kind)) return layout(m, dev.kind);
+  const cols = m && m.cols - ((m.first ?? 1) - 1);
+  if (m && m.rows <= 5) return cols <= 15 ? layout({ rows: 5, cols: 15 }, 'keyboard') : compactBoard(false);
+  if (m && cols < 18) return compactBoard(true);
+  const numpad = m ? cols >= 20 : (btnData[dev.id] || []).some(b => b.name === 'key-num5');
+  return layout(numpad ? { rows: 6, cols: 22 } : { rows: 6, cols: 18 }, 'keyboard');
+}
+// 75% (fRow) and 65% boards: the full-size main block, a column of navigation keys, and the
+// arrows tucked in at the bottom right. Drawn for remapping only; the columns aren't lights.
+function compactBoard(fRow) {
+  const nav = fRow ? ['Del', 'Home', 'PgUp', 'PgDn'] : [null, 'Del', 'PgUp', 'PgDn'];
+  const rows = FULLSIZE.map((keys, row) => {
+    let main = keys.filter(k => k[1] <= 14);
+    if (row === 1 && !fRow) main = main.map(k => k[0] === '`' ? ['Esc', 1] : k);
+    if (row === 4) main = main.map(k => k[1] === 14 ? ['Shift', 14, 1.75] : k);
+    if (row === 5) main = main.filter(k => k[0] !== 'Menu').map(k => k[1] > 7 ? [k[0], k[1], 1] : k);
+    const right = row === 4 ? [['↑', 16, 1, .25], ['End', 17]] : row === 5 ? [['←', 15, 1, .25], ['↓', 16], ['→', 17]] : [[nav[row], 15, 1, .25]];
+    return [...main, ...right];
+  }).slice(fRow ? 0 : 1);
+  return isoKeys(nameKeys(rows.flatMap((keys, row) => {
+    let x = 0;
+    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
+      x += gap;
+      const k = { label, row, col, x, y: row + (fRow && row ? .25 : 0), w, h };
+      x += w; return k;
+    });
+  })));
+}
+function isoKeys(keys) { return kbLayout() === 'ansi' ? keys : isoLayout(keys, kbLayout() === 'de' ? DE_LABELS : null); }
+
+// Keys section: click a key on the drawing. Keys the drawing doesn't have (Japanese keys,
+// keypads) are tiles below it.
+function keyTiles(t, cur) {
+  if (!cur.rows.length) {
+    t.append(el('p', { className: 'hint', textContent: btnFailed[dev.id] ? 'Couldn’t read the keys. Unplug and replug it, then open this again.'
+      : btnLayer === 'hypershift' ? 'This ' + holder() + ' has no HyperShift layer to change.'
+      : 'Key remapping isn’t supported on this ' + holder() + ' yet. It doesn’t take Razer’s remap commands, so it needs a remap done by Secretarybird itself, which is planned after 0.5.' }));
+    return;
+  }
+  const rows = new Map(cur.rows.map(r => [r.key, r])), drawn = new Set(), keys = remapLayout();
+  if (keys) {
+    const w = Math.max(...keys.map(k => k.x + k.w)), h = Math.max(...keys.map(k => k.y + k.h));
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'remapkb'; svg.setAttribute('viewBox', `-0.05 -0.05 ${w + 0.1} ${h + 0.1}`);
+    svg.setAttribute('aria-label', 'Keyboard: pick a key to change what it does');
+    svg.innerHTML = keys.map(k => {
+      const r = k.name && rows.get('btn:key-' + k.name);
+      const box = `<rect x="${k.x + .05}" y="${k.y + .05}" width="${k.w - .1}" height="${k.h - .1}" rx=".12"/>`;
+      if (!r) return `<g class="none">${box}<text x="${k.x + k.w / 2}" y="${k.y + k.h / 2}">${esc(k.label)}</text></g>`;
+      drawn.add(r.key);
+      const [html, changed] = cellView(r.key, dev.active);
+      const what = el('span', { innerHTML: html }).textContent.replace(/^Key /, '');
+      const short = what.length > 8 ? what.slice(0, 7) + '…' : what;
+      return `<g data-row="${esc(r.key)}" class="${changed ? 'changed' : ''}" tabindex="0" role="button" aria-pressed="${sel === r.key}"` +
+        ` aria-label="${esc(r.label + ': ' + what + (changed ? ' (changed)' : ''))}"><title>${esc(r.label + ': ' + what)}</title>${box}` +
+        (changed ? `<text x="${k.x + k.w / 2}" y="${k.y + k.h * .34}">${esc(k.label)}</text><text class="act" x="${k.x + k.w / 2}" y="${k.y + k.h * .7}">${esc(short)}</text>`
+          : `<text x="${k.x + k.w / 2}" y="${k.y + k.h / 2}">${esc(k.label)}</text>`) + '</g>';
+    }).join('');
+    const pick = e => { const g = e.target.closest && e.target.closest('g[data-row]'); if (g) select(g.dataset.row); };
+    svg.onclick = pick;
+    svg.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } };
+    t.append(el('div', { className: 'kbwrap' }, svg));
+    if (!(dev.matrix && knownLayout(dev.matrix, dev.kind))) t.append(el('p', { className: 'hint', textContent:
+      'Drawn as a standard keyboard: yours may not have every key shown. Greyed keys can’t be changed.' }));
+  }
+  const rest = cur.rows.filter(r => !drawn.has(r.key));
+  if (!rest.length) return;
+  const g = el('div', { className: 'tgrid' });
+  rest.forEach(r => g.append(tile(r)));
+  if (!keys) return t.append(g);
+  // Keys the drawing doesn't have (ISO, Japanese, a smaller board's numpad): folded away unless
+  // one is in use.
+  const open = rest.some(r => r.key === sel || cellView(r.key, dev.active)[1]);
+  t.append(el('details', { className: 'morekeys', open }, el('summary', { className: 'subhead', textContent: `${plural(rest.length, 'more key')}, not on the drawing` }), g));
 }
 
 function tile(r, short) {
@@ -1096,6 +1221,7 @@ function refreshCell(row) {
     const [html, changed] = cellView(row, dev.active);
     t.querySelector('.tv').innerHTML = html; t.classList.toggle('changed', !!changed);
   }
+  if (document.querySelector(`#remapkb g[data-row="${CSS.escape(row)}"]`)) renderTiles(sections().find(s => s.id === section));
   renderRail(sections());
 }
 
@@ -1115,7 +1241,13 @@ function renderCompare() {
   secs.forEach(s => {
     const body = el('tbody');
     body.append(el('tr', { className: 'grp' }, el('th', { colSpan: span, scope: 'rowgroup', textContent: s.name + (s.id === 'buttons' && btnLayer === 'hypershift' ? ' · HyperShift' : '') })));
-    const rowsOf = s.loading ? [{ key: 'loading', label: 'Reading buttons…' }] : s.rows.filter(r => r.key !== 'lighting-control');
+    let rowsOf = s.loading ? [{ key: 'loading', label: 'Reading buttons…' }] : s.rows.filter(r => r.key !== 'lighting-control');
+    // A keyboard has a hundred keys: only those some profile changes.
+    if (s.id === 'buttons' && isBoard() && !s.loading) {
+      const skey = r => btnLayer === 'normal' ? r.name : r.name + '/hypershift';
+      rowsOf = rowsOf.filter(r => names.some(n => (prof(n).buttons || {})[skey(r)]));
+      if (!rowsOf.length) rowsOf = [{ key: 'loading', label: 'No profile changes a key' }];
+    }
     rowsOf.forEach(r => {
       const tr = el('tr');
       tr.append(el('th', { scope: 'row', textContent: r.label }));
@@ -2028,7 +2160,7 @@ function actionLabel(a) {
 }
 
 async function loadButtons(d, force) {
-  if (d.kind !== 'mouse' || (!force && btnData[d.id] !== undefined)) return;
+  if ((d.kind !== 'mouse' && !BOARDS.includes(d.kind)) || (!force && btnData[d.id] !== undefined)) return;
   btnData[d.id] = null; // loading
   if (dev && dev.id === d.id && !showAll) renderSheet();
   try {
@@ -2044,8 +2176,10 @@ function buttonEditor(box, name) {
   const sel = el('select', { ariaLabel: b.label + ' action', id: 'btnSel' });
   let found = false;
   BTN_CHOICES.forEach(([group, opts]) => {
+    if (isBoard() && group === 'Sensitivity') return; // a keyboard has no DPI
     const g = el('optgroup', { label: group });
-    opts.forEach(([v, t]) => { g.append(new Option(t, v, false, v === choice)); found ||= v === choice; });
+    opts.filter(([v]) => !(isBoard() && v === 'scroll-mode:1'))
+      .forEach(([v, t]) => { g.append(new Option(t, v, false, v === choice)); found ||= v === choice; });
     sel.append(g);
   });
   if (!found) sel.prepend(new Option(actionLabel(action) + ' (as saved)', action, false, true)); // only Synapse sets these
@@ -2074,7 +2208,7 @@ function buttonEditor(box, name) {
   const setKeys = keys => {
     keyIn.dataset.keys = keys; keyIn.value = combo(keys);
     const parts = keys.split('+');
-    modBox.querySelectorAll('button').forEach(t => t.ariaPressed = parts.includes(t.dataset.m));
+    modBox.querySelectorAll('button[data-m]').forEach(t => t.ariaPressed = parts.includes(t.dataset.m));
   };
   ['ctrl', 'shift', 'alt', 'win'].forEach(m => modBox.append(el('button', { textContent: keyLabel(m), ariaPressed: false, dataset: { m },
     title: 'Add or remove ' + keyLabel(m) + '. For shortcuts Windows keeps for itself, like Win+D: press the key, then click this.',
@@ -2085,6 +2219,13 @@ function buttonEditor(box, name) {
       const key = parts.find(p => !MODIFIER_ORDER.includes(p));
       setKeys([...MODIFIER_ORDER.filter(x => on.has(x)), key].filter(Boolean).join('+')); send(); keyIn.focus();
     } })));
+  // Tab moves focus out of the box, and Windows keeps Alt+Tab, so Tab gets its own button:
+  // click it, then a modifier, for Alt+Tab or Ctrl+Tab (#51).
+  modBox.append(el('button', { textContent: 'Tab', title: 'Use Tab as the key. For Alt+Tab, click this, then Alt.',
+    onclick: () => {
+      const mods = (keyIn.dataset.keys || '').split('+').filter(p => MODIFIER_ORDER.includes(p));
+      setKeys([...mods, 'tab'].join('+')); send(); keyIn.focus();
+    } }));
   if (keys) setKeys(keys);
   let lone = null;
   keyIn.onkeydown = e => {
@@ -2123,8 +2264,8 @@ function buttonEditor(box, name) {
   box.append(el('div', { className: 'edgroup' },
     el('h3', { textContent: 'What it does' + (btnLayer === 'hypershift' ? ' while HyperShift is held' : '') }),
     el('div', { className: 'row' }, sel, keyIn, modBox, macroSel, playSel, numIn, numLabel)));
-  if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Stored on the mouse' }),
-    el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'ghost', textContent: 'Restore', title: 'Put back what the mouse stores', onclick: () => assign(b.name, '') }))));
+  if (b.remapped[btnLayer]) box.append(el('div', { className: 'edgroup' }, el('h3', { textContent: 'Stored on the ' + holder() }),
+    el('div', { className: 'row' }, el('span', { textContent: actionLabel(saved) || 'Unknown' }), el('button', { className: 'ghost', textContent: 'Restore', title: 'Put back what the ' + holder() + ' stores', onclick: () => assign(b.name, '') }))));
 }
 
 async function loadMacros(d) {
@@ -2194,7 +2335,7 @@ async function restoreAllButtons() {
     const r = await api('/api/buttons-restore', {});
     btnData[dev.id] = r.buttons; onboardData[dev.id] = r.onboard; dev.profile.buttons = {};
     sel = null; renderWork();
-    toast('Every button is back to what the mouse stores');
+    toast(`Every ${isBoard() ? 'key' : 'button'} is back to what the ${holder()} stores`);
   } catch (err) { toast(err.message, true); }
 }
 
@@ -2210,7 +2351,7 @@ async function assign(button, action, isUndo) {
     if (action) dev.profile.buttons[skey] = action; else delete dev.profile.buttons[skey];
     if (!action) renderWork(); else refreshCell('btn:' + button);
     const undo = !isUndo && prev ? () => { btnLayer = layer; assign(button, prev.remapped ? prev.action : '', true); } : null;
-    toast(isUndo ? 'Undone' : action ? 'Saved to ' + dev.active : 'Restored what the mouse stores', false, undo);
+    toast(isUndo ? 'Undone' : action ? 'Saved to ' + dev.active : 'Restored what the ' + holder() + ' stores', false, undo);
   } catch (err) { toast(err.message, true); renderWork(); }
 }
 

@@ -26,9 +26,13 @@ pub struct Engine {
     frames_paused_until: Option<Instant>,
     /// Brightness percent while the PC is locked or its screen is off ([`Engine::lights_away`]).
     away: Option<u8>,
+    /// Devices that didn't answer [`Engine::lights_back`], and until when to keep trying.
+    relight: HashMap<String, Instant>,
 }
 
 const FINDER_PAUSE: Duration = Duration::from_secs(10 * 60);
+/// A wireless keyboard can miss the "back" write and answer ~20 s later (#52).
+const RELIGHT_FOR: Duration = Duration::from_secs(2 * 60);
 
 /// Battery state of one wireless device.
 pub struct Battery {
@@ -41,6 +45,7 @@ pub struct Battery {
 /// A connected Razer product that can't be controlled (yet), shown so it isn't silently missing.
 /// Why a wireless device we know is quiet, most often: it sleeps until a keypress (#37).
 const ASLEEP: &str = "Not answering. Asleep? Press a key or move it";
+const BLUETOOTH: &str = "Connected over Bluetooth, which can't be controlled yet. Use the cable or the USB receiver";
 
 pub struct Unsupported {
     pub pid: u16,
@@ -91,6 +96,7 @@ impl Engine {
             live_seq: 0,
             frames_paused_until: None,
             away: None,
+            relight: HashMap::new(),
         })
     }
 
@@ -286,6 +292,7 @@ impl Engine {
     /// devices that just arrived. Devices with the older lighting commands are left lit.
     pub fn lights_away(&mut self, percent: u8) {
         self.away = Some(percent);
+        self.relight.clear();
         self.each_zone(|dev, led| {
             let saved = dev.brightness(led)?;
             dev.set_brightness_live(led, (saved as u32 * percent as u32 / 100) as u8)
@@ -299,8 +306,33 @@ impl Engine {
         if self.away.take().is_none() {
             return Vec::new();
         }
-        self.each_zone(|dev, led| dev.set_brightness_live(led, dev.brightness(led)?));
+        let missed = self.each_zone(|dev, led| dev.set_brightness_live(led, dev.brightness(led)?));
+        let until = Instant::now() + RELIGHT_FOR;
+        self.relight = missed.into_iter().map(|key| (key, until)).collect();
         self.apply(&self.all_keys())
+    }
+
+    /// [`Engine::lights_back`] again for the devices that missed it, until they answer or
+    /// [`RELIGHT_FOR`] runs out.
+    pub fn retry_lights_back(&mut self) {
+        let now = Instant::now();
+        self.relight.retain(|_, until| now < *until);
+        if self.relight.is_empty() || self.away.is_some() {
+            return;
+        }
+        let missed = self.each_zone(|dev, led| {
+            if !self.relight.contains_key(&dev.key()) {
+                return Ok(());
+            }
+            dev.set_brightness_live(led, dev.brightness(led)?)
+        });
+        let back: Vec<String> = self.relight.keys().filter(|k| !missed.contains(k)).cloned().collect();
+        for key in &back {
+            self.relight.remove(key);
+        }
+        if !back.is_empty() {
+            self.apply(&back);
+        }
     }
 
     pub fn is_away(&self) -> bool {
@@ -308,17 +340,20 @@ impl Engine {
     }
 
     /// Run `f` on each lighting zone of each device whose lighting this app controls.
-    /// Failures are left out: an asleep wireless device doesn't answer.
-    fn each_zone(&self, f: impl Fn(&Device, u8) -> Result<()>) {
-        let Ok(mut store) = Self::store() else { return };
+    /// Returns the keys of the devices where `f` failed: an asleep wireless device doesn't answer.
+    fn each_zone(&self, f: impl Fn(&Device, u8) -> Result<()>) -> Vec<String> {
+        let Ok(mut store) = Self::store() else { return Vec::new() };
+        let mut failed = Vec::new();
         for dev in &self.devices {
             if store.for_device(dev).lighting_off {
                 continue;
             }
-            for led in dev.spec.iter().flat_map(|s| s.leds.iter().map(|l| l.id)) {
-                let _ = f(dev, led);
+            let leds: Vec<u8> = dev.spec.iter().flat_map(|s| s.leds.iter().map(|l| l.id)).collect();
+            if leds.into_iter().map(|led| f(dev, led)).filter(Result::is_err).count() > 0 {
+                failed.push(dev.key());
             }
         }
+        failed
     }
 
     /// The editor's light finder shows one light at a time; don't paint over it. A finder
@@ -349,7 +384,10 @@ impl Engine {
                 }
                 Some(spec) if spec.wireless => Unsupported { pid, name: spec.name.clone(), reason: ASLEEP },
                 Some(spec) => Unsupported { pid, name: spec.name.clone(), reason: "Not answering. Is Synapse running?" },
-                None => Unsupported { pid, name: format!("Razer device {pid:04X}"), reason: "Unknown model. Run secbird report" },
+                None => match db.bluetooth_name(pid) {
+                    Some(name) => Unsupported { pid, name, reason: BLUETOOTH },
+                    None => Unsupported { pid, name: format!("Razer device {pid:04X}"), reason: "Unknown model. Run secbird report" },
+                },
             })
             .collect();
         #[cfg(windows)]

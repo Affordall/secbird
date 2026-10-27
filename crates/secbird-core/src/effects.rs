@@ -100,6 +100,9 @@ impl Device {
             let percent = self.battery()?.ok_or_else(|| Error::Unsupported(format!("{} has no battery", self.name())))?;
             return self.set_static_color(led, Effect::battery_color(percent));
         }
+        if self.lighting_for(led) == Lighting::Standard && self.is_grid_backlight(led) {
+            return self.set_grid_effect(effect);
+        }
         if self.lighting_for(led) != Lighting::Extended {
             return Err(Error::Unsupported(format!("lighting effects on {} (older lighting commands)", self.name())));
         }
@@ -116,6 +119,36 @@ impl Device {
             ))),
             other => other.map(|_| ()),
         }
+    }
+}
+
+impl Device {
+    /// An effect on an older keyboard's whole grid with `03:0A` (the BlackWidow Chroma V2,
+    /// #49). Bytes and sizes as openrazer sends them; wave speed has no byte here.
+    fn set_grid_effect(&self, effect: &Effect) -> Result<()> {
+        let rgb = |c: &Rgb| [c.0, c.1, c.2];
+        let (size, args): (u8, Vec<u8>) = match effect {
+            Effect::Spectrum => (1, vec![0x04]),
+            Effect::Wave { reverse, .. } => (2, vec![0x01, if *reverse { 0x02 } else { 0x01 }]),
+            Effect::Reactive { color, duration } => (5, [&[0x02, *duration][..], &rgb(color)].concat()),
+            Effect::Breathing(colors) => {
+                let kind = match colors.len() {
+                    0 => 0x03,
+                    n => n as u8,
+                };
+                (8, [vec![0x03, kind], colors.iter().flat_map(rgb).collect()].concat())
+            }
+            Effect::Starlight { colors, duration } => {
+                let kind = match colors.len() {
+                    0 => 0x03,
+                    n => n as u8,
+                };
+                (1, [vec![0x19, kind, *duration], colors.iter().flat_map(rgb).collect()].concat())
+            }
+            Effect::Battery => unreachable!("sent as a static colour"),
+        };
+        self.transact(cmd::GRID_EFFECT, size, &args)?;
+        Ok(())
     }
 }
 

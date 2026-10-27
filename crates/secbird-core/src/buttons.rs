@@ -55,12 +55,14 @@ pub const BUTTONS: &[(u8, &str, &str)] = &[
     (104, "scroll-left", "Scroll left"),
     (105, "scroll-right", "Scroll right"),
     (106, "wheel-mode", "Wheel mode button"),
-    // Basilisk V4 Pro: the third button on top, Synapse's "AI Prompt Master" (#16).
-    (128, "top-extra", "Extra top button"),
+    // Basilisk V4 Pro: the extra side button, Synapse's "AI Prompt Master" (#16, #54). Named
+    // top-extra until 0.5; profiles saved with that name still find it.
+    (128, "side-extra", "Extra side button"),
 ];
 
 /// The id of a button name; buttons not in [`BUTTONS`] are named `button-<id>`.
 pub fn button_id(name: &str) -> Option<u8> {
+    let name = if name == "top-extra" { "side-extra" } else { name };
     BUTTONS.iter().find(|b| b.1 == name).map(|b| b.0).or_else(|| name.strip_prefix("button-")?.parse().ok())
 }
 
@@ -921,7 +923,8 @@ mod tests {
         assert_eq!("forward".parse::<Action>().unwrap().encode(), (1, 1, [5, 0, 0, 0, 0]));
         // Synapse stores a lone Alt as the key E2, not as a modifier bit (#16).
         assert_eq!(Action::decode(2, [0, 0xE2, 0, 0, 0]).to_string(), "key:alt");
-        assert_eq!(button_label(128), "Extra top button");
+        assert_eq!(button_label(128), "Extra side button");
+        assert_eq!(button_id("top-extra"), Some(128));
     }
 
     #[test]

@@ -244,10 +244,15 @@ impl Server {
     }
 }
 
+fn null_as_empty<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    Ok(Option::<String>::deserialize(d)?.unwrap_or_default())
+}
+
 #[derive(Deserialize)]
 struct Body {
-    /// Device key (`PID:SERIAL`); older clients send only `pid`.
-    #[serde(default)]
+    /// Device key (`PID:SERIAL`); older clients send only `pid`. The editor sends null when
+    /// no device can be controlled (#51), which the app-wide requests don't need.
+    #[serde(default, deserialize_with = "null_as_empty")]
     id: String,
     #[serde(default)]
     pid: String,
@@ -320,27 +325,32 @@ struct Body {
 /// Every button of a mouse with what it does on each layer, and which ones the active
 /// profile remaps.
 fn buttons_json(dev: &Device, store: &mut Store) -> Value {
-    use secbird_core::buttons::{button_label, button_name, setting_key, Layer};
+    use secbird_core::buttons::{setting_key, Input, Layer};
+    // Keyboards, keypads and laptops list their keys; everything else its mouse buttons.
+    let keyboard = dev.spec.as_ref().is_some_and(|s| matches!(s.kind, Kind::Keyboard | Kind::Keypad | Kind::Laptop));
+    let inputs: Vec<(Input, _)> = match keyboard {
+        true => dev.keys().into_iter().map(|(id, a)| (Input::Key(id), a)).collect(),
+        false => dev.buttons().into_iter().map(|(id, a)| (Input::Button(id), a)).collect(),
+    };
     let profiles = store.for_device(dev);
     let remapped = &profiles.active().buttons;
     let onboard = profiles.onboard.as_ref();
     // Before a "Save to mouse" the slot holds our remap; the original is in its backup.
     let original = |key: &str| onboard.and_then(|o| o.before.get(key)).cloned();
-    let list: Vec<Value> = dev
-        .buttons()
+    let list: Vec<Value> = inputs
         .into_iter()
-        .map(|(id, normal)| {
-            let name = button_name(id);
-            let hyper = dev.button(id, Layer::HyperShift).map(|a| a.to_string()).ok();
+        .map(|(input, normal)| {
+            let name = input.name();
+            let hyper = dev.input(input, Layer::HyperShift).map(|a| a.to_string()).ok();
             let is_remapped = |layer| remapped.contains_key(&setting_key(&name, layer));
-            // What the mouse itself holds: the live value unless the active profile remapped it.
+            // What the device itself holds: the live value unless the active profile remapped it.
             let saved = |layer, live: Option<String>| match is_remapped(layer) {
-                true => original(&setting_key(&name, layer)).or_else(|| dev.saved_button(id, layer).map(|a| a.to_string()).ok()),
+                true => original(&setting_key(&name, layer)).or_else(|| dev.saved_input(input, layer).map(|a| a.to_string()).ok()),
                 false => live,
             };
             json!({
                 "name": name,
-                "label": button_label(id),
+                "label": input.label(),
                 "normal": normal.to_string(),
                 "hypershift": hyper,
                 "remapped": { "normal": is_remapped(Layer::Normal), "hypershift": is_remapped(Layer::HyperShift) },
