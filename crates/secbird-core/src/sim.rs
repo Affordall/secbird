@@ -1257,7 +1257,7 @@ mod tests {
         assert_eq!(dev.polling_rate().unwrap(), 500);
         assert_eq!(dev.set_dpi(31000, 31000).unwrap(), (30000, 30000));
         let leds: Vec<u8> = dev.spec.as_ref().unwrap().leds.iter().map(|l| l.id).collect();
-        assert_eq!(leds, [4, 1]);
+        assert_eq!(leds, [4, 1, 10]);
     }
 
     #[test]

@@ -1017,12 +1017,40 @@ const holder = () => dev.kind === 'mouse' ? 'mouse' : (KINDS[dev.kind] || 'devic
 // The keyboard drawn for remapping. Key ids are key positions, not lights, so a board whose
 // lights aren't mapped still gets a standard drawing: full size if it has a numpad, else
 // tenkeyless. Keypads get tiles.
+// The size comes from the light grid: 5 rows is 60% (15 columns) or 65%, 6 rows of 16 or 17
+// columns is 75%. With no grid, a numpad key in the key list means full size.
 function remapLayout() {
   if (dev.kind === 'keypad') return null;
-  if (dev.matrix && knownLayout(dev.matrix, dev.kind)) return layout(dev.matrix, dev.kind);
-  const numpad = (btnData[dev.id] || []).some(b => b.name === 'key-num5');
+  const m = dev.matrix;
+  if (m && knownLayout(m, dev.kind)) return layout(m, dev.kind);
+  const cols = m && m.cols - ((m.first ?? 1) - 1);
+  if (m && m.rows <= 5) return cols <= 15 ? layout({ rows: 5, cols: 15 }, 'keyboard') : compactBoard(false);
+  if (m && cols < 18) return compactBoard(true);
+  const numpad = m ? cols >= 20 : (btnData[dev.id] || []).some(b => b.name === 'key-num5');
   return layout(numpad ? { rows: 6, cols: 22 } : { rows: 6, cols: 18 }, 'keyboard');
 }
+// 75% (fRow) and 65% boards: the full-size main block, a column of navigation keys, and the
+// arrows tucked in at the bottom right. Drawn for remapping only; the columns aren't lights.
+function compactBoard(fRow) {
+  const nav = fRow ? ['Del', 'Home', 'PgUp', 'PgDn'] : [null, 'Del', 'PgUp', 'PgDn'];
+  const rows = FULLSIZE.map((keys, row) => {
+    let main = keys.filter(k => k[1] <= 14);
+    if (row === 1 && !fRow) main = main.map(k => k[0] === '`' ? ['Esc', 1] : k);
+    if (row === 4) main = main.map(k => k[1] === 14 ? ['Shift', 14, 1.75] : k);
+    if (row === 5) main = main.filter(k => k[0] !== 'Menu').map(k => k[1] > 7 ? [k[0], k[1], 1] : k);
+    const right = row === 4 ? [['↑', 16, 1, .25], ['End', 17]] : row === 5 ? [['←', 15, 1, .25], ['↓', 16], ['→', 17]] : [[nav[row], 15, 1, .25]];
+    return [...main, ...right];
+  }).slice(fRow ? 0 : 1);
+  return isoKeys(nameKeys(rows.flatMap((keys, row) => {
+    let x = 0;
+    return keys.map(([label, col, w = 1, gap = 0, h = 1]) => {
+      x += gap;
+      const k = { label, row, col, x, y: row + (fRow && row ? .25 : 0), w, h };
+      x += w; return k;
+    });
+  })));
+}
+function isoKeys(keys) { return kbLayout() === 'ansi' ? keys : isoLayout(keys, kbLayout() === 'de' ? DE_LABELS : null); }
 
 // Keys section: click a key on the drawing. Keys the drawing doesn't have (Japanese keys,
 // keypads) are tiles below it.
@@ -1030,7 +1058,7 @@ function keyTiles(t, cur) {
   if (!cur.rows.length) {
     t.append(el('p', { className: 'hint', textContent: btnFailed[dev.id] ? 'Couldn’t read the keys. Unplug and replug it, then open this again.'
       : btnLayer === 'hypershift' ? 'This ' + holder() + ' has no HyperShift layer to change.'
-      : 'This ' + holder() + ' doesn’t answer key remapping commands. Please send a device report (Device section) in a GitHub issue.' }));
+      : 'Key remapping isn’t supported on this ' + holder() + ' yet. It doesn’t take Razer’s remap commands, so it needs a remap done by Secretarybird itself, which is planned after 0.5.' }));
     return;
   }
   const rows = new Map(cur.rows.map(r => [r.key, r])), drawn = new Set(), keys = remapLayout();
@@ -1064,9 +1092,10 @@ function keyTiles(t, cur) {
   const g = el('div', { className: 'tgrid' });
   rest.forEach(r => g.append(tile(r)));
   if (!keys) return t.append(g);
-  // ISO and Japanese keys most boards don't have: folded away unless one is in use.
+  // Keys the drawing doesn't have (ISO, Japanese, a smaller board's numpad): folded away unless
+  // one is in use.
   const open = rest.some(r => r.key === sel || cellView(r.key, dev.active)[1]);
-  t.append(el('details', { className: 'morekeys', open }, el('summary', { className: 'subhead', textContent: `${plural(rest.length, 'more key')} (ISO, Japanese)` }), g));
+  t.append(el('details', { className: 'morekeys', open }, el('summary', { className: 'subhead', textContent: `${plural(rest.length, 'more key')}, not on the drawing` }), g));
 }
 
 function tile(r, short) {

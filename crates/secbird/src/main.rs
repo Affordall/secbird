@@ -695,7 +695,11 @@ fn key_cmd(dev: &Device, store: &mut Store, rest: &[String]) -> Result<(), Error
     let unsupported = || {
         use secbird_core::Kind;
         match dev.spec.as_ref().map(|s| s.kind) {
-            Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop) | None => Error::Unsupported(format!(
+            Some(Kind::Keyboard | Kind::Keypad | Kind::Laptop) => Error::Unsupported(format!(
+                "key remapping isn't supported on {} yet: it doesn't take Razer's remap commands",
+                dev.name()
+            )),
+            None => Error::Unsupported(format!(
                 "{} doesn't answer key remapping commands; please send `secbird report` in a GitHub issue",
                 dev.name()
             )),
