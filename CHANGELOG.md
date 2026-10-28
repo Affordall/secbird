@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Bluetooth, first try: mice connected over Bluetooth are now asked the same way as over the
+  cable, under the feature report id Windows lists for them (Bluetooth numbers its reports; the
+  cable doesn't). If one answers, it shows up with its product's settings, named "(Bluetooth)".
+  Untested: no Bluetooth Razer mouse here (#10, #51).
+- `secbird report` lists the feature reports each interface declares (`feature 5:90` = report
+  id 5, 90 bytes), and the report id a device answered under.
+
 ## [0.5.0] - 2026-10-27
 
 ### Added

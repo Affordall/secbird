@@ -38,6 +38,12 @@ impl Device {
         }
     }
 
+    /// The feature report id commands go out under: 0 over USB, the declared one over
+    /// Bluetooth (see [`crate::transport::NumberedReport`]).
+    pub fn report_id(&self) -> u8 {
+        self.transport.report_id()
+    }
+
     /// A Mouse Dock Pro is the docked mouse's receiver: every command reaches the mouse.
     /// Ask which mouse is paired and take its name, DPI range and lighting zones. Polling
     /// stays on the dock's `00:C0` command. If the answer is missing or isn't a mouse that
@@ -258,7 +264,7 @@ fn discover_hid(api: &HidApi, db: &Db) -> Vec<Device> {
     pids.into_iter()
         .filter(|pid| !db.get(*pid).is_some_and(|spec| spec.kind == Kind::Webcam))
         .filter_map(|pid| -> Option<Vec<Device>> {
-            let spec = db.get(pid).cloned();
+            let spec = db.spec(pid);
             let mut ifaces: Vec<&Candidate> = all.iter().filter(|c| c.pid == pid).collect();
             // Known interface first; the rest still get a chance.
             if let Some(want) = spec.as_ref().and_then(|s| s.interface) {
@@ -287,8 +293,33 @@ fn discover_hid(api: &HidApi, db: &Db) -> Vec<Device> {
 }
 
 fn probe(api: &HidApi, c: &Candidate, txids: &[u8], spec: Option<DeviceSpec>) -> Option<Device> {
-    let hid = api.open_path(&c.path).ok()?;
-    Device::open(Box::new(hid), c.pid, c.interface, c.path.clone(), txids, spec)
+    open_interface(api, &c.path, c.pid, c.interface, txids, spec)
+}
+
+/// Open one HID interface and probe it. If it doesn't answer the USB way, try each
+/// numbered feature report long enough for a Razer report (Bluetooth: #10, #51).
+pub fn open_interface(
+    api: &HidApi,
+    path: &std::ffi::CStr,
+    pid: u16,
+    interface: i32,
+    txids: &[u8],
+    spec: Option<DeviceSpec>,
+) -> Option<Device> {
+    let mut numbered: Vec<(u8, usize)> = crate::transport::feature_reports(api, path)
+        .into_iter()
+        .filter(|&(id, len)| id != 0 && len >= REPORT_LEN)
+        .collect();
+    numbered.sort_by_key(|&(_, len)| len != REPORT_LEN); // exactly 90 bytes first
+    let hid = api.open_path(path).ok()?;
+    if let Some(dev) = Device::open(Box::new(hid), pid, interface, path.to_owned(), txids, spec.clone()) {
+        return Some(dev);
+    }
+    numbered.into_iter().find_map(|(id, len)| {
+        let inner = api.open_path(path).ok()?;
+        let transport = crate::transport::NumberedReport { inner, id, len };
+        Device::open(Box::new(transport), pid, interface, path.to_owned(), txids, spec.clone())
+    })
 }
 
 impl Device {

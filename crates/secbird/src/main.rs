@@ -253,7 +253,7 @@ Download: {}", r.version, secbird_core::update::CURRENT, r.url),
                 }
                 Some(spec) => println!("{pid:04X}  {}  (connected but not answering{})", spec.name, NOT_ANSWERING_HINT),
                 None => match db.bluetooth_name(pid) {
-                    Some(name) => println!("{pid:04X}  {name}  (connected over Bluetooth, which can't be controlled yet; use the cable or the USB receiver)"),
+                    Some(name) => println!("{pid:04X}  {name}  (connected over Bluetooth, not answering; use the cable or the USB receiver, and please share `secbird report`)"),
                     None => println!("{pid:04X}  Unknown Razer device  (connected, not answering; please share `secbird report`)"),
                 },
             }
