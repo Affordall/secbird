@@ -20,6 +20,10 @@ pub struct Interface {
     pub usage: String,
     /// Transaction id this interface answered Protocol 2.5 with, if any.
     pub txid: Option<String>,
+    /// Feature report id it answered under; 0 over USB (see `NumberedReport`).
+    pub report_id: Option<u8>,
+    /// Feature reports its HID descriptor declares: (report id, bytes).
+    pub features: Vec<(u8, usize)>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -41,6 +45,8 @@ pub struct DeviceReport {
     pub simulated: bool,
     pub interface: i32,
     pub txid: String,
+    /// Feature report id the commands went under; 0 over USB.
+    pub report_id: u8,
     /// Shortened for privacy.
     pub serial: String,
     pub probes: Vec<Probe>,
@@ -151,16 +157,16 @@ pub fn build(api: &HidApi, db: &Db) -> Report {
 
     for info in infos {
         let pid = info.product_id();
-        let spec = db.get(pid).cloned();
-        let dev = api.open_path(info.path()).ok().and_then(|hid| {
-            Device::open(Box::new(hid), pid, info.interface_number(), info.path().to_owned(), &TXID_CANDIDATES, spec)
-        });
+        let features = crate::transport::feature_reports(api, info.path());
+        let dev = crate::device::open_interface(api, info.path(), pid, info.interface_number(), &TXID_CANDIDATES, db.spec(pid));
         interfaces.push(Interface {
             pid: format!("{pid:04X}"),
             interface: info.interface_number(),
             usage_page: format!("{:04X}", info.usage_page()),
             usage: format!("{:04X}", info.usage()),
             txid: dev.as_ref().map(|d| format!("{:02X}", d.txid)),
+            report_id: dev.as_ref().map(|d| d.report_id()),
+            features,
         });
         // One full probe per product, from the first interface that answers.
         if let Some(dev) = dev {
@@ -219,6 +225,7 @@ pub fn probe(dev: &Device, simulated: bool) -> DeviceReport {
         simulated,
         interface: dev.interface,
         txid: format!("{:02X}", dev.txid),
+        report_id: dev.report_id(),
         // Some Blades answer 0xFF bytes (#34), which printed as replacement characters.
         serial: match dev.serial() {
             Ok(s) if s.chars().all(|c| c.is_ascii_graphic()) => shorten(&s),
@@ -261,8 +268,20 @@ impl std::fmt::Display for Report {
             writeln!(f, "  (none)")?;
         }
         for i in &self.interfaces {
-            let answers = i.txid.as_ref().map(|t| format!("  <- answers Protocol 2.5 (txid {t})")).unwrap_or_default();
-            writeln!(f, "  {}  interface {:<2} usage {}:{}{answers}", i.pid, i.interface, i.usage_page, i.usage)?;
+            let id = match i.report_id {
+                Some(id) if id != 0 => format!(", report id {id}"),
+                _ => String::new(),
+            };
+            let answers = i.txid.as_ref().map(|t| format!("  <- answers Protocol 2.5 (txid {t}{id})")).unwrap_or_default();
+            // Feature reports matter for Bluetooth, whose descriptor numbers them (#10).
+            let features = match i.features.as_slice() {
+                [] => String::new(),
+                list => {
+                    let list: Vec<String> = list.iter().map(|(id, len)| format!("{id}:{len}")).collect();
+                    format!("  feature {}", list.join(" "))
+                }
+            };
+            writeln!(f, "  {}  interface {:<2} usage {}:{}{features}{answers}", i.pid, i.interface, i.usage_page, i.usage)?;
         }
 
         for d in &self.devices {
@@ -272,7 +291,8 @@ impl std::fmt::Display for Report {
                 (false, false) => "NOT in database",
             };
             writeln!(f, "\nDevice {} {} ({known})", d.pid, d.name)?;
-            writeln!(f, "  interface {}, txid {}, serial {}", d.interface, d.txid, d.serial)?;
+            let id = if d.report_id != 0 { format!(", report id {}", d.report_id) } else { String::new() };
+            writeln!(f, "  interface {}, txid {}{id}, serial {}", d.interface, d.txid, d.serial)?;
             for p in &d.probes {
                 writeln!(f, "  {:<26} {}  {:<12} {}", p.name, p.command, p.status, p.reply)?;
             }

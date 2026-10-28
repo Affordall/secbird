@@ -19,6 +19,7 @@ pub mod device;
 pub mod effects;
 pub mod error;
 pub mod firmware;
+pub mod hid_descriptor;
 pub mod features;
 pub mod log;
 pub mod macros;

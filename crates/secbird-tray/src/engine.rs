@@ -41,7 +41,7 @@ pub struct Battery {
 /// A connected Razer product that can't be controlled (yet), shown so it isn't silently missing.
 /// Why a wireless device we know is quiet, most often: it sleeps until a keypress (#37).
 const ASLEEP: &str = "Not answering. Asleep? Press a key or move it";
-const BLUETOOTH: &str = "Connected over Bluetooth, which can't be controlled yet. Use the cable or the USB receiver";
+const BLUETOOTH: &str = "Connected over Bluetooth and not answering. Use the cable or the USB receiver";
 
 pub struct Unsupported {
     pub pid: u16,
